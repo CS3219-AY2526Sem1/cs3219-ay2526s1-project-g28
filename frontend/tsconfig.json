@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "allowJs": true,                 // keep while migrating from JS
+    "resolveJsonModule": true,
+
+    "baseUrl": ".",                  // ⬅ if you had this in jsconfig, keep it
+    "paths": {
+      "@/*": ["src/*"]               // ⬅ match your existing alias (common with shadcn)
+    },
+    "types": ["vite/client"]         // Vite's env types
+  },
+  "include": ["src", "vite-env.d.ts"],
+  "exclude": ["node_modules", "dist"]
+}
