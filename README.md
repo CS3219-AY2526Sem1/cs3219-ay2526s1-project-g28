@@ -6,8 +6,10 @@
 - You are required to develop individual microservices within separate folders within this repository.
 - The teaching team should be given access to the repositories as we may require viewing the history of the repository in case of any disputes or disagreements. 
 
-### ENV creation template:
+Create a `.env` file in the project root with the following variables:
+
+```env
 ENV="DEV"
-DB_LOCAL_URI="your link"
-DB_CLOUD_URI="your link"
+DB_LOCAL_URI="your_local_db_link_here"
+DB_CLOUD_URI="your_cloud_db_link_here"
 PORT=5000
