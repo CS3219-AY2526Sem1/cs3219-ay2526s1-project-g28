@@ -68,3 +68,27 @@ export async function updateQuestionById(
 export async function findQuestionByTitle(title) {
   return QuestionModel.findOne({ title });
 }
+
+export async function findAllQuestions() {
+  return QuestionModel.find();
+}
+
+export async function findQuestionById(questionId) {
+  return QuestionModel.findById(questionId);
+}
+
+export async function findRandomQuestion(difficulty, topics) {
+  const matchingCritera = {
+    "difficulty": difficulty,
+    "topics" : topics
+  }
+
+  return QuestionModel.aggregate([
+    { $match: matchingCritera },
+    { $sample: {size: 1} }
+  ]);
+}
+
+export async function deleteQuestionById(questionId) {
+  return QuestionModel.findByIdAndDelete(questionId);
+}
