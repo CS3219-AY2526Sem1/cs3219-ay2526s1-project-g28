@@ -2,6 +2,7 @@ import express from "express";
 
 import {
   createQuestion,
+  updateQuestion,
 } from "../controller/question-controller.js";
 
 const router = express.Router();
@@ -11,6 +12,8 @@ const router = express.Router();
 // router.patch("/:id/privilege", verifyAccessToken, verifyIsAdmin, updateUserPrivilege);
 
 router.post("/", createQuestion);
+
+router.patch("/:id", updateQuestion);
 
 // router.get("/:id", verifyAccessToken, verifyIsOwnerOrAdmin, getUser);
 
