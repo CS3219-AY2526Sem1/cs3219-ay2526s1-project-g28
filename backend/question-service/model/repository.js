@@ -33,6 +33,38 @@ export async function createQuestion(
   }).save();
 }
 
+export async function updateQuestionById(
+  questionId, 
+  title,
+  difficulty,
+  topics,
+  problemStatement,
+  constraints,
+  examples,
+  codeSnippets,
+  testCases
+) {
+  return QuestionModel.findByIdAndUpdate(
+    questionId,
+    {
+      $set: {
+        title,
+        difficulty,
+        topics,
+        problemStatement,
+        constraints,
+        examples,
+        codeSnippets,
+        testCases,
+      },
+    },
+    { 
+      new: true, // return the updated question
+      runValidators: true,
+    },  
+  );
+}
+
 export async function findQuestionByTitle(title) {
   return QuestionModel.findOne({ title });
 }
