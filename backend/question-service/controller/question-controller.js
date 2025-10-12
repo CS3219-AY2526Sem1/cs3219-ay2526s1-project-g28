@@ -154,8 +154,6 @@ export async function getRandomQuestion(req, res) {
     }
 
     const randomQuestion = await _findRandomQuestion(difficulty, topics);
-    console.log("hi")
-    console.log(randomQuestion)
 
     if (!randomQuestion || randomQuestion.length === 0) {
       return res.status(404).json({ message: "No questions found matching the criteria." });
