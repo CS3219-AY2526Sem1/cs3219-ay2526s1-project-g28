@@ -11,8 +11,26 @@ export async function connectToDB() {
   await connect(mongoDBUri);
 }
 
-export async function createQuestion(title) {
-  return new QuestionModel({ title }).save();
+export async function createQuestion(
+  title,
+  difficulty,
+  topics,
+  problemStatement,
+  constraints,
+  examples,
+  codeSnippets,
+  testCases
+) {
+  return new QuestionModel({
+    title,
+    difficulty,
+    topics,
+    problemStatement,
+    constraints,
+    examples,
+    codeSnippets,
+    testCases,
+  }).save();
 }
 
 export async function findQuestionByTitle(title) {
