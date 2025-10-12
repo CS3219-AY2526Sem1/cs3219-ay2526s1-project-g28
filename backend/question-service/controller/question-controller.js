@@ -2,7 +2,14 @@ import { isValidObjectId } from "mongoose";
 import {
   createQuestion as _createQuestion,
   findQuestionByTitle as _findQuestionByTitle,
+  findQuestionById as _findQuestionById,
+  findAllQuestions as _findAllQuestions,
+  deleteQuestionById as _deleteQuestionById,
+  findRandomQuestion as _findRandomQuestion
 } from "../model/repository.js";
+
+const DIFFICULTIES = ["Easy", "Medium", "Hard"]
+const TOPICS = ["Strings", "Arrays", "Linked List", "Heaps", "Hashmap", "Trees", "Graphs", "Dynamic Programming"]
 
 export async function createQuestion(req, res) {
   try {
@@ -99,9 +106,100 @@ export async function createQuestion(req, res) {
   }
 }
 
+export async function getQuestion(req, res) {
+  try {
+    const questionId = req.params.id;
+    if (!isValidObjectId(questionId)) {
+      return res.status(404).json({ message: `ID ${questionId} is invalid` });
+    }
+
+    const question = await _findQuestionById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: `Question ${questionId} not found` });
+    } else {
+      return res.status(200).json({ message: `Found question`, data: formatQuestionResponse(question) });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when getting question!" });
+  }
+}
+
+export async function getAllQuestions(req, res) {
+  try {
+    const questions = await _findAllQuestions();
+
+    return res.status(200).json({ message: `Found ${questions.length} questions`, data: questions.map(formatQuestionResponse) });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when getting all questions!" });
+  }
+}
+
+export async function getRandomQuestion(req, res) {
+  try {
+    const { difficulty, topics } = req.query;
+
+    if (!difficulty) {
+      return res.status(404).json({ message: `Difficulty must be specified` });
+    }
+    if (!topics) {
+      return res.status(404).json({ message: `Topics must be specified` });
+    }
+    if (difficulty && !DIFFICULTIES.includes(difficulty)) {
+      return res.status(404).json({ message: `Invalid difficulty level: ${difficulty}` });
+    }
+    if (topics && !TOPICS.includes(topics)) {
+      return res.status(404).json({ message: `Invalid topic: ${topics}` });
+    }
+
+    const randomQuestion = await _findRandomQuestion(difficulty, topics);
+    console.log("hi")
+    console.log(randomQuestion)
+
+    if (!randomQuestion || randomQuestion.length === 0) {
+      return res.status(404).json({ message: "No questions found matching the criteria." });
+    }
+
+    return res.status(200).json({ 
+      message: `Found a random question for the difficulty: ${difficulty} and topic: ${topics}`, 
+      data: formatQuestionResponse(randomQuestion[0]) 
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when getting a random question!" });
+  }
+}
+
+export async function deleteQuestion(req, res) {
+  try {
+    const questionId = req.params.id;
+    if (!isValidObjectId(questionId)) {
+      return res.status(404).json({ message: `Question ${questionId} not found` });
+    }
+    const question = await _findQuestionById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: `Question ${questionId} not found` });
+    }
+
+    await _deleteQuestionById(questionId);
+    return res.status(200).json({ message: `Deleted question ${questionId} successfully` });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when deleting question!" });
+  }
+}
+
 export function formatQuestionResponse(question) {
   return {
     id: question.id,
     title: question.title,
+    difficulty: question.difficulty,
+    topics: question.topics,
+    problemStatement: question.problemStatement,
+    constraints: question.constraints,
+    examples: question.examples,
+    codeSnippets: question.codeSnippets,
+    testCases: question.testCases
   };
 }
