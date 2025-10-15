@@ -26,6 +26,7 @@ export default function Login() {
       const user = {
       id: res.data.id,
       username: res.data.username,
+      fullname: res.data.fullname,
       email: res.data.email,
       isAdmin: res.data.isAdmin,
       createdAt: res.data.createdAt,

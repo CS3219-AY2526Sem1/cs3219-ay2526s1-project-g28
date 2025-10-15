@@ -19,7 +19,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const displayName = user?.username || user?.email || "User";
+  const displayName = user?.fullname || "User";
   const displayEmail = user?.email || "";
   const avatarUrl =
     user && (user as any).avatarUrl
