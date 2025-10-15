@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
+import Header from "@/components/Header";
 export default function Login() {
   const [email,setEmail]=useState(""); 
   const [password,setPassword]=useState(""); 
@@ -43,11 +44,19 @@ export default function Login() {
 
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
+    <div>
+      <Header variant="authing"/>
+    
+    <div className="min-h-screen flex items-center justify-center px-6 dark:bg-black">
+    
       <form onSubmit={onSubmit} className="w-full max-w-sm bg-white rounded-2xl shadow p-6 space-y-3">
-        <h1 className="text-lg font-semibold text-center">Login to get started</h1>
-        <input className="w-full border rounded-md px-3 py-2" type="email" placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} required />
-        <input className="w-full border rounded-md px-3 py-2" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} required />
+        <h1 className="text-lg font-semibold text-center dark:text-black">Login to get started</h1>
+        <input className="w-full rounded-md px-3 py-2
+             border-2 border-black
+             focus:outline-none focus:ring-2 focus:ring-black focus:border-black dark:text-black" type="email" placeholder="email" value={email} onChange={e=>setEmail(e.target.value)} required />
+        <input className="w-full rounded-md px-3 py-2
+             border-2 border-black
+             focus:outline-none focus:ring-2 focus:ring-black focus:border-black dark:text-black" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} required />
         <button disabled={loading} className="w-full rounded-md bg-black text-white py-2.5">{loading?"Loading…":"Login"}</button>
          <p className="text-center text-sm text-neutral-700 pt-2">
           Don’t have an account?{" "}
@@ -64,6 +73,7 @@ export default function Login() {
           to reset
         </p>
       </form>
+    </div>
     </div>
   );
 }

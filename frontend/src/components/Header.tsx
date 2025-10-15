@@ -22,7 +22,8 @@ export type HeaderProps =
       currentPage: Page;
       onToggleSidebar: () => void;
       onNavigate: (p: Page) => void;
-  };
+  }
+  | {variant: "authing";};
 
 const AUThed_NAV = [
   { to: "/history", label: "History" },
@@ -92,6 +93,17 @@ export default function Header(props: HeaderProps) {
           onNavigate={onNavigate}
         />
       </div>
+    );
+  } else if (props.variant === "authing") {
+    return (
+      <header className="w-full bg-white dark:bg-black">
+        <div className="mx-auto max-w-6xl flex items-center justify-between py-4 px-4">
+          <Link to="/" className="text-xl font-semibold dark:bg-black">PeerPrep</Link>
+          <nav className="flex items-center gap-6">
+            <ThemeButton />
+          </nav>
+        </div>
+      </header>
     );
   }
   
