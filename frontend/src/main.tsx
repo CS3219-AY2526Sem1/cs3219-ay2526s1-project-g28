@@ -18,6 +18,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/home" element={<DashBoard />} />
         <Route path="*" element={<div className="p-10">404 Not found</div>} />
 
         {/* Everything below requires auth */}

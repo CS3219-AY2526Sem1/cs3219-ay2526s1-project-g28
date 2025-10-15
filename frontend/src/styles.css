@@ -1,0 +1,254 @@
+/* src/styles.css */
+
+/* ========================================= */
+/* 1. Global Styles & CSS Variables          */
+/* ========================================= */
+
+:root {
+  --primary-color: #4f46e5; /* Indigo */
+  --secondary-color: #10b981; /* Emerald */
+  --background-color: #f3f4f6; /* Cool Gray 100 */
+  --card-background-color: #ffffff;
+  --text-primary-color: #1f2937; /* Cool Gray 800 */
+  --text-secondary-color: #6b7280; /* Cool Gray 500 */
+  --border-color: #e5e7eb; /* Cool Gray 200 */
+  --shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--background-color);
+  color: var(--text-primary-color);
+  line-height: 1.6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* ========================================= */
+/* 2. Page Layout (HomePage.tsx)             */
+/* ========================================= */
+
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  margin-bottom: 2rem;
+}
+
+.welcome-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+}
+
+.welcome-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary-color);
+  margin: 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+/* Responsive adjustments for the main grid */
+@media (max-width: 900px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================================= */
+/* 3. Component Styles                       */
+/* ========================================= */
+
+/* --- Breadcrumb.tsx --- */
+.breadcrumb-container {
+  margin-bottom: 1.5rem;
+}
+
+.breadcrumb-list {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+}
+
+.breadcrumb-separator {
+  margin: 0 0.5rem;
+  color: var(--text-secondary-color);
+}
+
+.breadcrumb-link {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  text-decoration: underline;
+  color: #3730a3; /* Darker indigo */
+}
+
+.breadcrumb-current-page {
+  color: var(--text-secondary-color);
+  font-weight: 500;
+}
+
+/* --- Generic Card Style --- */
+.card {
+  background-color: var(--card-background-color);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px -1px var(--shadow-color),
+    0 2px 4px -2px var(--shadow-color);
+  border: 1px solid var(--border-color);
+}
+
+.card-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+}
+
+/* --- StatCard.tsx --- */
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background-color: var(--card-background-color);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 1px 3px 0 var(--shadow-color);
+}
+
+.stat-card-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #e0e7ff; /* Indigo 100 */
+  color: var(--primary-color);
+}
+
+.stat-card-icon svg {
+  /* Style the SVG icon inside */
+  width: 24px;
+  height: 24px;
+}
+
+.stat-card-title {
+  font-size: 0.9rem;
+  color: var(--text-secondary-color);
+  margin: 0;
+}
+
+.stat-card-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text-primary-color);
+}
+
+/* --- ChartComponent.tsx --- */
+.chart-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 250px;
+  background-color: #f9fafb; /* Gray 50 */
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary-color);
+}
+
+/* --- RecentActivity.tsx --- */
+.activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.activity-item {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.9rem;
+}
+
+.activity-item:last-child {
+  border-bottom: none;
+}
+
+.activity-item strong {
+  font-weight: 600;
+  color: var(--text-primary-color);
+}
+
+/* --- QuickActions.tsx --- */
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.btn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: #3730a3; /* Darker indigo */
+}
+
+.btn-secondary {
+  background-color: var(--card-background-color);
+  color: var(--text-primary-color);
+  border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+  background-color: #f9fafb; /* Gray 50 */
+}
