@@ -1,12 +1,45 @@
 // src/pages/Login.tsx
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
+import { api } from "../lib/api";
 export default function Login() {
   const [email,setEmail]=useState(""); 
   const [password,setPassword]=useState(""); 
   const [loading,setLoading]=useState(false);
+  const [error,setError]=useState<string|null>(null);
+  const { login } = useAuth();
+  const navigate = useNavigate();
+  
+  async function onSubmit(e:React.FormEvent){ 
+    e.preventDefault(); 
+    setLoading(true);
+    
+    try {
+      
+      // school template: POST /auth/login -> { token, user }
+      const res = await api("/auth/login", { method: "POST", body: { email, password } });
 
-  async function onSubmit(e:React.FormEvent){ e.preventDefault(); setLoading(true); /* TODO: call /auth/login */ setLoading(false); }
+      const token = res?.data?.accessToken;
+
+      const user = {
+      id: res.data.id,
+      username: res.data.username,
+      email: res.data.email,
+      isAdmin: res.data.isAdmin,
+      createdAt: res.data.createdAt,
+      };
+
+      if (!token) throw new Error("Missing token from server");
+      login(token, user);
+      navigate("/dashboard", { replace: true });
+
+    } catch (err:any) {
+      setError(err.message || "Login failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
 
   return (

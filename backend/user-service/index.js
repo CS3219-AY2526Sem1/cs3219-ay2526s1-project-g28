@@ -8,30 +8,19 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors("*")); // config cors so that front-end can use  // i guess it does what it wants below????????
-// app.options("*", cors())
+const FRONTEND = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+app.use(cors({
+  origin: [FRONTEND, "http://127.0.0.1:5173"],
+  credentials: true,
+  methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+  allowedHeaders: ["Content-Type","Authorization","X-Requested-With","Accept","Origin"],
+}));
 
-// To handle CORS Errors
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*"); // "*" -> Allow all links to access
 
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization",
-  );
-
-  // Browsers usually send this before PUT or POST Requests
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, PUT, PATCH");
-    return res.status(200).json({});
-  }
-
-  // Continue Route Processing
-  next();
-});
 
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
+app.get("/health", (_req, res) => res.json({ ok: true }));
 
 app.get("/", (req, res, next) => {
   console.log("Sending Greetings!");

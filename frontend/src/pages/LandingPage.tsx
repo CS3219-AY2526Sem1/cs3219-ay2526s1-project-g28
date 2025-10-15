@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import TextType from '../components/TextType';
+import Header from "../components/Header";
 
 function MacWindow({ children }: { children: React.ReactNode }) {
   return (
@@ -18,15 +19,10 @@ function MacWindow({ children }: { children: React.ReactNode }) {
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-screen">
       <div className="mx-auto w-full max-w-6xl px-6">
-        <header className="py-6 flex items-center justify-between">
-          <div className="text-xl font-bold">PeerPrep</div>
-          <nav className="hidden sm:flex items-center gap-6 text-sm text-gray-600">
-            <Link className="hover:underline" to="/login">Log in</Link>
-            <Link className="hover:underline" to="/signup">Sign up</Link>
-          </nav>
-        </header>
+                <Header variant="public"/>
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center py-10">
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
