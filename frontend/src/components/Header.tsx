@@ -3,6 +3,8 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
+import TopBar from "../components/TopBar";
+import CollapsibleSidebar from "../components/CollapsibleSidebar";
 
 export type HeaderProps =
   | { variant: "public" }
@@ -11,7 +13,13 @@ export type HeaderProps =
       level?: number;
       avatarUrl?: string;
 
-    };
+    }
+  | { variant: "beta";
+      isSidebarOpen: boolean;
+      currentPage: Page;
+      onToggleSidebar: () => void;
+      onNavigate: (p: Page) => void;
+  };
 
 const AUThed_NAV = [
   { to: "/history", label: "History" },
@@ -37,7 +45,25 @@ export default function Header(props: HeaderProps) {
         </div>
       </header>
     );
+  } else   if (props.variant === "beta") {
+    const { isSidebarOpen, currentPage, onToggleSidebar, onNavigate } = props;
+    return (
+      <div>
+        <TopBar
+          onMenuClick={onToggleSidebar}
+          username={user?.username || user?.email || "User"}
+          badge={user?.isAdmin ? "Admin" : undefined}
+        />
+        <CollapsibleSidebar
+          isOpen={isSidebarOpen}
+          isAdmin={!!user?.isAdmin}
+          currentPage={currentPage}
+          onNavigate={onNavigate}
+        />
+      </div>
+    );
   }
+  
 
   const { level = 1, avatarUrl } = props;
 

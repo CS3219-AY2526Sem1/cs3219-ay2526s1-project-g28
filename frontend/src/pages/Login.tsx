@@ -32,7 +32,7 @@ export default function Login() {
 
       if (!token) throw new Error("Missing token from server");
       login(token, user);
-      navigate("/dashboard", { replace: true });
+      navigate("/home", { replace: true });
 
     } catch (err:any) {
       setError(err.message || "Login failed");
