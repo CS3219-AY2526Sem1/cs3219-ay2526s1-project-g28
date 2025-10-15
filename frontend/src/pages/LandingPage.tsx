@@ -6,20 +6,28 @@ import Header from "../components/Header";
 
 function MacWindow({ children }: { children: React.ReactNode }) {
   return (
-    <div className="w-full max-w-xl rounded-2xl border bg-gray-100 shadow-inner">
-      <div className="flex items-center gap-2 px-4 py-2 border-b bg-white rounded-t-2xl">
+    <div className="
+      w-full max-w-xl rounded-2xl border bg-gray-100 shadow-inner
+      border-gray-200
+      dark:bg-zinc-900 dark:border-zinc-700
+    ">
+      <div className="
+        flex items-center gap-2 px-4 py-2 border-b bg-white rounded-t-2xl
+        border-gray-200
+        dark:bg-zinc-800 dark:border-zinc-700
+      ">
         <span className="h-3 w-3 rounded-full bg-red-400"></span>
         <span className="h-3 w-3 rounded-full bg-yellow-400"></span>
         <span className="h-3 w-3 rounded-full bg-green-400"></span>
       </div>
-      <div className="p-6 font-mono text-sm text-gray-800 min-h-[220px]">{children}</div>
+      <div className="p-6 font-mono text-sm text-gray-800 min-h-[220px] dark:text-zinc-100">{children}</div>
     </div>
   );
 }
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen dark:bg-black">
       <div className="mx-auto w-full max-w-6xl px-6">
                 <Header variant="public"/>
 
@@ -28,18 +36,32 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
 
             <h1 className="text-5xl md:text-6xl font-bold leading-tight">Your best code companion</h1>
-            <p className="mt-6 text-gray-600 max-w-md">
+            <p className="mt-6 text-gray-600 max-w-md dark:text-white">
               Pair up, practice coding interviews, and track progress with ease.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4">
-              <Link to="/login" className="inline-flex items-center justify-center rounded-2xl bg-black px-6 py-3 text-white hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-gray-300">
+              <Link to="/login" className="
+    inline-flex items-center justify-center rounded-2xl
+    px-6 py-3
+    bg-black text-white hover:bg-gray-800
+    focus:outline-none focus:ring-4 focus:ring-gray-300
+    dark:bg-white dark:text-black dark:hover:bg-gray-100 dark:focus:ring-gray-600
+  ">
                 Get started
               </Link>
-              <Link to="/signup" className="inline-flex items-center justify-center rounded-2xl border px-6 py-3 text-gray-900 hover:bg-gray-50">
+              <Link to="/signup" className="
+    inline-flex items-center justify-center rounded-2xl
+    border border-gray-300 px-6 py-3
+    text-gray-900 hover:bg-gray-50
+    focus:outline-none focus:ring-4 focus:ring-gray-300
+
+    dark:bg-black dark:text-white dark:border-gray-700
+    dark:hover:bg-gray-800 dark:focus:ring-gray-600
+  ">
                 Create an account
               </Link>
             </div>
-            <ul className="mt-8 text-gray-600 space-y-2 text-sm list-disc list-inside">
+            <ul className="mt-8 text-gray-600 space-y-2 text-sm list-disc list-inside dark:text-white">
               <li>Match with a peer in seconds</li>
               <li>Practice curated questions</li>
               <li>Review history and improve</li>
@@ -51,7 +73,7 @@ export default function LandingPage() {
               <pre className="m-0 leading-7">
     <TextType
       as="span"                          // render inline inside <pre>
-      className="font-mono text-sm text-gray-800"
+      className="font-mono text-sm text-gray-800 dark:text-zinc-100"
       text={[
     `# Python: memoized Fibonacci
 from functools import lru_cache
@@ -102,7 +124,7 @@ SELECT user_id, ts,
        ) AS running_score
 FROM submissions;`,
   ]}
-      textColors={['#111827']}   
+      textColors={['##e5e7eb']}   
       typingSpeed={10}                   // feel free to tune
       deletingSpeed={10}
       pauseDuration={600}
@@ -119,7 +141,9 @@ FROM submissions;`,
           </motion.div>
         </div>
 
-        <footer className="py-10 text-center text-xs text-gray-500">© {new Date().getFullYear()} PeerPrep</footer>
+        <footer className="py-10 text-center text-xs text-gray-500">© {new Date().getFullYear()} PeerPrep
+        </footer>
+        
       </div>
     </div>
   );

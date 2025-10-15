@@ -11,9 +11,10 @@ type Style = React.CSSProperties;
 
 interface TopBarProps {
   onMenuClick: () => void;
+  rightExtra?: React.ReactNode; 
 }
 
-const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
+const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -46,7 +47,8 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       </div>
 
       <div style={styles.rightSection}>
-        <div style={{ position: "relative" }}>
+        {rightExtra}
+        <div style={{ position: "relative", marginLeft: "0.75rem" }}>
           <button
             onClick={() => setDropdownOpen(!isDropdownOpen)}
             style={styles.profileButton}
