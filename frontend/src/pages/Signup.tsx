@@ -28,7 +28,7 @@ export default function Signup() {
 
     try {
       // 1) create user
-      await api("/users", { method: "POST", body: { username, email, password } });
+      await api("/users", { method: "POST", body: { username, fullname, email, password } });
 
       // 2) login to get token
       const auth = await api("/auth/login", { method: "POST", body: { email, password } });
