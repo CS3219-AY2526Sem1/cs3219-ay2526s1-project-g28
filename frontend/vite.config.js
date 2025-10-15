@@ -15,5 +15,14 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    server: {
+    host: true,        // allow HMR over localhost from Windows browser
+    port: 5173,
+    watch: {
+      usePolling: true,
+      interval: 100,
+    },
+
+  },
   },
 })
