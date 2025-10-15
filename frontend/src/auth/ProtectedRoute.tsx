@@ -27,7 +27,7 @@ export default function ProtectedRoute() {
   }, [token, logout]);
 
   if (ok === null) {
-    return <div className="p-10 text-center">Checking session…</div>;
+    return <div className="p-10 text-center">Loading...</div>;
   }
 
   return ok ? <Outlet /> : <Navigate to="/login" replace />;
