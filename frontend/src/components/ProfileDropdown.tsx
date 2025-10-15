@@ -7,9 +7,16 @@ type Style = React.CSSProperties;
 
 interface ProfileDropdownProps {
   onClose: () => void;
+  userName: string;
+  userEmail: string;
+  avatarUrl?: string;
+  onLogout: () => void;
 }
 
-const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
+const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose,userName,
+  userEmail,
+  avatarUrl,
+  onLogout, }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Effect to handle clicks outside the dropdown
@@ -28,27 +35,23 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose }) => {
     };
   }, [onClose]);
 
-  const menuItems = [
-    { name: "Your Profile", icon: <ProfileIcon /> },
-    { name: "Settings", icon: <SettingsIcon /> },
-    {
-      name: "Logout",
-      icon: <LogoutIcon />,
-      action: () => alert("Logout clicked"),
-    },
+    const menuItems = [
+    { name: "Your Profile", icon: <ProfileIcon />, action: () => {/* navigate to /profile if you want */} },
+    { name: "Settings", icon: <SettingsIcon />, action: () => {/* navigate to /settings if you want */} },
+    { name: "Logout", icon: <LogoutIcon />, action: onLogout },
   ];
 
   return (
-    <div ref={dropdownRef} style={styles.dropdown}>
+    <div ref={dropdownRef} style={styles.dropdown} role="menu" aria-label="Profile menu">
       <div style={styles.header}>
         <img
-          src="https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg"
+          src={avatarUrl || "https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg"}
           alt="User Avatar"
           style={styles.avatar}
         />
         <div>
-          <p style={styles.userName}>Erika Mustermann</p>
-          <p style={styles.userEmail}>erika.m@example.com</p>
+          <p style={styles.userName}>{userName}</p>
+          <p style={styles.userEmail}>{userEmail}</p>
         </div>
       </div>
       <hr style={styles.divider} />
