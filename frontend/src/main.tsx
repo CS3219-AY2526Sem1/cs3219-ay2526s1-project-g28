@@ -8,9 +8,9 @@ import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import MatchingPage from "./pages/MatchingPage";
 import Dashboard from "./pages/Dashboard";
+import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import { ThemeProvider } from "./theme/ThemeProvider";
-function Signup() { return <div className="min-h-screen flex items-center justify-center">Signup page</div>; }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
