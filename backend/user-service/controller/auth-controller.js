@@ -16,7 +16,7 @@ export async function handleLogin(req, res) {
       if (!match) {
         return res.status(401).json({ message: "Wrong email and/or password" });
       }
-
+      console.log(user);
       const accessToken = jwt.sign({
         id: user.id,
       }, process.env.JWT_SECRET, {

@@ -8,6 +8,10 @@ const UserModelSchema = new Schema({
     required: true,
     unique: true,
   },
+  fullname: { 
+    type: String, 
+    required: true,
+  },
   email: {
     type: String,
     required: true,
@@ -26,6 +30,7 @@ const UserModelSchema = new Schema({
     required: true,
     default: false,
   },
+  avatarUrl:{ type: String, default: "",required: false}, 
 });
 
 export default mongoose.model("UserModel", UserModelSchema);
