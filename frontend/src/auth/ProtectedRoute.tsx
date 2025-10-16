@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { api } from "../lib/api";
-
+import CenteredSpinner from "../components/CenteredSpinner";
 export default function ProtectedRoute() {
   const { token, logout } = useAuth();
   const [ok, setOk] = useState<null | boolean>(null); // null = checking
@@ -26,9 +26,7 @@ export default function ProtectedRoute() {
     return () => { isMounted = false; };
   }, [token, logout]);
 
-  if (ok === null) {
-    return <div className="p-10 text-center">Checking session…</div>;
-  }
+  if (ok === null) return <CenteredSpinner />;
 
   return ok ? <Outlet /> : <Navigate to="/login" replace />;
 }

@@ -9,9 +9,11 @@ import Login from "./pages/Login";
 import MatchingPage from "./pages/MatchingPage";
 import Dashboard from "./pages/Dashboard";
 import HomePage from "./pages/HomePage";
+import { ThemeProvider } from "./theme/ThemeProvider";
 function Signup() { return <div className="min-h-screen flex items-center justify-center">Signup page</div>; }
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
+  <ThemeProvider>
   <React.StrictMode>
     <BrowserRouter>
     <AuthProvider>
@@ -33,4 +35,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
+  </ThemeProvider>
 );

@@ -5,6 +5,9 @@ import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
 import TopBar from "../components/TopBar";
 import CollapsibleSidebar from "../components/CollapsibleSidebar";
+import { useTheme } from "../theme/ThemeProvider";
+
+
 
 export type HeaderProps =
   | { variant: "public" }
@@ -19,7 +22,8 @@ export type HeaderProps =
       currentPage: Page;
       onToggleSidebar: () => void;
       onNavigate: (p: Page) => void;
-  };
+  }
+  | {variant: "authing";};
 
 const AUThed_NAV = [
   { to: "/history", label: "History" },
@@ -28,17 +32,44 @@ const AUThed_NAV = [
 ];
 
 export default function Header(props: HeaderProps) {
- 
+ function ThemeButton() {
+  const { theme, resolved, setTheme, toggle } = useTheme();
+
+  // cycle through: light -> dark -> system -> light
+  function cycle() {
+    if (theme === "light") setTheme("dark");
+    else if (theme === "dark") setTheme("system");
+    else setTheme("light");
+  }
+
+  const label =
+    theme === "system" ? `System (${resolved})` : resolved === "dark" ? "Dark" : "Light";
+  const icon = theme === "system" ? "🖥️" : resolved === "dark" ? "🌙" : "☀️";
+
+  return (
+    <button
+      onClick={cycle}
+      title={`Theme: ${label} (click to change)`}
+      className="px-2 py-1 rounded-md border border-neutral-300 bg-white text-black
+                 hover:bg-neutral-100 transition
+                 dark:border-neutral-600 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700"
+    >
+      <span className="mr-1">{icon}</span>
+      <span className="text-sm">{label}</span>
+    </button>
+  );
+}
   const { user } = useAuth();
 
   if (props.variant === "public") {
     return (
-      <header className="w-full bg-white">
+      <header className="w-full bg-white dark:bg-black">
         <div className="mx-auto max-w-6xl flex items-center justify-between py-4 px-4">
-          <Link to="/" className="text-xl font-semibold">PeerPrep</Link>
+          <Link to="/" className="text-xl font-semibold dark:bg-black">PeerPrep</Link>
           <nav className="flex items-center gap-6">
-            <Link to="/login" className="text-sm hover:opacity-80">Log in</Link>
-            <Link to="/signup" className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90">
+            <ThemeButton />
+            <Link to="/login" className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 ">Log in</Link>
+            <Link to="/signup" className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 ">
               Sign up
             </Link>
           </nav>
@@ -53,6 +84,7 @@ export default function Header(props: HeaderProps) {
           onMenuClick={onToggleSidebar}
           username={user?.username || user?.email || "User"}
           badge={user?.isAdmin ? "Admin" : undefined}
+          rightExtra={<ThemeButton />}
         />
         <CollapsibleSidebar
           isOpen={isSidebarOpen}
@@ -61,6 +93,17 @@ export default function Header(props: HeaderProps) {
           onNavigate={onNavigate}
         />
       </div>
+    );
+  } else if (props.variant === "authing") {
+    return (
+      <header className="w-full bg-white dark:bg-black">
+        <div className="mx-auto max-w-6xl flex items-center justify-between py-4 px-4">
+          <Link to="/" className="text-xl font-semibold dark:bg-black">PeerPrep</Link>
+          <nav className="flex items-center gap-6">
+            <ThemeButton />
+          </nav>
+        </div>
+      </header>
     );
   }
   
@@ -80,6 +123,7 @@ export default function Header(props: HeaderProps) {
         </nav>
 
         <div className="flex items-center gap-4">
+          <ThemeButton />
           <span className="text-sm">Level <span className="font-semibold">{level}</span></span>
           {user?.username && <span className="text-sm"><span className="font-semibold">{user?.username}</span></span>}
           {/* Avatar menu owns logout */}
