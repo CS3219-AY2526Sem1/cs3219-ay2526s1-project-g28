@@ -45,11 +45,12 @@
 - Endpoint: http://localhost:3001/users
 
 - Body
-  - Required: `username` (string), `email` (string), `password` (string)
+  - Required: `username` (string), `fullname` (string), `email` (string), `password` (string)
 
     ```json
     {
       "username": "SampleUserName",
+      "fullname": "Sample User",
       "email": "sample@gmail.com",
       "password": "SecurePassword"
     }
