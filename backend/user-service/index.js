@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import passport from "./config/passport.js";
 
 import userRoutes from "./routes/user-routes.js";
 import authRoutes from "./routes/auth-routes.js";
@@ -8,6 +9,7 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(passport.initialize());
 const FRONTEND = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 app.use(cors({
   origin: [FRONTEND, "http://127.0.0.1:5173"],

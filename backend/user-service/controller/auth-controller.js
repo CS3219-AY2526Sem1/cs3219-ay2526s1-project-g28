@@ -39,3 +39,28 @@ export async function handleVerifyToken(req, res) {
     return res.status(500).json({ message: err.message });
   }
 }
+
+export const googleCallback = (req, res) => {
+  const payload = {
+    id: req.user.id,
+    name: req.user.displayName,
+    provider: "google",
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+  // Redirect to frontend with token
+  res.redirect(`http://localhost:3001/login/success?token=${token}`);
+};
+
+export const githubCallback = (req, res) => {
+  const payload = {
+    id: req.user.id,
+    name: req.user.displayName,
+    provider: "github",
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+  res.redirect(`http://localhost:3001/login/success?token=${token}`);
+};
