@@ -1,4 +1,4 @@
-import { findMatch } from '../model/matching-model.js';
+import { findMatch, cancelMatchmaking } from '../model/matching-model.js';
 import redis from '../server.js';
 
 const getUserKey = (userId) => `user:${userId}`;
@@ -31,5 +31,22 @@ export async function startMatchmaking(req, res) {
   } catch (err) {
     console.error('Matchmaking error:', err);
     return res.status(500).json({ message: 'An error occurred in the matching service.' });
+  }
+}
+
+export async function cancelMatching(req, res) {
+  try {
+    const { userId } = req.params;
+
+    const success = await cancelMatchmaking(userId);
+
+    if (success) {
+      return res.status(200).json({ message: 'You have been removed from the queue.' });
+    } else {
+      return res.status(404).json({ message: 'You were not found in the matchmaking queue.' });
+    }
+  } catch (err) {
+    console.error('Error canceling matchmaking:', err);
+    return res.status(500).json({ message: 'An error occurred while removing you from the queue.' });
   }
 }
