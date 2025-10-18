@@ -49,3 +49,26 @@ export async function findMatch(userId, difficulty, topics) {
 
   return null;
 }
+
+export async function cancelMatchmaking(userId) {
+  const userKey = getUserKey(userId);
+  const userData = await redis.hgetall(userKey);
+
+  if (!userData || !userData.topics) {
+    return false;
+  }
+
+  const difficulty = userData.difficulty;
+  const topics = JSON.parse(userData.topics);
+
+  const pipeline = redis.pipeline();
+  pipeline.del(userKey);
+  for (const topic of topics) {
+    const topicKey = getTopicKey(difficulty, topic);
+    pipeline.srem(topicKey, userId);
+  }
+
+  await pipeline.exec();
+  console.log(`User ${userId} has been removed from the matchmaking queue.`);
+  return true;
+}
