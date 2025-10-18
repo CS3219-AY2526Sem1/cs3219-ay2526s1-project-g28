@@ -1,4 +1,4 @@
-import { findMatch, cancelMatchmaking } from '../model/matching-model.js';
+import { findMatch, cancelMatchmaking, createPendingMatch, acceptMatch } from '../model/matching-model.js';
 import redis from '../server.js';
 
 const getUserKey = (userId) => `user:${userId}`;
@@ -48,5 +48,20 @@ export async function cancelMatching(req, res) {
   } catch (err) {
     console.error('Error canceling matchmaking:', err);
     return res.status(500).json({ message: 'An error occurred while removing you from the queue.' });
+  }
+}
+
+export async function acceptMatching(req, res) {
+  try {
+    const { userId, matchId } = req.body;
+    if (!userId || !matchId) {
+      return res.status(400).json({ message: 'userId and matchId are required.' });
+    }
+
+    const result = await acceptMatch(userId, matchId);
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error('Error accepting match:', err);
+    return res.status(500).json({ message: 'An error occurred while accepting the match.' });
   }
 }
