@@ -5,8 +5,7 @@ import {
   findMatch,
   cancelMatchmaking,
   acceptMatch,
-} from "../model/matching-model.js";
-import redis from "../server.js";
+} from "../model/repository.js";
 
 const getUserKey = (userId) => `user:${userId}`;
 
@@ -63,11 +62,9 @@ export async function cancelMatching(req, res) {
     }
   } catch (err) {
     console.error("Error canceling matchmaking:", err);
-    return res
-      .status(500)
-      .json({
-        message: "An error occurred while removing you from the queue.",
-      });
+    return res.status(500).json({
+      message: "An error occurred while removing you from the queue.",
+    });
   }
 }
 
