@@ -1,8 +1,7 @@
-import redis from '../server.js';
+import redis from "../server.js";
 
 const getTopicKey = (difficulty, topic) => `queue:${difficulty}:${topic}`;
 const getUserKey = (userId) => `user:${userId}`;
-
 
 async function removeUserFromAllQueues(userId, difficulty, topics) {
   const pipeline = redis.pipeline();
@@ -14,7 +13,6 @@ async function removeUserFromAllQueues(userId, difficulty, topics) {
   await pipeline.exec();
 }
 
-
 export async function findMatch(userId, difficulty, topics) {
   for (const topic of topics) {
     const topicKey = getTopicKey(difficulty, topic);
@@ -22,11 +20,17 @@ export async function findMatch(userId, difficulty, topics) {
 
     if (waitingUserId && waitingUserId !== userId) {
       const matchedUserData = await redis.hgetall(getUserKey(waitingUserId));
-      
-      await removeUserFromAllQueues(userId, difficulty, topics);
-      await removeUserFromAllQueues(waitingUserId, matchedUserData.difficulty, JSON.parse(matchedUserData.topics));
 
-      console.log(`Match found for ${userId} with ${waitingUserId} on topic ${topic}`);
+      await removeUserFromAllQueues(userId, difficulty, topics);
+      await removeUserFromAllQueues(
+        waitingUserId,
+        matchedUserData.difficulty,
+        JSON.parse(matchedUserData.topics)
+      );
+
+      console.log(
+        `Match found for ${userId} with ${waitingUserId} on topic ${topic}`
+      );
       return { matchedWith: waitingUserId, topic: topic };
     }
   }
