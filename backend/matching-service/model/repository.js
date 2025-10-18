@@ -1,8 +1,7 @@
-import redis from '../server.js';
+import redis from "../server.js";
 
 const getTopicKey = (difficulty, topic) => `queue:${difficulty}:${topic}`;
 const getUserKey = (userId) => `user:${userId}`;
-
 
 async function removeUserFromAllQueues(userId, difficulty, topics) {
   const pipeline = redis.pipeline();
@@ -14,7 +13,6 @@ async function removeUserFromAllQueues(userId, difficulty, topics) {
   await pipeline.exec();
 }
 
-
 export async function findMatch(userId, difficulty, topics) {
   for (const topic of topics) {
     const topicKey = getTopicKey(difficulty, topic);
@@ -22,10 +20,18 @@ export async function findMatch(userId, difficulty, topics) {
 
     if (waitingUserId && waitingUserId !== userId) {
       const matchedUserData = await redis.hgetall(getUserKey(waitingUserId));
-      
-      await removeUserFromAllQueues(userId, difficulty, topics);
-      await removeUserFromAllQueues(waitingUserId, matchedUserData.difficulty, JSON.parse(matchedUserData.topics));
 
+      await removeUserFromAllQueues(userId, difficulty, topics);
+      await removeUserFromAllQueues(
+        waitingUserId,
+        matchedUserData.difficulty,
+        JSON.parse(matchedUserData.topics)
+      );
+
+      console.log(
+        `Match found for ${userId} with ${waitingUserId} on topic ${topic}`
+      );
+      return { matchedWith: waitingUserId, topic: topic };
       const matchId = await createPendingMatch(
         userId,
         waitingUserId,
@@ -34,7 +40,9 @@ export async function findMatch(userId, difficulty, topics) {
         topic
       );
 
-      console.log(`Match found for ${userId} with ${waitingUserId} on topic ${topic}`);
+      console.log(
+        `Match found for ${userId} with ${waitingUserId} on topic ${topic}`
+      );
       return { matchId, matchedWith: waitingUserId, topic: topic };
     }
   }
@@ -81,12 +89,23 @@ export async function cancelMatchmaking(userId) {
   return true;
 }
 
-export async function createPendingMatch(user1, user2, difficulty, topics, topic) {
+export async function createPendingMatch(
+  user1,
+  user2,
+  difficulty,
+  topics,
+  topic
+) {
   const matchId = `match:${Date.now()}`;
   await redis.hset(matchId, user1, "pending", user2, "pending");
   await redis.set(
     `${matchId}:meta`,
-    JSON.stringify({ difficulty, topics, matchedTopic: topic, createdAt: new Date().toISOString() }),
+    JSON.stringify({
+      difficulty,
+      topics,
+      matchedTopic: topic,
+      createdAt: new Date().toISOString(),
+    }),
     "EX",
     10 // expires in 10 seconds
   );
@@ -104,7 +123,9 @@ export async function acceptMatch(userId, matchId) {
   await redis.hset(matchKey, userId, "accepted");
 
   const matchData = await redis.hgetall(matchKey);
-  const allAccepted = Object.values(matchData).every((status) => status === "accepted");
+  const allAccepted = Object.values(matchData).every(
+    (status) => status === "accepted"
+  );
 
   if (allAccepted) {
     const meta = await redis.get(`${matchKey}:meta`);
@@ -124,5 +145,8 @@ export async function acceptMatch(userId, matchId) {
     };
   }
 
-  return { status: "pending", message: "Waiting for the other user to accept." };
+  return {
+    status: "pending",
+    message: "Waiting for the other user to accept.",
+  };
 }

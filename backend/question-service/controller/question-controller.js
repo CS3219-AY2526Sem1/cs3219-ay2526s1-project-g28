@@ -6,11 +6,21 @@ import {
   findQuestionById as _findQuestionById,
   findAllQuestions as _findAllQuestions,
   deleteQuestionById as _deleteQuestionById,
-  findRandomQuestion as _findRandomQuestion
+  findRandomQuestion as _findRandomQuestion,
 } from "../model/repository.js";
+import { producer } from "../kafka-utilties.js";
 
-const DIFFICULTIES = ["Easy", "Medium", "Hard"]
-const TOPICS = ["Strings", "Arrays", "Linked List", "Heaps", "Hashmap", "Trees", "Graphs", "Dynamic Programming"]
+const DIFFICULTIES = ["Easy", "Medium", "Hard"];
+const TOPICS = [
+  "Strings",
+  "Arrays",
+  "Linked List",
+  "Heaps",
+  "Hashmap",
+  "Trees",
+  "Graphs",
+  "Dynamic Programming",
+];
 
 export async function createQuestion(req, res) {
   try {
@@ -198,7 +208,7 @@ export async function updateQuestion(req, res) {
     );
 
     if (!updatedQuestion) {
-      return res.status(404).json({ message: "Question not found"})
+      return res.status(404).json({ message: "Question not found" });
     }
 
     return res.status(200).json({
@@ -212,7 +222,7 @@ export async function updateQuestion(req, res) {
       .json({ message: "Unknown error when updating question!" });
   }
 }
-    
+
 export async function getQuestion(req, res) {
   try {
     const questionId = req.params.id;
@@ -222,13 +232,20 @@ export async function getQuestion(req, res) {
 
     const question = await _findQuestionById(questionId);
     if (!question) {
-      return res.status(404).json({ message: `Question ${questionId} not found` });
+      return res
+        .status(404)
+        .json({ message: `Question ${questionId} not found` });
     } else {
-      return res.status(200).json({ message: `Found question`, data: formatQuestionResponse(question) });
+      return res.status(200).json({
+        message: `Found question`,
+        data: formatQuestionResponse(question),
+      });
     }
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when getting question!" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when getting question!" });
   }
 }
 
@@ -236,10 +253,15 @@ export async function getAllQuestions(req, res) {
   try {
     const questions = await _findAllQuestions();
 
-    return res.status(200).json({ message: `Found ${questions.length} questions`, data: questions.map(formatQuestionResponse) });
+    return res.status(200).json({
+      message: `Found ${questions.length} questions`,
+      data: questions.map(formatQuestionResponse),
+    });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when getting all questions!" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when getting all questions!" });
   }
 }
 
@@ -254,7 +276,9 @@ export async function getRandomQuestion(req, res) {
       return res.status(404).json({ message: `Topics must be specified` });
     }
     if (difficulty && !DIFFICULTIES.includes(difficulty)) {
-      return res.status(404).json({ message: `Invalid difficulty level: ${difficulty}` });
+      return res
+        .status(404)
+        .json({ message: `Invalid difficulty level: ${difficulty}` });
     }
     if (topics && !TOPICS.includes(topics)) {
       return res.status(404).json({ message: `Invalid topic: ${topics}` });
@@ -263,16 +287,20 @@ export async function getRandomQuestion(req, res) {
     const randomQuestion = await _findRandomQuestion(difficulty, topics);
 
     if (!randomQuestion || randomQuestion.length === 0) {
-      return res.status(404).json({ message: "No questions found matching the criteria." });
+      return res
+        .status(404)
+        .json({ message: "No questions found matching the criteria." });
     }
 
-    return res.status(200).json({ 
-      message: `Found a random question for the difficulty: ${difficulty} and topic: ${topics}`, 
-      data: formatQuestionResponse(randomQuestion[0]) 
+    return res.status(200).json({
+      message: `Found a random question for the difficulty: ${difficulty} and topic: ${topics}`,
+      data: formatQuestionResponse(randomQuestion[0]),
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when getting a random question!" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when getting a random question!" });
   }
 }
 
@@ -280,18 +308,26 @@ export async function deleteQuestion(req, res) {
   try {
     const questionId = req.params.id;
     if (!isValidObjectId(questionId)) {
-      return res.status(404).json({ message: `Question ${questionId} not found` });
+      return res
+        .status(404)
+        .json({ message: `Question ${questionId} not found` });
     }
     const question = await _findQuestionById(questionId);
     if (!question) {
-      return res.status(404).json({ message: `Question ${questionId} not found` });
+      return res
+        .status(404)
+        .json({ message: `Question ${questionId} not found` });
     }
 
     await _deleteQuestionById(questionId);
-    return res.status(200).json({ message: `Deleted question ${questionId} successfully` });
+    return res
+      .status(200)
+      .json({ message: `Deleted question ${questionId} successfully` });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when deleting question!" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when deleting question!" });
   }
 }
 
@@ -305,6 +341,104 @@ export function formatQuestionResponse(question) {
     constraints: question.constraints,
     examples: question.examples,
     codeSnippets: question.codeSnippets,
-    testCases: question.testCases
+    testCases: question.testCases,
   };
+}
+
+// ===================================================================
+// --- NEW KAFKA HANDLER (Add this new function at the bottom) ---
+// ===================================================================
+
+/**
+ * This function is a "controller" for Kafka messages.
+ * It's triggered by the consumer in `kafka.js` instead of an HTTP route.
+ */
+export async function handleMatchingRequest(message) {
+  let request;
+  try {
+    request = JSON.parse(message.value.toString());
+  } catch (err) {
+    console.error("Failed to parse Kafka message:", err);
+    return; // Ignore unparseable message
+  }
+  console.log(request);
+  const { correlationId, difficulty, topics } = request;
+
+  if (!difficulty || !topics) {
+    console.warn(
+      "Received invalid matching request (missing fields):",
+      request
+    );
+    return;
+  }
+
+  console.log(
+    `[Question] Kafka: Handling request ${correlationId} for ${difficulty} and topic ${topics[0]}`
+  );
+
+  try {
+    // 1. Use your existing model function to find a question
+    const randomQuestion = await _findRandomQuestion(difficulty, topics[0]);
+
+    if (!randomQuestion || randomQuestion.length === 0) {
+      // 2a. Send "Not Found" reply
+      console.warn(`[Question] Kafka: No question found for ${correlationId}`);
+      await producer.send({
+        topic: "question-replies",
+        messages: [
+          {
+            value: JSON.stringify({
+              correlationId: correlationId,
+              status: "error",
+              message: "No questions found matching the criteria.",
+            }),
+          },
+        ],
+      });
+      return;
+    }
+
+    const question = randomQuestion[0];
+
+    // 2b. Send "Success" reply
+    await producer.send({
+      topic: "question-replies",
+      messages: [
+        {
+          value: JSON.stringify({
+            correlationId: correlationId,
+            status: "success",
+            // Use your existing formatter for a consistent response!
+            data: formatQuestionResponse(question),
+          }),
+        },
+      ],
+    });
+    console.log(`[Question] Kafka: Sent reply for ${correlationId}`);
+  } catch (err) {
+    console.error(
+      `[Question] Kafka: Error processing request ${correlationId}:`,
+      err
+    );
+    // 3. Send "Error" reply (if possible)
+    try {
+      await producer.send({
+        topic: "question-replies",
+        messages: [
+          {
+            value: JSON.stringify({
+              correlationId: correlationId,
+              status: "error",
+              message: "An internal error occurred in the Question Service.",
+            }),
+          },
+        ],
+      });
+    } catch (sendErr) {
+      console.error(
+        `[Question] Kafka: CRITICAL! Failed to send error reply:`,
+        sendErr
+      );
+    }
+  }
 }
