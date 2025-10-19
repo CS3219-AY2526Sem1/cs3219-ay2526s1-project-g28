@@ -5,6 +5,7 @@ import {
   findMatch,
   cancelMatchmaking,
   acceptMatch,
+  rejectMatch,
 } from "../model/repository.js";
 
 const getUserKey = (userId) => `user:${userId}`;
@@ -104,4 +105,19 @@ export async function requestQuestion(difficulty, topics) {
       },
     ],
   });
+}
+
+export async function rejectMatching(req, res) {
+  try {
+    const { userId, matchId } = req.body;
+    if (!userId || !matchId) {
+      return res.status(400).json({ message: "userId and matchId are required." });
+    }
+
+    const result = await rejectMatch(userId, matchId);
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Error rejecting match:", err);
+    return res.status(500).json({ message: "An error occurred while rejecting the match." });
+  }
 }
