@@ -6,7 +6,7 @@ import {
   getQuestion,
   getAllQuestions,
   deleteQuestion,
-  getRandomQuestion
+  getRandomQuestion,
 } from "../controller/question-controller.js";
 
 const router = express.Router();
@@ -15,7 +15,7 @@ router.get("/", getAllQuestions);
 
 router.post("/", createQuestion);
 
-router.patch("/:id", updateQuestion);
+router.patch("/id/:id", updateQuestion);
 
 router.get("/id/:id", getQuestion);
 
