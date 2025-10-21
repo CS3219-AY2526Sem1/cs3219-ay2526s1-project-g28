@@ -24,7 +24,7 @@ const startServer = async () => {
     console.log("Connected to Kafka successfully!");
 
     server.listen(port, () => {
-      console.log(`Matching service listening on port ${port}`);
+      console.log(`Matching service listening on http://localhost:${port}`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
