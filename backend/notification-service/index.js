@@ -1,10 +1,11 @@
+// notification-service/index.js
 import 'dotenv/config';
 import http from 'http';
 import express from 'express';
 import { Server } from 'socket.io';
 import IORedis from 'ioredis';
 
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3004;
 const REDIS_URL = process.env.REDIS_URL;
 
 if (!REDIS_URL) {
@@ -16,7 +17,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: "*", 
   },
 });
 
@@ -42,15 +43,8 @@ io.on('connection', (socket) => {
 });
 
 const subscriber = new IORedis(REDIS_URL);
-
-subscriber.on('connect', () => {
-  console.log('[Redis] Subscriber connected successfully!');
-});
-
-subscriber.on('error', (err) => {
-  console.error('[Redis] Subscriber connection error:', err);
-});
-
+subscriber.on('connect', () => console.log('[Redis] Subscriber connected successfully!'));
+subscriber.on('error', (err) => console.error('[Redis] Subscriber connection error:', err));
 subscriber.subscribe('match_events', (err, count) => {
   if (err) {
     console.error("[Redis] Failed to subscribe:", err);
@@ -62,13 +56,27 @@ subscriber.subscribe('match_events', (err, count) => {
 subscriber.on('message', (channel, message) => {
   if (channel === 'match_events') {
     console.log(`[Redis] Received message from 'match_events':`, message);
-    const matchData = JSON.parse(message);
+    const eventData = JSON.parse(message);
     
-    matchData.users.forEach(userId => {
+    const eventType = eventData.type;
+
+    if (!eventType) {
+      console.log("Received message with no type, skipping.");
+      return;
+    }
+
+    let targetUserIds = [];
+    if (eventData.users) {
+      targetUserIds = eventData.users;
+    } else if (eventData.userId) {
+      targetUserIds = [eventData.userId];
+    }
+
+    targetUserIds.forEach(userId => {
       const socketId = userSocketMap.get(userId);
       if (socketId) {
-        io.to(socketId).emit('match_found', matchData);
-        console.log(`[Socket.IO] Emitted 'match_found' to user ${userId}`);
+        io.to(socketId).emit(eventType, eventData); 
+        console.log(`[Socket.IO] Emitted '${eventType}' to user ${userId}`);
       } else {
         console.log(`[Socket.IO] No socket found for user ${userId}.`);
       }
