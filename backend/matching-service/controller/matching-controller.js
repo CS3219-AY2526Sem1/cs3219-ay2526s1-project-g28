@@ -1,4 +1,4 @@
-import redis from "../server.js";
+import redis from '../utils/redisClient.js';
 import { producer } from "../kafka-utilties.js";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -88,11 +88,9 @@ export async function acceptMatching(req, res) {
   }
 }
 
-// This function will be called by your controller
 export async function requestQuestion(difficulty, topics) {
   const correlationId = uuidv4();
 
-  // Send the request message
   await producer.send({
     topic: "match_request",
     messages: [
