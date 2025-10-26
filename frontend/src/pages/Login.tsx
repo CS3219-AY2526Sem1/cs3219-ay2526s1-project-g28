@@ -59,6 +59,23 @@ export default function Login() {
              border-2 border-black
              focus:outline-none focus:ring-2 focus:ring-black focus:border-black dark:text-black" type="password" placeholder="password" value={password} onChange={e=>setPassword(e.target.value)} required />
         <button disabled={loading} className="w-full rounded-md bg-black text-white py-2.5">{loading?"Loading…":"Login"}</button>
+        <div className="pt-2 space-y-2">
+  <button
+    type="button"
+    onClick={() => (window.location.href = "http://localhost:3001/auth/google")}
+    className="w-full rounded-md border-2 border-black py-2.5"
+  >
+    Continue with Google
+  </button>
+  <button
+    type="button"
+    onClick={() => (window.location.href = "http://localhost:3001/auth/github")}
+    className="w-full rounded-md border-2 border-black py-2.5"
+  >
+    Continue with GitHub
+  </button>
+</div>
+
          <p className="text-center text-sm text-neutral-700 pt-2">
           Don’t have an account?{" "}
           <Link to="/signup" className="font-semibold underline">

@@ -10,6 +10,7 @@ import MatchingPage from "./pages/MatchingPage";
 import Dashboard from "./pages/Dashboard";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
+import LoginSuccess from "./pages/LoginSuccess";
 import { ThemeProvider } from "./theme/ThemeProvider";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -22,7 +23,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="*" element={<div className="p-10">404 Not found</div>} />
-
+        <Route path="/login/success" element={<LoginSuccess />} />
         {/* Everything below requires auth */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
