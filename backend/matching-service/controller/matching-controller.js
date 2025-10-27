@@ -1,4 +1,4 @@
-import redis from "../server.js";
+import redis from "../utils/redisClient.js";
 import { producer } from "../kafka-utilties.js";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -88,11 +88,9 @@ export async function acceptMatching(req, res) {
   }
 }
 
-// This function will be called by your controller
 export async function requestQuestion(difficulty, topics) {
   const correlationId = uuidv4();
 
-  // Send the request message
   await producer.send({
     topic: "match_request",
     messages: [
@@ -111,13 +109,17 @@ export async function rejectMatching(req, res) {
   try {
     const { userId, matchId } = req.body;
     if (!userId || !matchId) {
-      return res.status(400).json({ message: "userId and matchId are required." });
+      return res
+        .status(400)
+        .json({ message: "userId and matchId are required." });
     }
 
     const result = await rejectMatch(userId, matchId);
     return res.status(200).json(result);
   } catch (err) {
     console.error("Error rejecting match:", err);
-    return res.status(500).json({ message: "An error occurred while rejecting the match." });
+    return res
+      .status(500)
+      .json({ message: "An error occurred while rejecting the match." });
   }
 }
