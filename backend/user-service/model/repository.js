@@ -1,5 +1,5 @@
-import UserModel from "./user-model.js";
 import "dotenv/config";
+import UserModel from "./user-model.js";
 import { connect } from "mongoose";
 
 export async function connectToDB() {
@@ -11,8 +11,8 @@ export async function connectToDB() {
   await connect(mongoDBUri);
 }
 
-export async function createUser(username, fullname,email, password) {
-  return new UserModel({ username,fullname, email, password }).save();
+export async function createUser(username, fullname, email, password) {
+  return new UserModel({ username, fullname, email, password }).save();
 }
 
 export async function findUserByEmail(email) {
@@ -29,10 +29,7 @@ export async function findUserByUsername(username) {
 
 export async function findUserByUsernameOrEmail(username, email) {
   return UserModel.findOne({
-    $or: [
-      { username },
-      { email },
-    ],
+    $or: [{ username }, { email }],
   });
 }
 
@@ -50,7 +47,7 @@ export async function updateUserById(userId, username, email, password) {
         password,
       },
     },
-    { new: true },  // return the updated user
+    { new: true } // return the updated user
   );
 }
 
@@ -62,7 +59,7 @@ export async function updateUserPrivilegeById(userId, isAdmin) {
         isAdmin,
       },
     },
-    { new: true },  // return the updated user
+    { new: true } // return the updated user
   );
 }
 
