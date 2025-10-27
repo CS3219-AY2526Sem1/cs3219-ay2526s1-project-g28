@@ -1,4 +1,5 @@
 import redis from "../server.js";
+import { producer } from "../kafka-utilties.js";
 
 const getTopicKey = (difficulty, topic) => `queue:${difficulty}:${topic}`;
 const getUserKey = (userId) => `user:${userId}`;
@@ -164,12 +165,30 @@ export async function acceptMatch(userId, matchId) {
     await redis.del(matchKey);
     await redis.del(`${matchKey}:meta`);
 
+    // Publish match_found event to Kafka
+    const users = Object.keys(matchData);
+    const matchEvent = {
+      matchId,
+      userA: { id: users[0], username: "N/A" }, // replace with actual username if stored
+      userB: { id: users[1], username: "N/A" },
+      questionId: parsedMeta.questionId,
+      timestamp: new Date().toISOString(),
+    };
+
+    await producer.send({
+      topic: "match_found",
+      messages: [
+        { value: JSON.stringify(matchEvent) },
+      ],
+    });
+    console.log(`[Matching] Published match_found event for match ${matchId}`);
+
     return {
       status: "confirmed",
       message: "Both users accepted the match!",
       data: {
         matchId,
-        users: Object.keys(matchData),
+        users,
         ...parsedMeta,
       },
     };
