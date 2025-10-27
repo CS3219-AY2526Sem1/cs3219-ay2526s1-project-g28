@@ -3,7 +3,7 @@ import { Kafka } from "kafkajs";
 
 const kafka = new Kafka({
   clientId: "peerprep-matching-app",
-  brokers: [process.env.KAFKA_BROKERS],
+  brokers: process.env.KAFKA_BROKERS.split(","),
   ssl: true,
   sasl: {
     mechanism: "plain",

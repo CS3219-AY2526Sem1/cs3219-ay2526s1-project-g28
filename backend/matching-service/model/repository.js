@@ -1,7 +1,7 @@
-import redis from '../utils/redisClient.js';
+import redis from "../utils/redisClient.js";
 
 const publisher = redis.duplicate();
-const MATCH_CHANNEL = 'match_events';
+const MATCH_CHANNEL = "match_events";
 
 const getTopicKey = (difficulty, topic) => `queue:${difficulty}:${topic}`;
 const getUserKey = (userId) => `user:${userId}`;
@@ -23,9 +23,13 @@ export async function findMatch(userId, difficulty, topics) {
 
     if (waitingUserId && waitingUserId !== userId) {
       const matchedUserData = await redis.hgetall(getUserKey(waitingUserId));
-      
-      if (!matchedUserData || !matchedUserData.difficulty || !matchedUserData.topics) {
-        await redis.sadd(topicKey, waitingUserId); 
+
+      if (
+        !matchedUserData ||
+        !matchedUserData.difficulty ||
+        !matchedUserData.topics
+      ) {
+        await redis.sadd(topicKey, waitingUserId);
         continue;
       }
 
@@ -47,15 +51,17 @@ export async function findMatch(userId, difficulty, topics) {
       );
 
       const payload = {
-        type: 'pending_match_created',
+        type: "pending_match_created",
         matchId: matchId,
         users: [userId, waitingUserId],
         topic: topic,
-        difficulty: difficulty
+        difficulty: difficulty,
       };
       await publisher.publish(MATCH_CHANNEL, JSON.stringify(payload));
 
-      console.log(`Match found for ${userId} with ${waitingUserId} on topic ${topic}`);
+      console.log(
+        `Match found for ${userId} with ${waitingUserId} on topic ${topic}`
+      );
       return { matchId, matchedWith: waitingUserId, topic: topic };
     }
   }
@@ -136,9 +142,9 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
   if (acceptor && !rejector) {
     const confirmedData = { matchId: matchKey, users, ...meta };
     const socketPayload = {
-      type: 'match_confirmed',
+      type: "match_confirmed",
       users: [waitingUser],
-      message: "Match Confirmed! Moving to room..."
+      message: "Match Confirmed! Moving to room...",
     };
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(socketPayload));
     return {
@@ -159,19 +165,22 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
     }
     await pipeline.exec();
     const requeuePayload = {
-      type: 'match_requeued',
+      type: "match_requeued",
       userId: acceptor,
-      message: 'Your match has rejected. You will be requeued.'
+      message: "Your match has rejected. You will be requeued.",
     };
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(requeuePayload));
     const rejectPayload = {
-      type: 'match_rejected',
+      type: "match_rejected",
       userId: rejector,
-      message: "You have rejected the match."
+      message: "You have rejected the match.",
     };
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(rejectPayload));
     if (clickedUserId === acceptor) {
-      return { status: "requeued", message: "Your match has rejected. You will be requeued." };
+      return {
+        status: "requeued",
+        message: "Your match has rejected. You will be requeued.",
+      };
     } else {
       return { status: "rejected", message: "You have rejected the match." };
     }
@@ -180,14 +189,14 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
   await removeUserFromAllQueues(users[0], meta.difficulty, meta.topics);
   await removeUserFromAllQueues(users[1], meta.difficulty, meta.topics);
   const rejectPayload = {
-    type: 'match_rejected',
+    type: "match_rejected",
     users: [waitingUser],
-    message: "Match was rejected by the other user."
+    message: "You have rejected the match.",
   };
   await publisher.publish(MATCH_CHANNEL, JSON.stringify(rejectPayload));
   return {
     status: "rejected",
-    message: "You have rejected the match."
+    message: "You have rejected the match.",
   };
 }
 
@@ -203,13 +212,16 @@ export async function acceptMatch(userId, matchId) {
   const statuses = Object.values(matchData);
 
   if (statuses.includes("pending")) {
-    return { status: "pending", message: "Waiting for the other user to respond." };
+    return {
+      status: "pending",
+      message: "Waiting for the other user to respond.",
+    };
   }
 
   const metaStr = await redis.get(`${matchKey}:meta`);
   const meta = metaStr ? JSON.parse(metaStr) : null;
   if (!meta) {
-     return { status: "error", message: "Match metadata missing or expired." };
+    return { status: "error", message: "Match metadata missing or expired." };
   }
 
   return await resolveMatch(matchKey, matchData, meta, userId);
@@ -227,13 +239,16 @@ export async function rejectMatch(userId, matchId) {
   const statuses = Object.values(matchData);
 
   if (statuses.includes("pending")) {
-    return { status: "pending", message: "Waiting for the other user to respond." };
+    return {
+      status: "pending",
+      message: "Waiting for the other user to respond.",
+    };
   }
 
   const metaStr = await redis.get(`${matchKey}:meta`);
   const meta = metaStr ? JSON.parse(metaStr) : null;
   if (!meta) {
-     return { status: "error", message: "Match metadata missing or expired." };
+    return { status: "error", message: "Match metadata missing or expired." };
   }
 
   return await resolveMatch(matchKey, matchData, meta, userId);
