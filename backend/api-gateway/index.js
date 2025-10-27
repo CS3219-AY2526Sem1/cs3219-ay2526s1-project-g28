@@ -24,6 +24,16 @@ app.use(
 );
 
 app.use(
+  "/auth",
+  createProxyMiddleware({
+    target: process.env.USER_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/auth${path}`,
+  })
+);
+
+app.use(
   "/questions",
   createProxyMiddleware({
     target: process.env.QUESTION_SERVICE_URL,
