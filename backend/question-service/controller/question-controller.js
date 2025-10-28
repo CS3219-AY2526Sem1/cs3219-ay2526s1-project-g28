@@ -345,44 +345,33 @@ export function formatQuestionResponse(question) {
   };
 }
 
-// ===================================================================
-// --- NEW KAFKA HANDLER (Add this new function at the bottom) ---
-// ===================================================================
-
 /**
  * This function is a "controller" for Kafka messages.
- * It's triggered by the consumer in `kafka.js` instead of an HTTP route.
+ * It's triggered by the consumer in kafka.js instead of an HTTP route.
  */
 export async function handleMatchingRequest(message) {
-  let request;
-  try {
-    request = JSON.parse(message.value.toString());
-  } catch (err) {
-    console.error("Failed to parse Kafka message:", err);
-    return; // Ignore unparseable message
-  }
-  console.log(request);
-  const { correlationId, difficulty, topics } = request;
+  const { correlationId, meta } = message;
 
-  if (!difficulty || !topics) {
+  if (!meta.difficulty || !meta.topics) {
     console.warn(
       "Received invalid matching request (missing fields):",
-      request
+      message
     );
     return;
   }
 
   console.log(
-    `[Question] Kafka: Handling request ${correlationId} for ${difficulty} and topic ${topics[0]}`
+    `[Question] Kafka: Handling request ${correlationId} for ${meta.difficulty} and topic ${meta.topics[0]}`
   );
 
   try {
     // 1. Use your existing model function to find a question
-    const randomQuestion = await _findRandomQuestion(difficulty, topics[0]);
+    const randomQuestion = await _findRandomQuestion(meta.difficulty, meta.topics[0]);
 
     if (!randomQuestion || randomQuestion.length === 0) {
       // 2a. Send "Not Found" reply
       console.warn(`[Question] Kafka: No question found for ${correlationId}`);
+
       await producer.send({
         topic: "question-replies",
         messages: [
@@ -390,11 +379,13 @@ export async function handleMatchingRequest(message) {
             value: JSON.stringify({
               correlationId: correlationId,
               status: "error",
+              data: null,
               message: "No questions found matching the criteria.",
             }),
           },
         ],
       });
+
       return;
     }
 
@@ -410,16 +401,19 @@ export async function handleMatchingRequest(message) {
             status: "success",
             // Use your existing formatter for a consistent response!
             data: formatQuestionResponse(question),
+            message: "Question found successfully.",
           }),
         },
       ],
     });
+
     console.log(`[Question] Kafka: Sent reply for ${correlationId}`);
   } catch (err) {
     console.error(
       `[Question] Kafka: Error processing request ${correlationId}:`,
       err
     );
+
     // 3. Send "Error" reply (if possible)
     try {
       await producer.send({
@@ -429,6 +423,7 @@ export async function handleMatchingRequest(message) {
             value: JSON.stringify({
               correlationId: correlationId,
               status: "error",
+              data: null,
               message: "An internal error occurred in the Question Service.",
             }),
           },
