@@ -12,6 +12,7 @@ import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import Settings from "./pages/Settings";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
@@ -26,6 +27,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/login/success" element={<LoginSuccess />} />
         {/* Everything below requires auth */}
         <Route element={<ProtectedRoute />}>
+          <Route path="/settings" element={<Settings />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/matchingpage" element={<MatchingPage />} />
           <Route path="/home" element={<HomePage />} />

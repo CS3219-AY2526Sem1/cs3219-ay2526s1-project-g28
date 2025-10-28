@@ -4,7 +4,14 @@
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-
+/* tame Chrome autofill */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: inherit;
+  -webkit-box-shadow: 0 0 0px 1000px transparent inset;
+  transition: background-color 9999s ease-out 0s;
+}
 
 @custom-variant dark (&:where(.dark, .dark *));
 @theme {

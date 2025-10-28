@@ -201,5 +201,6 @@ export function formatUserResponse(user) {
     avatarUrl: user.avatarUrl ?? "",
     isAdmin: !!user.isAdmin,
     createdAt: user.createdAt,
+    provider: user.provider || "password",
   };
 }

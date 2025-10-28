@@ -27,10 +27,12 @@ export default function Login() {
       id: res.data.id,
       username: res.data.username,
       fullname: res.data.fullname,
+      avatarUrl: res.data.avatarUrl,
       email: res.data.email,
       isAdmin: res.data.isAdmin,
       createdAt: res.data.createdAt,
       };
+      console.log("Login response user:", user);
 
       if (!token) throw new Error("Missing token from server");
       login(token, user);
