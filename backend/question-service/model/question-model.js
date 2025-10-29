@@ -2,6 +2,22 @@ import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
+const ParamSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    type: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const SignatureSchema = new Schema(
+  {
+    params: { type: [ParamSchema], default: [] },
+    returnType: { type: String, default: "any" },
+  },
+  { _id: false }
+);
+
 const ExampleSchema = new Schema(
   {
     input: String,
@@ -14,9 +30,9 @@ const ExampleSchema = new Schema(
       width: Number,
       height: Number,
       mime: String,
-      size: Number
-    }
-  }, 
+      size: Number,
+    },
+  },
   { _id: false }
 );
 
@@ -36,14 +52,19 @@ const CodeSnippetSchema = new Schema(
 
 const TestCaseSchema = new Schema(
   {
-    input: {
-      type: String,
+    args: {
+      type: [Schema.Types.Mixed],
       required: true,
+      validate: [
+        (arr) => Array.isArray(arr),
+        "Test case 'args' must be an array (of JSON-serializable values).",
+      ],
     },
     expected: {
-      type: String,
+      type: Schema.Types.Mixed,
       required: true,
     },
+    hidden: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -75,7 +96,6 @@ const QuestionsModelSchema = new Schema({
       },
     ],
     required: true,
-    
     validate: [
       (val) => val.length > 0,
       "A question must have at least one topic.",
@@ -101,6 +121,9 @@ const QuestionsModelSchema = new Schema({
     type: [CodeSnippetSchema],
     required: false,
   },
+  entryPoint: { type: String, required: true },
+  signature: { type: SignatureSchema, default: undefined },
+
   testCases: {
     type: [TestCaseSchema],
     required: true,

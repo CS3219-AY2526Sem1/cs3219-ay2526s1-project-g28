@@ -8,7 +8,11 @@ import {
   deleteQuestionById as _deleteQuestionById,
   findRandomQuestion as _findRandomQuestion,
 } from "../model/repository.js";
-import { sanitizeExamplesForSave, collectImageKeys, destroyCloudinaryKeys } from './upload-controller.js';
+import {
+  sanitizeExamplesForSave,
+  collectImageKeys,
+  destroyCloudinaryKeys,
+} from "./upload-controller.js";
 import { producer } from "../kafka-utilties.js";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"];
@@ -23,6 +27,45 @@ const TOPICS = [
   "Dynamic Programming",
 ];
 
+function isJsonSerializable(v) {
+  try {
+    JSON.stringify(v);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateFunctionTestCases(testCases = []) {
+  const problems = [];
+  if (!Array.isArray(testCases) || testCases.length === 0) {
+    problems.push({ index: -1, message: "At least one test case is required." });
+    return problems;
+  }
+  testCases.forEach((tc, idx) => {
+    if (!tc || !Array.isArray(tc.args)) {
+      problems.push({ index: idx, message: "`args` must be an array." });
+      return;
+    }
+    if (!("expected" in tc)) {
+      problems.push({ index: idx, message: "`expected` is required." });
+      return;
+    }
+    if (!isJsonSerializable(tc.args) || !isJsonSerializable(tc.expected)) {
+      problems.push({ index: idx, message: "`args` and `expected` must be JSON-serializable." });
+    }
+  });
+  return problems;
+}
+
+function sanitizeTestCasesForSave(testCases = []) {
+  return (Array.isArray(testCases) ? testCases : []).map((tc) => ({
+    args: tc.args,
+    expected: tc.expected,
+    hidden: !!tc.hidden,
+  }));
+}
+
 export async function createQuestion(req, res) {
   try {
     const {
@@ -33,6 +76,8 @@ export async function createQuestion(req, res) {
       constraints,
       examples,
       codeSnippets,
+      entryPoint,
+      signature,
       testCases,
     } = req.body;
 
@@ -44,11 +89,12 @@ export async function createQuestion(req, res) {
       problemStatement,
       constraints,
       examples,
+      entryPoint,
       testCases,
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null)
+      .filter(([_, value]) => value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
       .map(([key, _]) => key);
 
     if (missingFields.length > 0) {
@@ -58,7 +104,7 @@ export async function createQuestion(req, res) {
     }
 
     // Validate examples
-    const invalidExamples = examples
+    const invalidExamples = (examples || [])
       .map((ex, idx) => {
         const missing = [];
         if (!ex.input || ex.input.trim() === "") missing.push("input");
@@ -74,48 +120,21 @@ export async function createQuestion(req, res) {
     }
 
     // Validate test cases
-    const invalidTestCases = testCases
-      .map((tc, idx) => {
-        const missing = [];
-        if (!tc.input || tc.input.trim() === "") missing.push("input");
-        if (!tc.expected || tc.expected.trim() === "") missing.push("expected");
-        return missing.length > 0 ? { index: idx, missing } : true;
-      })
-      .filter((x) => x !== true);
-
-    if (invalidTestCases.length > 0) {
+    const tcProblems = validateFunctionTestCases(testCases);
+    if (tcProblems.length > 0) {
       return res
         .status(400)
-        .json({ message: "Invalid test cases", details: invalidTestCases });
+        .json({ message: "Invalid test cases", details: tcProblems });
     }
 
-    // Check if question already exists
+    // Unique title
     const existingQuestion = await _findQuestionByTitle(title);
     if (existingQuestion) {
       return res.status(409).json({ message: "Title already exists" });
     }
 
-    const cleanExamples = examples.map((ex) => {
-      const img = ex.image && typeof ex.image === 'object' ? ex.image : null;
-      const cleanedImage = (img && img.url)
-        ? {
-            url: img.url,
-            provider: img.provider || 'cloudinary',
-            key: img.key,
-            width: img.width,
-            height: img.height,
-            mime: img.mime,
-            size: img.size,
-          }
-        : undefined;
-
-      return {
-        input: ex.input,
-        output: ex.output,
-        explanation: ex.explanation,
-        image: cleanedImage,
-      };
-    });
+    const cleanExamples = sanitizeExamplesForSave(examples);
+    const cleanTestCases = sanitizeTestCasesForSave(testCases);
 
     // Create new question
     const createdQuestion = await _createQuestion(
@@ -126,17 +145,18 @@ export async function createQuestion(req, res) {
       constraints,
       cleanExamples,
       codeSnippets,
-      testCases
+      entryPoint,
+      signature,
+      cleanTestCases
     );
+
     return res.status(201).json({
       message: `Created new question ${title} successfully`,
       data: formatQuestionResponse(createdQuestion),
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when creating new question!" });
+    return res.status(500).json({ message: "Unknown error when creating new question!" });
   }
 }
 
@@ -151,6 +171,8 @@ export async function updateQuestion(req, res) {
       constraints,
       examples,
       codeSnippets,
+      entryPoint,
+      signature,
       testCases,
     } = req.body;
 
@@ -164,18 +186,27 @@ export async function updateQuestion(req, res) {
     }
 
     const requiredFields = {
-      title, difficulty, topics, problemStatement, constraints, examples, testCases,
+      title,
+      difficulty,
+      topics,
+      problemStatement,
+      constraints,
+      examples,
+      entryPoint,
+      testCases,
     };
+
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null)
+      .filter(([_, value]) => value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
       .map(([key]) => key);
+
     if (missingFields.length > 0) {
       return res.status(400).json({
         message: `Missing required fields: ${missingFields.join(", ")}`,
       });
     }
 
-    const invalidExamples = examples
+    const invalidExamples = (examples || [])
       .map((ex, idx) => {
         const missing = [];
         if (!ex.input || ex.input.trim() === "") missing.push("input");
@@ -184,19 +215,16 @@ export async function updateQuestion(req, res) {
       })
       .filter((x) => x !== true);
     if (invalidExamples.length > 0) {
-      return res.status(400).json({ message: "Invalid examples", details: invalidExamples });
+      return res
+        .status(400)
+        .json({ message: "Invalid examples", details: invalidExamples });
     }
 
-    const invalidTestCases = testCases
-      .map((tc, idx) => {
-        const missing = [];
-        if (!tc.input || tc.input.trim() === "") missing.push("input");
-        if (!tc.expected || tc.expected.trim() === "") missing.push("expected");
-        return missing.length > 0 ? { index: idx, missing } : true;
-      })
-      .filter((x) => x !== true);
-    if (invalidTestCases.length > 0) {
-      return res.status(400).json({ message: "Invalid test cases", details: invalidTestCases });
+    const tcProblems = validateFunctionTestCases(testCases);
+    if (tcProblems.length > 0) {
+      return res
+        .status(400)
+        .json({ message: "Invalid test cases", details: tcProblems });
     }
 
     const existingQuestion = await _findQuestionByTitle(title);
@@ -206,8 +234,10 @@ export async function updateQuestion(req, res) {
 
     const cleanExamples = sanitizeExamplesForSave(examples);
     const prevKeys = collectImageKeys(current.examples);
-    const newKeys  = collectImageKeys(cleanExamples);
-    const keysToDelete = prevKeys.filter(k => !newKeys.includes(k));
+    const newKeys = collectImageKeys(cleanExamples);
+    const keysToDelete = prevKeys.filter((k) => !newKeys.includes(k));
+
+    const cleanTestCases = sanitizeTestCasesForSave(testCases);
 
     const updatedQuestion = await _updateQuestionById(
       id,
@@ -218,7 +248,9 @@ export async function updateQuestion(req, res) {
       constraints,
       cleanExamples,
       codeSnippets,
-      testCases
+      entryPoint,
+      signature,
+      cleanTestCases
     );
 
     if (!updatedQuestion) {
@@ -233,9 +265,7 @@ export async function updateQuestion(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when updating question!" });
+    return res.status(500).json({ message: "Unknown error when updating question!" });
   }
 }
 
@@ -248,9 +278,7 @@ export async function getQuestion(req, res) {
 
     const question = await _findQuestionById(questionId);
     if (!question) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
+      return res.status(404).json({ message: `Question ${questionId} not found` });
     } else {
       return res.status(200).json({
         message: `Found question`,
@@ -259,9 +287,7 @@ export async function getQuestion(req, res) {
     }
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting question!" });
+    return res.status(500).json({ message: "Unknown error when getting question!" });
   }
 }
 
@@ -275,9 +301,7 @@ export async function getAllQuestions(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting all questions!" });
+    return res.status(500).json({ message: "Unknown error when getting all questions!" });
   }
 }
 
@@ -292,9 +316,7 @@ export async function getRandomQuestion(req, res) {
       return res.status(404).json({ message: `Topics must be specified` });
     }
     if (difficulty && !DIFFICULTIES.includes(difficulty)) {
-      return res
-        .status(404)
-        .json({ message: `Invalid difficulty level: ${difficulty}` });
+      return res.status(404).json({ message: `Invalid difficulty level: ${difficulty}` });
     }
     if (topics && !TOPICS.includes(topics)) {
       return res.status(404).json({ message: `Invalid topic: ${topics}` });
@@ -303,9 +325,7 @@ export async function getRandomQuestion(req, res) {
     const randomQuestion = await _findRandomQuestion(difficulty, topics);
 
     if (!randomQuestion || randomQuestion.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No questions found matching the criteria." });
+      return res.status(404).json({ message: "No questions found matching the criteria." });
     }
 
     return res.status(200).json({
@@ -314,9 +334,7 @@ export async function getRandomQuestion(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting a random question!" });
+    return res.status(500).json({ message: "Unknown error when getting a random question!" });
   }
 }
 
@@ -341,9 +359,7 @@ export async function deleteQuestion(req, res) {
     return res.status(200).json({ message: `Deleted question ${questionId} successfully` });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when deleting question!" });
+    return res.status(500).json({ message: "Unknown error when deleting question!" });
   }
 }
 
@@ -357,6 +373,8 @@ export function formatQuestionResponse(question) {
     constraints: question.constraints,
     examples: question.examples,
     codeSnippets: question.codeSnippets,
+    entryPoint: question.entryPoint,
+    signature: question.signature,
     testCases: question.testCases,
   };
 }
