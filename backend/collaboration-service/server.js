@@ -22,7 +22,11 @@ redis.on("error", (err) => {
 
 // --- Socket.IO Setup ---
 const io = new Server(server, {
-  cors: { origin: "*" },
+  cors: {
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
 });
 
 // Attach WebSocket collaboration logic

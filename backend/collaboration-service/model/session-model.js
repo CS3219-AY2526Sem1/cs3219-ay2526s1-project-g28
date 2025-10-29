@@ -14,6 +14,7 @@ const sessionSchema = new mongoose.Schema({
   status: { type: String, default: "PENDING_QUESTION" },
   createdAt: { type: Date, default: Date.now },
   startedAt: { type: Date },
+  isActive: { type: Boolean, default: true },
 });
 
 export default mongoose.model("Session", sessionSchema);

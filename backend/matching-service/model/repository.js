@@ -131,7 +131,8 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
     const confirmedData = { matchId: matchKey, users, ...meta };
     const socketPayload = {
       type: "match_confirmed",
-      users: [waitingUser],
+      sessionId: correlationId,
+      users,
       message: "Match Confirmed! Moving to room...",
     };
 
