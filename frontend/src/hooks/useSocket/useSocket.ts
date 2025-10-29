@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { useNavigate } from "react-router-dom";
 import { User } from "../../types/types";
 import {
   startMatchApi,
@@ -16,6 +17,8 @@ export function useSocket(user?: User) {
   const [countdown, setCountdown] = useState(DEFAULT_COUNTDOWN);
   const [showButtons, setShowButtons] = useState(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const navigate = useNavigate();
 
   const displayName = user?.username;
   const isQueueingRef = useRef(isQueueing);
@@ -58,7 +61,17 @@ export function useSocket(user?: User) {
 
     socket.on("match_confirmed", (data) => {
       console.log("Match confirmed!", data);
-      showFinalMessage("Match Confirmed! Moving to room...");
+      const { sessionId } = data;
+      console.log(data);
+
+      if (sessionId) {
+        showFinalMessage("Match confirmed! Redirecting...");
+        setTimeout(() => {
+          navigate(`/collab/${sessionId}`);
+        }, 1500);
+      } else {
+        console.error("No sessionId received in match_confirmed event");
+      }
     });
 
     socket.on("match_requeued", (data) => {

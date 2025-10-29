@@ -72,6 +72,7 @@ export async function connectKafka () {
           session.status = status;
           session.question = data;
           session.startedAt = new Date();
+          session.isActive = true;
           await session.save();
 
           sessionStore.set(correlationId, session);
