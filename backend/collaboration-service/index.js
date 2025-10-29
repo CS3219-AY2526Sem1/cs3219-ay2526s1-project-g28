@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import questionRoutes from "./routes/question-routes.js";
+
+import sessionRoutes from "./routes/session-routes.js";
 
 const app = express();
 
@@ -12,7 +13,6 @@ app.use(cors("*")); // config cors so that front-end can use  // i guess it does
 // To handle CORS Errors
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*"); // "*" -> Allow all links to access
-
   res.header(
     "Access-Control-Allow-Headers",
     "Origin, X-Requested-With, Content-Type, Accept, Authorization"
@@ -28,12 +28,12 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use("/questions", questionRoutes);
+app.use("/collaboration", sessionRoutes);
 
 app.get("/", (req, res, next) => {
-  console.log("Sending Greetings!");
+  console.log("Collaboration service responding!");
   res.json({
-    message: "Hello World from question-service",
+    message: "Hello World from collaboration-service",
   });
 });
 

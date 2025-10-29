@@ -11,6 +11,8 @@ import Dashboard from "./pages/Dashboard";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
+import QuestionsPage from "./pages/QuestionsPage";
+
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
 
@@ -31,6 +33,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/matchingpage" element={<MatchingPage />} />
           <Route path="/home" element={<HomePage />} />
+          <Route path="/questions" element={<QuestionsPage />} />
           </Route>
       </Routes>
 
@@ -38,5 +41,6 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
+
   </ThemeProvider>
 );

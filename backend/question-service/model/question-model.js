@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
-// Sub-schema for examples
 const ExampleSchema = new Schema(
   {
     input: {
@@ -15,17 +14,16 @@ const ExampleSchema = new Schema(
     },
     explanation: {
       type: String,
-      required: false, // Optional
+      required: false,
     },
     image: {
       type: String,
-      required: false, // Optional
+      required: false,
     },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
-// Sub-schema for code snippets
 const CodeSnippetSchema = new Schema(
   {
     language: {
@@ -38,9 +36,8 @@ const CodeSnippetSchema = new Schema(
     },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
-// Sub-schema for test cases
 const TestCaseSchema = new Schema(
   {
     input: {
@@ -53,7 +50,7 @@ const TestCaseSchema = new Schema(
     },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
 const QuestionsModelSchema = new Schema({
   title: {
@@ -82,7 +79,7 @@ const QuestionsModelSchema = new Schema({
       },
     ],
     required: true,
-    // Custom validator to ensure the array has at least one item
+    
     validate: [
       (val) => val.length > 0,
       "A question must have at least one topic.",
@@ -106,7 +103,7 @@ const QuestionsModelSchema = new Schema({
   },
   codeSnippets: {
     type: [CodeSnippetSchema],
-    required: false, // Optional field
+    required: false,
   },
   testCases: {
     type: [TestCaseSchema],

@@ -1,7 +1,7 @@
 // model/repository.js
 import bcrypt from "bcrypt";
-import UserModel from "./user-model.js";
 import "dotenv/config";
+import UserModel from "./user-model.js";
 import { connect } from "mongoose";
 
 export async function connectToDB() {
