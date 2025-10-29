@@ -8,6 +8,7 @@ import {
   deleteQuestionById as _deleteQuestionById,
   findRandomQuestion as _findRandomQuestion,
 } from "../model/repository.js";
+import { sanitizeExamplesForSave, collectImageKeys, destroyCloudinaryKeys } from './upload-controller.js';
 import { producer } from "../kafka-utilties.js";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"];
@@ -94,6 +95,28 @@ export async function createQuestion(req, res) {
       return res.status(409).json({ message: "Title already exists" });
     }
 
+    const cleanExamples = examples.map((ex) => {
+      const img = ex.image && typeof ex.image === 'object' ? ex.image : null;
+      const cleanedImage = (img && img.url)
+        ? {
+            url: img.url,
+            provider: img.provider || 'cloudinary',
+            key: img.key,
+            width: img.width,
+            height: img.height,
+            mime: img.mime,
+            size: img.size,
+          }
+        : undefined;
+
+      return {
+        input: ex.input,
+        output: ex.output,
+        explanation: ex.explanation,
+        image: cleanedImage,
+      };
+    });
+
     // Create new question
     const createdQuestion = await _createQuestion(
       title,
@@ -101,7 +124,7 @@ export async function createQuestion(req, res) {
       topics,
       problemStatement,
       constraints,
-      examples,
+      cleanExamples,
       codeSnippets,
       testCases
     );
@@ -135,28 +158,23 @@ export async function updateQuestion(req, res) {
       return res.status(400).json({ message: "Invalid question ID" });
     }
 
-    // Collect missing fields
-    const requiredFields = {
-      title,
-      difficulty,
-      topics,
-      problemStatement,
-      constraints,
-      examples,
-      testCases,
-    };
+    const current = await _findQuestionById(id);
+    if (!current) {
+      return res.status(404).json({ message: "Question not found" });
+    }
 
+    const requiredFields = {
+      title, difficulty, topics, problemStatement, constraints, examples, testCases,
+    };
     const missingFields = Object.entries(requiredFields)
       .filter(([_, value]) => value === undefined || value === null)
-      .map(([key, _]) => key);
-
+      .map(([key]) => key);
     if (missingFields.length > 0) {
       return res.status(400).json({
         message: `Missing required fields: ${missingFields.join(", ")}`,
       });
     }
 
-    // Validate examples
     const invalidExamples = examples
       .map((ex, idx) => {
         const missing = [];
@@ -165,14 +183,10 @@ export async function updateQuestion(req, res) {
         return missing.length > 0 ? { index: idx, missing } : true;
       })
       .filter((x) => x !== true);
-
     if (invalidExamples.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "Invalid examples", details: invalidExamples });
+      return res.status(400).json({ message: "Invalid examples", details: invalidExamples });
     }
 
-    // Validate test cases
     const invalidTestCases = testCases
       .map((tc, idx) => {
         const missing = [];
@@ -181,20 +195,20 @@ export async function updateQuestion(req, res) {
         return missing.length > 0 ? { index: idx, missing } : true;
       })
       .filter((x) => x !== true);
-
     if (invalidTestCases.length > 0) {
-      return res
-        .status(400)
-        .json({ message: "Invalid test cases", details: invalidTestCases });
+      return res.status(400).json({ message: "Invalid test cases", details: invalidTestCases });
     }
 
-    // Check if question already exists
     const existingQuestion = await _findQuestionByTitle(title);
     if (existingQuestion && existingQuestion._id.toString() !== id) {
       return res.status(409).json({ message: "Title already exists" });
     }
 
-    // Update question
+    const cleanExamples = sanitizeExamplesForSave(examples);
+    const prevKeys = collectImageKeys(current.examples);
+    const newKeys  = collectImageKeys(cleanExamples);
+    const keysToDelete = prevKeys.filter(k => !newKeys.includes(k));
+
     const updatedQuestion = await _updateQuestionById(
       id,
       title,
@@ -202,7 +216,7 @@ export async function updateQuestion(req, res) {
       topics,
       problemStatement,
       constraints,
-      examples,
+      cleanExamples,
       codeSnippets,
       testCases
     );
@@ -210,6 +224,8 @@ export async function updateQuestion(req, res) {
     if (!updatedQuestion) {
       return res.status(404).json({ message: "Question not found" });
     }
+
+    await destroyCloudinaryKeys(keysToDelete);
 
     return res.status(200).json({
       message: `Updated question ${title} successfully`,
@@ -308,21 +324,21 @@ export async function deleteQuestion(req, res) {
   try {
     const questionId = req.params.id;
     if (!isValidObjectId(questionId)) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
-    }
-    const question = await _findQuestionById(questionId);
-    if (!question) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
+      return res.status(404).json({ message: `Question ${questionId} not found` });
     }
 
+    const question = await _findQuestionById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: `Question ${questionId} not found` });
+    }
+
+    const keys = collectImageKeys(question.examples);
+
     await _deleteQuestionById(questionId);
-    return res
-      .status(200)
-      .json({ message: `Deleted question ${questionId} successfully` });
+
+    await destroyCloudinaryKeys(keys);
+
+    return res.status(200).json({ message: `Deleted question ${questionId} successfully` });
   } catch (err) {
     console.error(err);
     return res
@@ -365,11 +381,9 @@ export async function handleMatchingRequest(message) {
   );
 
   try {
-    // 1. Use your existing model function to find a question
     const randomQuestion = await _findRandomQuestion(meta.difficulty, meta.topics[0]);
 
     if (!randomQuestion || randomQuestion.length === 0) {
-      // 2a. Send "Not Found" reply
       console.warn(`[Question] Kafka: No question found for ${correlationId}`);
 
       await producer.send({
@@ -391,7 +405,6 @@ export async function handleMatchingRequest(message) {
 
     const question = randomQuestion[0];
 
-    // 2b. Send "Success" reply
     await producer.send({
       topic: "question-replies",
       messages: [
@@ -399,7 +412,6 @@ export async function handleMatchingRequest(message) {
           value: JSON.stringify({
             correlationId: correlationId,
             status: "success",
-            // Use your existing formatter for a consistent response!
             data: formatQuestionResponse(question),
             message: "Question found successfully.",
           }),
@@ -414,7 +426,6 @@ export async function handleMatchingRequest(message) {
       err
     );
 
-    // 3. Send "Error" reply (if possible)
     try {
       await producer.send({
         topic: "question-replies",

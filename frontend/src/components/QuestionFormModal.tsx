@@ -3,7 +3,18 @@ import React, { useState } from 'react';
 import { XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { api } from "../lib/api";
 
-export interface Example { input: string; output: string; explanation?: string; image?: string; }
+/** Cloudinary metadata */
+export interface ImageMeta {
+  url: string;
+  provider?: string;
+  key?: string;
+  width?: number;
+  height?: number;
+  mime?: string;
+  size?: number;
+}
+
+export interface Example { input: string; output: string; explanation?: string; image?: ImageMeta | undefined; }
 export interface CodeSnippet { language: string; code: string; }
 export interface TestCase { input: string; expected: string; }
 export type Difficulty = 'Easy' | 'Medium' | 'Hard';
@@ -32,7 +43,7 @@ const TOPIC_OPTIONS: Topic[] = [
   'Strings','Arrays','Linked List','Heaps','Hashmap','Trees','Graphs','Dynamic Programming'
 ];
 
-const emptyExample: Example = { input: '', output: '', explanation: '', image: '' };
+const emptyExample: Example = { input: '', output: '', explanation: '', image: undefined };
 const emptySnippet: CodeSnippet = { language: 'javascript', code: '' };
 const emptyTestCase: TestCase = { input: '', expected: '' };
 
@@ -67,6 +78,8 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
 
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [uploading, setUploading] = useState<Record<number, boolean>>({});
+  const anyUploading = Object.values(uploading).some(Boolean);
 
   const toggleTopic = (t: Topic) => setTopics((prev) => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
@@ -90,8 +103,45 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
     return e.length === 0;
   };
 
+  const uploadExampleImage = async (idx: number, file: File) => {
+    setUploading((u) => ({ ...u, [idx]: true }));
+    try {
+      const form = new FormData();
+      form.append('image', file);
+
+      const base = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${base}/questions/uploads/image`, {
+        method: 'POST',
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: form
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const msg = (data && (data.message || data.error)) || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+
+      const meta: ImageMeta = data?.data ?? data;
+      setExamples(prev => prev.map((ex, i) => i === idx ? { ...ex, image: meta } : ex));
+    } catch (err: any) {
+      const msg = err?.message || 'Image upload failed.';
+      setErrors([msg]);
+      console.error('Image upload error:', err);
+    } finally {
+      setUploading((u) => ({ ...u, [idx]: false }));
+    }
+  };
+
   const onSubmit = async () => {
     if (saving) return;
+
+    if (anyUploading) {
+      setErrors(['Please wait for image upload(s) to finish before saving.']);
+      return;
+    }
+
     if (!validate()) return;
     setSaving(true);
     setErrors([]);
@@ -107,7 +157,7 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
           input: e.input?.trim() || '',
           output: e.output?.trim() || '',
           explanation: e.explanation?.trim() || undefined,
-          image: e.image?.trim() || undefined
+          image: e.image && typeof (e.image as any).url === 'string' ? (e.image as ImageMeta) : undefined
         }))
         .filter(e => e.input && e.output),
       codeSnippets: (codeSnippets || [])
@@ -313,14 +363,61 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
                       />
                     </div>
 
+                    {/* Image upload */}
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-medium text-gray-600">Image URL (optional)</label>
-                      <input
-                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                        value={ex.image || ''}
-                        onChange={(e) => setExamples(prev => prev.map((x, i) => i === idx ? { ...x, image: e.target.value } : x))}
-                        placeholder="https://..."
-                      />
+                      <label className="block text-xs font-medium text-gray-600">Image (optional)</label>
+
+                      {ex.image?.url ? (
+                        <div className="mt-2 flex items-start gap-4">
+                          <img
+                            src={ex.image.url}
+                            alt="Example"
+                            className="h-24 w-24 object-contain rounded border border-gray-200 bg-white"
+                          />
+                          <div className="flex flex-col gap-2">
+                            <div className="text-xs text-gray-500">
+                              {ex.image.width ?? '—'}×{ex.image.height ?? '—'} · {ex.image.mime ?? 'image'}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 text-sm cursor-pointer hover:bg-gray-50">
+                                Replace…
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) uploadExampleImage(idx, f);
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setExamples(prev => prev.map((x, i) => i === idx ? { ...x, image: undefined } : x))}
+                                className="inline-flex items-center px-3 py-2 rounded-lg border border-gray-300 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600"
+                              >
+                                Remove image
+                              </button>
+                            </div>
+                            {uploading[idx] && (
+                              <div className="text-xs text-blue-600">Uploading…</div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="mt-1 inline-flex items-center px-3 py-2 rounded-lg border border-dashed border-gray-300 text-sm cursor-pointer hover:bg-gray-50">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) uploadExampleImage(idx, f);
+                            }}
+                          />
+                          {uploading[idx] ? 'Uploading…' : 'Choose image file'}
+                        </label>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -423,16 +520,16 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
                     />
                   </div>
                   <div className="justify-self-start md:justify-self-end md:flex md:flex-col">
-                  <label className="block text-xs font-medium opacity-0 select-none">Remove</label>
-                  <button
-                    type="button"
-                    onClick={() => setTestCases(prev => prev.filter((_, i) => i !== idx))}
-                    className="mt-1 inline-flex items-center px-3 py-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 border border-gray-300 w-auto"
-                    title="Remove test case"
-                  >
-                    Remove
-                  </button>
-                </div>
+                    <label className="block text-xs font-medium opacity-0 select-none">Remove</label>
+                    <button
+                      type="button"
+                      onClick={() => setTestCases(prev => prev.filter((_, i) => i !== idx))}
+                      className="mt-1 inline-flex items-center px-3 py-2 rounded-lg text-gray-500 hover:text-red-600 hover:bg-red-50 border border-gray-300 w-auto"
+                      title="Remove test case"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -454,6 +551,7 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
             onClick={onSubmit}
             disabled={saving}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            title={anyUploading ? 'Please wait for image upload(s) to finish' : undefined}
           >
             {saving && (
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">

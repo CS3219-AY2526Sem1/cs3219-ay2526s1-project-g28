@@ -4,23 +4,19 @@ const Schema = mongoose.Schema;
 
 const ExampleSchema = new Schema(
   {
-    input: {
-      type: String,
-      required: true,
-    },
-    output: {
-      type: String,
-      required: true,
-    },
-    explanation: {
-      type: String,
-      required: false,
-    },
+    input: String,
+    output: String,
+    explanation: String,
     image: {
-      type: String,
-      required: false,
-    },
-  },
+      url: { type: String },
+      provider: { type: String },
+      key: { type: String },
+      width: Number,
+      height: Number,
+      mime: String,
+      size: Number
+    }
+  }, 
   { _id: false }
 );
 
