@@ -20,6 +20,7 @@ export interface CodeSnippet { language: string; code: string; }
 export interface TestCase {
   args: unknown[];
   expected: unknown;
+  hidden?: boolean;
 }
 
 // --- Single signature for both languages (no `optional` flag) ---
@@ -41,6 +42,7 @@ export interface Question {
   testCases: TestCase[];
   entryPoint: string;
   signature?: Signature;
+  timeout?: number;
 }
 
 export type QuestionFormModalProps = {
@@ -56,9 +58,8 @@ const TOPIC_OPTIONS: Topic[] = [
 
 const emptyExample: Example = { input: '', output: '', explanation: '', image: undefined };
 const emptySnippet: CodeSnippet = { language: 'javascript', code: '' };
-// For the UI, we'll allow editing testcases as text then parse to JSON on submit:
-type UITestCase = { args: unknown[] | string; expected: unknown | string };
-const emptyUITest: UITestCase = { args: '[]', expected: '' };
+type UITestCase = { args: unknown[] | string; expected: unknown | string; hidden?: boolean };
+const emptyUITest: UITestCase = { args: '[]', expected: '', hidden: false };
 
 const emptyParam: Param = { name: '', type: 'any' };
 
@@ -76,7 +77,8 @@ const normalizeSaved = (raw: any): Question => {
     codeSnippets: data.codeSnippets || [],
     testCases: data.testCases || [],
     entryPoint: data.entryPoint || '',
-    signature: data.signature
+    signature: data.signature,
+    timeout: data.timeout,
   } as Question;
 };
 
@@ -96,12 +98,14 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
     initial?.testCases?.length
       ? initial.testCases.map(tc => ({
           args: Array.isArray(tc.args) ? tc.args : '[]',
-          expected: typeof tc.expected === 'string' ? tc.expected : JSON.stringify(tc.expected)
+          expected: typeof tc.expected === 'string' ? tc.expected : JSON.stringify(tc.expected),
+          hidden: !!tc.hidden,
         }))
       : [{...emptyUITest}]
   );
 
   const [entryPoint, setEntryPoint] = useState<string>(initial?.entryPoint || '');
+  const [timeout, setTimeout] = useState<number>(typeof initial?.timeout === 'number' ? initial.timeout : 1);
   const [sigParams, setSigParams] = useState<Param[]>(
     initial?.signature?.params?.length ? initial.signature.params : [{...emptyParam}]
   );
@@ -121,6 +125,7 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
     if (!difficulty) e.push('Difficulty is required.');
     if (!topics.length) e.push('Select at least one topic.');
     if (!entryPoint.trim()) e.push('Function entry point is required.');
+    if (!timeout || Number.isNaN(timeout) || timeout <= 0) e.push('Timeout (seconds) must be a positive number.');
 
     const filteredConstraints = constraints.map(c => c.trim()).filter(Boolean);
     if (!filteredConstraints.length) e.push('Provide at least one constraint.');
@@ -228,7 +233,8 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
 
         return {
           args: parsedArgs as unknown[],
-          expected: parsedExpected
+          expected: parsedExpected,
+          hidden: !!tc.hidden,
         };
       });
     } catch (e: any) {
@@ -249,7 +255,8 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
         .filter(s => s.language && s.code?.trim()),
       testCases: payloadTestCases,
       entryPoint: entryPoint.trim(),
-      signature
+      signature,
+      timeout: Number(timeout) || 1,
     };
 
     try {
@@ -570,7 +577,7 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
           {/* Single Signature + Entry Point */}
           <section>
             <h3 className="text-base font-semibold text-gray-800">Function Execution</h3>
-            <div className="mt-3 grid grid-cols-1 gap-4">
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700">Entry point (function name) *</label>
                 <input
@@ -580,60 +587,70 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
                   placeholder="twoSum"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Timeout (seconds)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  value={timeout}
+                  onChange={(e) => setTimeout(Number(e.target.value))}
+                  placeholder="5"
+                />
+              </div>
+            </div>
 
-              <div className="rounded-xl border border-gray-200 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Signature</span>
-                  <button
-                    type="button"
-                    onClick={() => setSigParams(prev => [...prev, { ...emptyParam }])}
-                    className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900"
-                  >
-                    <PlusIcon className="h-4 w-4" /> Add parameter
-                  </button>
-                </div>
+            <div className="mt-4 rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Signature</span>
+                <button
+                  type="button"
+                  onClick={() => setSigParams(prev => [...prev, { ...emptyParam }])}
+                  className="inline-flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900"
+                >
+                  <PlusIcon className="h-4 w-4" /> Add parameter
+                </button>
+              </div>
 
-                {/* Params */}
-                <div className="space-y-2">
-                  {sigParams.map((p, idx) => (
-                    <div key={idx} className="grid grid-cols-1 md:grid-cols-[2fr_2fr_auto] gap-2 items-center">
-                      <input
-                        className="border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                        placeholder="name (e.g., nums)"
-                        value={p.name}
-                        onChange={(e) => setSigParams(prev => prev.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
-                      />
-                      <input
-                        className="border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                        placeholder="type (e.g., array<number>, list[int], any)"
-                        value={p.type}
-                        onChange={(e) => setSigParams(prev => prev.map((x, i) => i === idx ? { ...x, type: e.target.value } : x))}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setSigParams(prev => prev.filter((_, i) => i !== idx))}
-                        className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              {/* Params */}
+              <div className="space-y-2">
+                {sigParams.map((p, idx) => (
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-[2fr_2fr_auto] gap-2 items-center">
+                    <input
+                      className="border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="name (e.g., nums)"
+                      value={p.name}
+                      onChange={(e) => setSigParams(prev => prev.map((x, i) => i === idx ? { ...x, name: e.target.value } : x))}
+                    />
+                    <input
+                      className="border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                      placeholder="type (e.g., array<number>, list[int], any)"
+                      value={p.type}
+                      onChange={(e) => setSigParams(prev => prev.map((x, i) => i === idx ? { ...x, type: e.target.value } : x))}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSigParams(prev => prev.filter((_, i) => i !== idx))}
+                      className="px-3 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-red-50 hover:text-red-600"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
 
-                <div className="mt-3">
-                  <label className="block text-sm font-medium text-gray-700">Return type</label>
-                  <input
-                    className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
-                    value={sigReturnType}
-                    onChange={(e) => setSigReturnType(e.target.value)}
-                    placeholder="int | number | any"
-                  />
-                </div>
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-gray-700">Return type</label>
+                <input
+                  className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                  value={sigReturnType}
+                  onChange={(e) => setSigReturnType(e.target.value)}
+                  placeholder="int | number | any"
+                />
               </div>
             </div>
           </section>
 
-          {/* Test Cases (deep equality) */}
           <section>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-gray-800">Test Cases * (min 1)</h3>
@@ -683,9 +700,20 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
                     </div>
                   </div>
 
-                  <p className="text-xs text-gray-500">
-                    Comparison is deep equality. Ensure JSON is valid.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-500">
+                      Comparison is deep equality. Ensure JSON is valid.
+                    </p>
+                    <label className="inline-flex items-center gap-2 text-xs text-gray-600">
+                      <input
+                        type="checkbox"
+                        className="rounded text-blue-600 focus:ring-blue-500"
+                        checked={!!tc.hidden}
+                        onChange={(e) => setTestCases(prev => prev.map((x, i) => i === idx ? { ...x, hidden: e.target.checked } : x))}
+                      />
+                      Hidden
+                    </label>
+                  </div>
                 </div>
               ))}
             </div>
