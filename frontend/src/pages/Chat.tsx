@@ -3,8 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 type Msg = { role: "user" | "assistant"; content: string };
 
 // Only Vite env; fallback to same-origin (use a dev proxy)
-// const API_BASE = import.meta.env.VITE_API_URL || "";
-const API_BASE = 3000;
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function Chat() {
   const [messages, setMessages] = useState<Msg[]>([
@@ -27,11 +26,7 @@ export default function Chat() {
 
     setErr(null);
     setInput("");
-    setMessages((m) => [
-      ...m,
-      { role: "user", content },
-      { role: "assistant", content: "" },
-    ]);
+    setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
     setLoading(true);
 
     const payload = {
@@ -56,9 +51,7 @@ export default function Chat() {
 
       if (!resp.ok) {
         const txt = await resp.text().catch(() => "");
-        throw new Error(
-          `API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`
-        );
+        throw new Error(`API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`);
       }
 
       const reader = resp.body?.getReader?.();

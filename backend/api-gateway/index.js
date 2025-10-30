@@ -4,6 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 dotenv.config();
+const port = process.env.GATEWAY_PORT || 3000;
 
 const app = express();
 app.use(cors());
@@ -53,8 +54,6 @@ app.use(
   })
 );
 
-<<<<<<< Updated upstream
-=======
 app.use(
   "/collaboration",
   createProxyMiddleware({
@@ -95,12 +94,10 @@ app.use(
   })
 );
 
->>>>>>> Stashed changes
 app.use((req, res) => {
   res.status(404).json({ error: { message: "Route Not Found" } });
 });
 
-const port = process.env.GATEWAY_PORT || 3000;
 app.listen(port, () => {
   console.log(`API Gateway running on http://localhost:${port}`);
 });
