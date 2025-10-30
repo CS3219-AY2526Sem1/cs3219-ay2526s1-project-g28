@@ -37,7 +37,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/matchingpage" element={<MatchingPage />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/questions" element={<QuestionsPage />} />
-              <Route path="/collab/:sessionId" element={<CollaborationPage />} />
+              <Route
+                path="/collab/:sessionId"
+                element={<CollaborationPage />}
+              />
             </Route>
           </Routes>
         </AuthProvider>
