@@ -53,6 +53,49 @@ app.use(
   })
 );
 
+<<<<<<< Updated upstream
+=======
+app.use(
+  "/collaboration",
+  createProxyMiddleware({
+    target: process.env.COLLABORATION_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/collaboration${path}`,
+  })
+);
+
+// app.use(
+//   "/notification",
+//   createProxyMiddleware({
+//     target: process.env.COLLABORATION_SERVICE_URL,
+//     changeOrigin: true,
+//     logLevel: "debug",
+//     pathRewrite: (path) => `/notification${path}`,
+//   })
+// );
+
+app.use(
+  "/execute",
+  createProxyMiddleware({
+    target: process.env.EXECUTION_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/execute${path}`,
+  })
+);
+
+app.use(
+  "/ai",
+  createProxyMiddleware({
+    target: process.env.AI_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/ai${path}`,
+  })
+);
+
+>>>>>>> Stashed changes
 app.use((req, res) => {
   res.status(404).json({ error: { message: "Route Not Found" } });
 });
