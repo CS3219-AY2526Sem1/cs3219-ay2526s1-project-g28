@@ -54,6 +54,12 @@ function validateFunctionTestCases(testCases = []) {
     if (!isJsonSerializable(tc.args) || !isJsonSerializable(tc.expected)) {
       problems.push({ index: idx, message: "`args` and `expected` must be JSON-serializable." });
     }
+    if ("hidden" in tc && typeof tc.hidden !== "boolean") {
+      problems.push({
+        index: idx,
+        message: "`hidden` must be a boolean.",
+      });
+    }
   });
   return problems;
 }
@@ -77,6 +83,7 @@ export async function createQuestion(req, res) {
       examples,
       codeSnippets,
       entryPoint,
+      timeout,
       signature,
       testCases,
     } = req.body;
@@ -94,8 +101,13 @@ export async function createQuestion(req, res) {
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
-      .map(([key, _]) => key);
+      .filter(
+        ([_, value]) =>
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+      )
+      .map(([key]) => key);
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -136,6 +148,11 @@ export async function createQuestion(req, res) {
     const cleanExamples = sanitizeExamplesForSave(examples);
     const cleanTestCases = sanitizeTestCasesForSave(testCases);
 
+    let timeoutSec = Number(timeout);
+    if (Number.isNaN(timeoutSec) || timeoutSec <= 0) {
+      timeoutSec = 1;
+    }
+
     // Create new question
     const createdQuestion = await _createQuestion(
       title,
@@ -146,8 +163,9 @@ export async function createQuestion(req, res) {
       cleanExamples,
       codeSnippets,
       entryPoint,
+      timeoutSec,
       signature,
-      cleanTestCases
+      cleanTestCases,
     );
 
     return res.status(201).json({
@@ -156,7 +174,9 @@ export async function createQuestion(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when creating new question!" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when creating new question!" });
   }
 }
 
@@ -172,8 +192,9 @@ export async function updateQuestion(req, res) {
       examples,
       codeSnippets,
       entryPoint,
+      timeout,
       signature,
-      testCases,
+      testCases
     } = req.body;
 
     if (!isValidObjectId(id)) {
@@ -197,7 +218,12 @@ export async function updateQuestion(req, res) {
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null || (typeof value === 'string' && value.trim() === ''))
+      .filter(
+        ([_, value]) =>
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+      )
       .map(([key]) => key);
 
     if (missingFields.length > 0) {
@@ -214,6 +240,7 @@ export async function updateQuestion(req, res) {
         return missing.length > 0 ? { index: idx, missing } : true;
       })
       .filter((x) => x !== true);
+
     if (invalidExamples.length > 0) {
       return res
         .status(400)
@@ -239,6 +266,11 @@ export async function updateQuestion(req, res) {
 
     const cleanTestCases = sanitizeTestCasesForSave(testCases);
 
+    let timeoutSec = Number(timeout);
+    if (Number.isNaN(timeoutSec) || timeoutSec <= 0) {
+      timeoutSec = 1;
+    }
+
     const updatedQuestion = await _updateQuestionById(
       id,
       title,
@@ -249,6 +281,7 @@ export async function updateQuestion(req, res) {
       cleanExamples,
       codeSnippets,
       entryPoint,
+      timeoutSec,
       signature,
       cleanTestCases
     );
@@ -374,6 +407,7 @@ export function formatQuestionResponse(question) {
     examples: question.examples,
     codeSnippets: question.codeSnippets,
     entryPoint: question.entryPoint,
+    timeout: question.timeout,
     signature: question.signature,
     testCases: question.testCases,
   };

@@ -20,6 +20,7 @@ export async function createQuestion(
   examples,
   codeSnippets,
   entryPoint,
+  timeout,
   signature,
   testCases,
 ) {
@@ -32,6 +33,7 @@ export async function createQuestion(
     examples,
     codeSnippets,
     entryPoint,
+    timeout,
     signature,
     testCases,
   }).save();
@@ -47,6 +49,7 @@ export async function updateQuestionById(
   examples,
   codeSnippets,
   entryPoint,
+  timeout,
   signature,
   testCases,
 ) {
@@ -62,6 +65,7 @@ export async function updateQuestionById(
         examples,
         codeSnippets,
         entryPoint,
+        timeout,
         signature,
         testCases,
       },
