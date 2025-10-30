@@ -18,12 +18,12 @@ export const consumer = kafka.consumer({ groupId: "collaboration-group" });
 
 const sessionStore = new Map();
 
-export async function connectKafka () {
+export async function connectKafka() {
   await consumer.connect();
 
   // subscribe to each topic separately
-  await consumer.subscribe({ topic: 'match_found', fromBeginning: false });
-  await consumer.subscribe({ topic: 'question-replies', fromBeginning: true });
+  await consumer.subscribe({ topic: "match_found", fromBeginning: false });
+  await consumer.subscribe({ topic: "question-replies", fromBeginning: true });
 
   await consumer.run({
     eachMessage: async ({ topic, partition, message }) => {
@@ -35,9 +35,12 @@ export async function connectKafka () {
         return;
       }
 
-      if (topic === 'match_found') {
+      if (topic === "match_found") {
         if (!event || !event.correlationId || !event.userA || !event.userB) {
-          console.warn("[Collab] Invalid match_found message, skipping:", event);
+          console.warn(
+            "[Collab] Invalid match_found message, skipping:",
+            event
+          );
           return;
         }
         const { correlationId, userA, userB, matchKey, meta } = event;
@@ -52,7 +55,7 @@ export async function connectKafka () {
         const newSession = await Session.create({
           correlationId,
           users: [userA, userB],
-          status: 'PENDING_QUESTION',
+          status: "PENDING_QUESTION",
           meta: meta || null,
           matchKey: matchKey || null,
           createdAt: new Date(),
@@ -62,13 +65,15 @@ export async function connectKafka () {
         console.log(`[Collab] Created new session in DB for ${correlationId}`);
       }
 
-      if (topic === 'question-replies') {
+      if (topic === "question-replies") {
         const { correlationId, status, data } = event;
-        console.log(`[Collab Service] Received QuestionSelected for match: ${correlationId}`);
+        console.log(
+          `[Collab Service] Received QuestionSelected for match: ${correlationId}`
+        );
 
         const session = await Session.findOne({ correlationId });
 
-        if (session && status !== 'error') {
+        if (session && status !== "error") {
           session.status = status;
           session.question = data;
           session.startedAt = new Date();
@@ -79,9 +84,11 @@ export async function connectKafka () {
           console.log(`[Collab] Updated session in DB for ${correlationId}`);
           console.log(`[Collab] Session details:`, session);
         } else {
-          console.warn(`[Collab Service] Received question for a match not in store: ${correlationId}`);
+          console.warn(
+            `[Collab Service] Received question for a match not in store: ${correlationId}`
+          );
         }
       }
     },
   });
-};
+}

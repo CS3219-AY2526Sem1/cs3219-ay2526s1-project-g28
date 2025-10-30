@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import Editor, { OnChange } from "@monaco-editor/react";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
+import { runCodeApi, submitCodeApi } from "../lib/services/executionService";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
 
@@ -22,9 +23,17 @@ const difficultyStyles: Record<Difficulty, string> = {
 };
 
 // ----- Subcomponents -----
-function Tag({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+function Tag({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${className}`}>
+    <span
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${className}`}
+    >
       {children}
     </span>
   );
@@ -39,7 +48,12 @@ function ProblemViewer({
   title: string;
   difficulty: Difficulty;
   description: string;
-  examples: { id: number; input: string; output: string; explanation?: string }[];
+  examples: {
+    id: number;
+    input: string;
+    output: string;
+    explanation?: string;
+  }[];
 }) {
   return (
     <aside className="w-full md:w-2/5 overflow-y-auto bg-white rounded-2xl border shadow-sm p-4">
@@ -57,7 +71,11 @@ function ProblemViewer({
               <div>
                 <strong>Output:</strong> {ex.output}
               </div>
-              {ex.explanation && <div><strong>Explanation:</strong> {ex.explanation}</div>}
+              {ex.explanation && (
+                <div>
+                  <strong>Explanation:</strong> {ex.explanation}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -66,7 +84,15 @@ function ProblemViewer({
   );
 }
 
-function MonacoEditor({ language, value, onChange }: { language: string; value: string; onChange: OnChange }) {
+function MonacoEditor({
+  language,
+  value,
+  onChange,
+}: {
+  language: string;
+  value: string;
+  onChange: OnChange;
+}) {
   return (
     <Editor
       height="100%"
@@ -74,11 +100,44 @@ function MonacoEditor({ language, value, onChange }: { language: string; value: 
       theme="vs-dark"
       value={value}
       onChange={onChange}
-      options={{ minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false, automaticLayout: true }}
+      options={{
+        minimap: { enabled: false },
+        fontSize: 14,
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+      }}
     />
   );
 }
+function RunButton({
+  code,
+  testCases,
+}: {
+  code: string;
+  testCases: { input: any; expected: string }[];
+}) {
+  const [status, setStatus] = useState<boolean | null>(null); // null = default, true = success, false = fail
 
+  const handleClick = async (): Promise<void> => {
+    const result = await runCodeApi(code, testCases);
+    const { data } = result;
+    setStatus(data.output === true ? true : false);
+  };
+
+  // Determine button classes based on status
+  let bgClass = "bg-slate-900 text-white hover:bg-slate-800"; // default
+  if (status === true) bgClass = "bg-green-500 text-white hover:bg-green-600"; // success
+  if (status === false) bgClass = "bg-red-500 text-white hover:bg-red-600"; // failure
+
+  return (
+    <button
+      className={`rounded-lg border px-3 py-2 text-sm font-medium shadow-sm active:scale-[0.99] ${bgClass}`}
+      onClick={handleClick}
+    >
+      Run
+    </button>
+  );
+}
 function CodeEditorTab({
   language,
   setLanguage,
@@ -90,7 +149,7 @@ function CodeEditorTab({
   setLanguage: (lang: Language) => void;
   code: string;
   setCode: (c: string) => void;
-  testCases: { input: string; expected: string }[];
+  testCases: { input: any; expected: string }[];
 }) {
   const [showTests, setShowTests] = useState(true);
   const handleCodeChange: OnChange = (val) => setCode(val || "");
@@ -121,7 +180,11 @@ function CodeEditorTab({
 
       {/* Editor */}
       <div className="flex-1 rounded-xl border overflow-hidden min-h-0">
-        <MonacoEditor language={language} value={code} onChange={handleCodeChange} />
+        <MonacoEditor
+          language={language}
+          value={code}
+          onChange={handleCodeChange}
+        />
       </div>
 
       {/* Collapsible Test Cases */}
@@ -135,17 +198,38 @@ function CodeEditorTab({
         </button>
         {showTests && (
           <div className="border-t p-3 grid gap-2 text-xs text-slate-700 max-h-40 overflow-auto">
-            {testCases.map((tc, idx) => (
-              <div key={idx} className="rounded-lg bg-slate-50 px-3 py-2">
-                <div className="font-semibold text-slate-800">Case {idx + 1}</div>
-                <div>
-                  Input: <code>{tc.input}</code>
-                </div>
-                <div>
-                  Expected: <code>{tc.expected}</code>
-                </div>
-              </div>
-            ))}
+            {testCases.map((tcItem, idx) => {
+              const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
+
+              return tcs.map((tc) => {
+                return (
+                  <div
+                    key={`${idx}`}
+                    className="rounded-lg bg-slate-50 px-3 py-2 my-2"
+                  >
+                    <div className="font-semibold text-slate-800">
+                      Case {idx + 1}
+                    </div>
+                    <div>
+                      Input:{" "}
+                      <code>
+                        {Array.isArray(tc.args)
+                          ? JSON.stringify(tc.args)
+                          : tc.args}
+                      </code>
+                    </div>
+                    <div>
+                      Expected:{" "}
+                      <code>
+                        {Array.isArray(tc.expected)
+                          ? JSON.stringify(tc.expected)
+                          : tc.expected}
+                      </code>
+                    </div>
+                  </div>
+                );
+              });
+            })}
           </div>
         )}
       </div>
@@ -153,9 +237,7 @@ function CodeEditorTab({
       {/* Footer Bar */}
       <div className="sticky bottom-0 mt-3 flex items-center justify-between rounded-xl border bg-white px-3 py-2">
         <div className="flex gap-2">
-          <button className="rounded-lg border bg-slate-900 text-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-800 active:scale-[0.99]">
-            Run
-          </button>
+          <RunButton code={code} testCases={testCases} />{" "}
           <button className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50 active:scale-[0.99]">
             Submit
           </button>
@@ -197,7 +279,6 @@ function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
   return <div className="text-sm text-gray-500">{formatTime(elapsed)}</div>;
 }
 
-
 // ----- Main Page -----
 export default function CollaborationPage() {
   const { sessionId } = useParams();
@@ -216,7 +297,9 @@ export default function CollaborationPage() {
 
     const fetchSession = async () => {
       try {
-        const res = await fetch(`${COLLAB_SERVICE_URL}/collaboration/${sessionId}`);
+        const res = await fetch(
+          `${COLLAB_SERVICE_URL}/collaboration/${sessionId}`
+        );
         const data = await res.json();
         if (data.question) {
           setQuestion(data.question);
@@ -230,7 +313,7 @@ export default function CollaborationPage() {
         }
       } catch (err) {
         console.error("Failed to fetch session:", err);
-      } 
+      }
     };
 
     // Start polling every 1s
@@ -239,13 +322,15 @@ export default function CollaborationPage() {
     return () => {
       window.clearInterval(interval);
     };
-}, [sessionId]);
+  }, [sessionId]);
 
   // Setup socket
   useEffect(() => {
     if (!sessionId || socketRef.current) return;
 
-    const socket = io(COLLAB_SERVICE_URL, { transports: ["polling", "websocket"] });
+    const socket = io(COLLAB_SERVICE_URL, {
+      transports: ["polling", "websocket"],
+    });
     socketRef.current = socket;
 
     socket.on("connect", () => {
@@ -259,7 +344,7 @@ export default function CollaborationPage() {
     });
 
     socket.on("user-left", () => {
-      alert("The other user has left the session"); 
+      alert("The other user has left the session");
     });
 
     socket.on("disconnect", (reason) => {
@@ -285,7 +370,7 @@ export default function CollaborationPage() {
     try {
       // Notify other users via socket
       socketRef.current?.emit("leave-session", {
-        sessionId
+        sessionId,
       });
 
       // End session on backend
@@ -298,7 +383,7 @@ export default function CollaborationPage() {
       socketRef.current = null;
 
       // Navigate back to home page
-      navigate("/home"); 
+      navigate("/home");
     } catch (err) {
       console.error("Failed to leave session:", err);
       alert("Could not leave session. Try again.");
@@ -306,14 +391,13 @@ export default function CollaborationPage() {
   };
 
   if (loading) {
-  return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="text-gray-500 text-lg">Loading...</div>
-    </div>
-  );
-}
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-gray-500 text-lg">Loading...</div>
+      </div>
+    );
+  }
   if (!question) return <div>Question not found</div>;
-
   return (
     <div className="flex h-screen flex-col bg-gray-50 p-4 gap-4">
       <header className="flex items-center justify-between">
@@ -336,19 +420,25 @@ export default function CollaborationPage() {
         <div className="w-full md:w-3/5 flex flex-col">
           <div className="flex gap-2 mb-2">
             <button
-              className={`px-3 py-1 border rounded ${activeTab === "editor" ? "bg-white" : "bg-gray-200"}`}
+              className={`px-3 py-1 border rounded ${
+                activeTab === "editor" ? "bg-white" : "bg-gray-200"
+              }`}
               onClick={() => setActiveTab("editor")}
             >
               Editor
             </button>
             <button
-              className={`px-3 py-1 border rounded ${activeTab === "chat" ? "bg-white" : "bg-gray-200"}`}
+              className={`px-3 py-1 border rounded ${
+                activeTab === "chat" ? "bg-white" : "bg-gray-200"
+              }`}
               onClick={() => setActiveTab("chat")}
             >
               Chat
             </button>
             <button
-              className={`px-3 py-1 border rounded ${activeTab === "call" ? "bg-white" : "bg-gray-200"}`}
+              className={`px-3 py-1 border rounded ${
+                activeTab === "call" ? "bg-white" : "bg-gray-200"
+              }`}
               onClick={() => setActiveTab("call")}
             >
               Call
@@ -356,17 +446,25 @@ export default function CollaborationPage() {
           </div>
 
           <div className="flex-1 flex flex-col border rounded p-2 min-h-0">
-            {activeTab === "editor" && 
-                <CodeEditorTab 
-                    language={language} 
-                    setLanguage = {setLanguage} 
-                    code={code} 
-                    setCode={handleCodeChange}
-                    testCases={question.testCases}
-                />
-            }
-            {activeTab === "chat" && <div className="text-center text-gray-500">AI Chat placeholder</div>}
-            {activeTab === "call" && <div className="text-center text-gray-500">Voice/Video placeholder</div>}
+            {activeTab === "editor" && (
+              <CodeEditorTab
+                language={language}
+                setLanguage={setLanguage}
+                code={code}
+                setCode={handleCodeChange}
+                testCases={question.testCases}
+              />
+            )}
+            {activeTab === "chat" && (
+              <div className="text-center text-gray-500">
+                AI Chat placeholder
+              </div>
+            )}
+            {activeTab === "call" && (
+              <div className="text-center text-gray-500">
+                Voice/Video placeholder
+              </div>
+            )}
           </div>
         </div>
       </div>
