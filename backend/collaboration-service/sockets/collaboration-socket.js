@@ -4,15 +4,24 @@ export function initCollaborationSocket(io, redis) {
         console.log("User connected:", socket.id);
 
         socket.on("join-session", ({ sessionId }) => {
-        socket.join(sessionId);
-        console.log(`User joined session ${sessionId}`);
+            socket.join(sessionId);
+            console.log(`User joined session ${sessionId}`);
         });
 
         socket.on("code-change", ({ sessionId, code }) => {
-        // Broadcast code updates to other clients
-        socket.to(sessionId).emit("code-change", { code });
-        // Optionally cache code in Redis
-        redis.set(`session:${sessionId}:code`, code);
+            // Broadcast code updates to other clients
+            socket.to(sessionId).emit("code-change", { code });
+            // Optionally cache code in Redis
+            redis.set(`session:${sessionId}:code`, code);
+        });
+
+        socket.on("language-change", ({ sessionId, language }) => {
+            // Broadcast language updates to others
+            socket.to(sessionId).emit("language-change", { language });
+        });
+        
+        socket.on("cursor-change", ({ sessionId, position, username }) => {
+            socket.to(sessionId).emit("remote-cursor-change", { position, username });
         });
 
         // Custom event for leaving
