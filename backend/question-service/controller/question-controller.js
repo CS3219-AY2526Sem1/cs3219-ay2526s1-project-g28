@@ -8,6 +8,11 @@ import {
   deleteQuestionById as _deleteQuestionById,
   findRandomQuestion as _findRandomQuestion,
 } from "../model/repository.js";
+import {
+  sanitizeExamplesForSave,
+  collectImageKeys,
+  destroyCloudinaryKeys,
+} from "./upload-controller.js";
 import { producer } from "../kafka-utilties.js";
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"];
@@ -22,6 +27,51 @@ const TOPICS = [
   "Dynamic Programming",
 ];
 
+function isJsonSerializable(v) {
+  try {
+    JSON.stringify(v);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function validateFunctionTestCases(testCases = []) {
+  const problems = [];
+  if (!Array.isArray(testCases) || testCases.length === 0) {
+    problems.push({ index: -1, message: "At least one test case is required." });
+    return problems;
+  }
+  testCases.forEach((tc, idx) => {
+    if (!tc || !Array.isArray(tc.args)) {
+      problems.push({ index: idx, message: "`args` must be an array." });
+      return;
+    }
+    if (!("expected" in tc)) {
+      problems.push({ index: idx, message: "`expected` is required." });
+      return;
+    }
+    if (!isJsonSerializable(tc.args) || !isJsonSerializable(tc.expected)) {
+      problems.push({ index: idx, message: "`args` and `expected` must be JSON-serializable." });
+    }
+    if ("hidden" in tc && typeof tc.hidden !== "boolean") {
+      problems.push({
+        index: idx,
+        message: "`hidden` must be a boolean.",
+      });
+    }
+  });
+  return problems;
+}
+
+function sanitizeTestCasesForSave(testCases = []) {
+  return (Array.isArray(testCases) ? testCases : []).map((tc) => ({
+    args: tc.args,
+    expected: tc.expected,
+    hidden: !!tc.hidden,
+  }));
+}
+
 export async function createQuestion(req, res) {
   try {
     const {
@@ -32,6 +82,9 @@ export async function createQuestion(req, res) {
       constraints,
       examples,
       codeSnippets,
+      entryPoint,
+      timeout,
+      signature,
       testCases,
     } = req.body;
 
@@ -43,12 +96,18 @@ export async function createQuestion(req, res) {
       problemStatement,
       constraints,
       examples,
+      entryPoint,
       testCases,
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null)
-      .map(([key, _]) => key);
+      .filter(
+        ([_, value]) =>
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+      )
+      .map(([key]) => key);
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -57,7 +116,7 @@ export async function createQuestion(req, res) {
     }
 
     // Validate examples
-    const invalidExamples = examples
+    const invalidExamples = (examples || [])
       .map((ex, idx) => {
         const missing = [];
         if (!ex.input || ex.input.trim() === "") missing.push("input");
@@ -73,25 +132,25 @@ export async function createQuestion(req, res) {
     }
 
     // Validate test cases
-    const invalidTestCases = testCases
-      .map((tc, idx) => {
-        const missing = [];
-        if (!tc.input || tc.input.trim() === "") missing.push("input");
-        if (!tc.expected || tc.expected.trim() === "") missing.push("expected");
-        return missing.length > 0 ? { index: idx, missing } : true;
-      })
-      .filter((x) => x !== true);
-
-    if (invalidTestCases.length > 0) {
+    const tcProblems = validateFunctionTestCases(testCases);
+    if (tcProblems.length > 0) {
       return res
         .status(400)
-        .json({ message: "Invalid test cases", details: invalidTestCases });
+        .json({ message: "Invalid test cases", details: tcProblems });
     }
 
-    // Check if question already exists
+    // Unique title
     const existingQuestion = await _findQuestionByTitle(title);
     if (existingQuestion) {
       return res.status(409).json({ message: "Title already exists" });
+    }
+
+    const cleanExamples = sanitizeExamplesForSave(examples);
+    const cleanTestCases = sanitizeTestCasesForSave(testCases);
+
+    let timeoutSec = Number(timeout);
+    if (Number.isNaN(timeoutSec) || timeoutSec <= 0) {
+      timeoutSec = 1;
     }
 
     // Create new question
@@ -101,10 +160,14 @@ export async function createQuestion(req, res) {
       topics,
       problemStatement,
       constraints,
-      examples,
+      cleanExamples,
       codeSnippets,
-      testCases
+      entryPoint,
+      timeoutSec,
+      signature,
+      cleanTestCases,
     );
+
     return res.status(201).json({
       message: `Created new question ${title} successfully`,
       data: formatQuestionResponse(createdQuestion),
@@ -128,14 +191,21 @@ export async function updateQuestion(req, res) {
       constraints,
       examples,
       codeSnippets,
-      testCases,
+      entryPoint,
+      timeout,
+      signature,
+      testCases
     } = req.body;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({ message: "Invalid question ID" });
     }
 
-    // Collect missing fields
+    const current = await _findQuestionById(id);
+    if (!current) {
+      return res.status(404).json({ message: "Question not found" });
+    }
+
     const requiredFields = {
       title,
       difficulty,
@@ -143,12 +213,18 @@ export async function updateQuestion(req, res) {
       problemStatement,
       constraints,
       examples,
+      entryPoint,
       testCases,
     };
 
     const missingFields = Object.entries(requiredFields)
-      .filter(([_, value]) => value === undefined || value === null)
-      .map(([key, _]) => key);
+      .filter(
+        ([_, value]) =>
+          value === undefined ||
+          value === null ||
+          (typeof value === "string" && value.trim() === "")
+      )
+      .map(([key]) => key);
 
     if (missingFields.length > 0) {
       return res.status(400).json({
@@ -156,8 +232,7 @@ export async function updateQuestion(req, res) {
       });
     }
 
-    // Validate examples
-    const invalidExamples = examples
+    const invalidExamples = (examples || [])
       .map((ex, idx) => {
         const missing = [];
         if (!ex.input || ex.input.trim() === "") missing.push("input");
@@ -172,29 +247,30 @@ export async function updateQuestion(req, res) {
         .json({ message: "Invalid examples", details: invalidExamples });
     }
 
-    // Validate test cases
-    const invalidTestCases = testCases
-      .map((tc, idx) => {
-        const missing = [];
-        if (!tc.input || tc.input.trim() === "") missing.push("input");
-        if (!tc.expected || tc.expected.trim() === "") missing.push("expected");
-        return missing.length > 0 ? { index: idx, missing } : true;
-      })
-      .filter((x) => x !== true);
-
-    if (invalidTestCases.length > 0) {
+    const tcProblems = validateFunctionTestCases(testCases);
+    if (tcProblems.length > 0) {
       return res
         .status(400)
-        .json({ message: "Invalid test cases", details: invalidTestCases });
+        .json({ message: "Invalid test cases", details: tcProblems });
     }
 
-    // Check if question already exists
     const existingQuestion = await _findQuestionByTitle(title);
     if (existingQuestion && existingQuestion._id.toString() !== id) {
       return res.status(409).json({ message: "Title already exists" });
     }
 
-    // Update question
+    const cleanExamples = sanitizeExamplesForSave(examples);
+    const prevKeys = collectImageKeys(current.examples);
+    const newKeys = collectImageKeys(cleanExamples);
+    const keysToDelete = prevKeys.filter((k) => !newKeys.includes(k));
+
+    const cleanTestCases = sanitizeTestCasesForSave(testCases);
+
+    let timeoutSec = Number(timeout);
+    if (Number.isNaN(timeoutSec) || timeoutSec <= 0) {
+      timeoutSec = 1;
+    }
+
     const updatedQuestion = await _updateQuestionById(
       id,
       title,
@@ -202,14 +278,19 @@ export async function updateQuestion(req, res) {
       topics,
       problemStatement,
       constraints,
-      examples,
+      cleanExamples,
       codeSnippets,
-      testCases
+      entryPoint,
+      timeoutSec,
+      signature,
+      cleanTestCases
     );
 
     if (!updatedQuestion) {
       return res.status(404).json({ message: "Question not found" });
     }
+
+    await destroyCloudinaryKeys(keysToDelete);
 
     return res.status(200).json({
       message: `Updated question ${title} successfully`,
@@ -217,9 +298,7 @@ export async function updateQuestion(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when updating question!" });
+    return res.status(500).json({ message: "Unknown error when updating question!" });
   }
 }
 
@@ -232,9 +311,7 @@ export async function getQuestion(req, res) {
 
     const question = await _findQuestionById(questionId);
     if (!question) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
+      return res.status(404).json({ message: `Question ${questionId} not found` });
     } else {
       return res.status(200).json({
         message: `Found question`,
@@ -243,9 +320,7 @@ export async function getQuestion(req, res) {
     }
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting question!" });
+    return res.status(500).json({ message: "Unknown error when getting question!" });
   }
 }
 
@@ -259,9 +334,7 @@ export async function getAllQuestions(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting all questions!" });
+    return res.status(500).json({ message: "Unknown error when getting all questions!" });
   }
 }
 
@@ -276,9 +349,7 @@ export async function getRandomQuestion(req, res) {
       return res.status(404).json({ message: `Topics must be specified` });
     }
     if (difficulty && !DIFFICULTIES.includes(difficulty)) {
-      return res
-        .status(404)
-        .json({ message: `Invalid difficulty level: ${difficulty}` });
+      return res.status(404).json({ message: `Invalid difficulty level: ${difficulty}` });
     }
     if (topics && !TOPICS.includes(topics)) {
       return res.status(404).json({ message: `Invalid topic: ${topics}` });
@@ -287,9 +358,7 @@ export async function getRandomQuestion(req, res) {
     const randomQuestion = await _findRandomQuestion(difficulty, topics);
 
     if (!randomQuestion || randomQuestion.length === 0) {
-      return res
-        .status(404)
-        .json({ message: "No questions found matching the criteria." });
+      return res.status(404).json({ message: "No questions found matching the criteria." });
     }
 
     return res.status(200).json({
@@ -298,9 +367,7 @@ export async function getRandomQuestion(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when getting a random question!" });
+    return res.status(500).json({ message: "Unknown error when getting a random question!" });
   }
 }
 
@@ -308,26 +375,24 @@ export async function deleteQuestion(req, res) {
   try {
     const questionId = req.params.id;
     if (!isValidObjectId(questionId)) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
-    }
-    const question = await _findQuestionById(questionId);
-    if (!question) {
-      return res
-        .status(404)
-        .json({ message: `Question ${questionId} not found` });
+      return res.status(404).json({ message: `Question ${questionId} not found` });
     }
 
+    const question = await _findQuestionById(questionId);
+    if (!question) {
+      return res.status(404).json({ message: `Question ${questionId} not found` });
+    }
+
+    const keys = collectImageKeys(question.examples);
+
     await _deleteQuestionById(questionId);
-    return res
-      .status(200)
-      .json({ message: `Deleted question ${questionId} successfully` });
+
+    await destroyCloudinaryKeys(keys);
+
+    return res.status(200).json({ message: `Deleted question ${questionId} successfully` });
   } catch (err) {
     console.error(err);
-    return res
-      .status(500)
-      .json({ message: "Unknown error when deleting question!" });
+    return res.status(500).json({ message: "Unknown error when deleting question!" });
   }
 }
 
@@ -341,6 +406,9 @@ export function formatQuestionResponse(question) {
     constraints: question.constraints,
     examples: question.examples,
     codeSnippets: question.codeSnippets,
+    entryPoint: question.entryPoint,
+    timeout: question.timeout,
+    signature: question.signature,
     testCases: question.testCases,
   };
 }
@@ -365,11 +433,9 @@ export async function handleMatchingRequest(message) {
   );
 
   try {
-    // 1. Use your existing model function to find a question
     const randomQuestion = await _findRandomQuestion(meta.difficulty, meta.topics[0]);
 
     if (!randomQuestion || randomQuestion.length === 0) {
-      // 2a. Send "Not Found" reply
       console.warn(`[Question] Kafka: No question found for ${correlationId}`);
 
       await producer.send({
@@ -391,7 +457,6 @@ export async function handleMatchingRequest(message) {
 
     const question = randomQuestion[0];
 
-    // 2b. Send "Success" reply
     await producer.send({
       topic: "question-replies",
       messages: [
@@ -399,7 +464,6 @@ export async function handleMatchingRequest(message) {
           value: JSON.stringify({
             correlationId: correlationId,
             status: "success",
-            // Use your existing formatter for a consistent response!
             data: formatQuestionResponse(question),
             message: "Question found successfully.",
           }),
@@ -414,7 +478,6 @@ export async function handleMatchingRequest(message) {
       err
     );
 
-    // 3. Send "Error" reply (if possible)
     try {
       await producer.send({
         topic: "question-replies",

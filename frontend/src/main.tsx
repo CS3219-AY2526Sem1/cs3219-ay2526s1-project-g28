@@ -13,6 +13,7 @@ import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
 import QuestionsPage from "./pages/QuestionsPage";
 
+
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
 
@@ -26,6 +27,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="*" element={<div className="p-10">404 Not found</div>} />
+        <Route path="/chat" element={<Chat />} />
         <Route path="/login/success" element={<LoginSuccess />} />
         {/* Everything below requires auth */}
         <Route element={<ProtectedRoute />}>
@@ -34,6 +36,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="/matchingpage" element={<MatchingPage />} />
           <Route path="/home" element={<HomePage />} />
           <Route path="/questions" element={<QuestionsPage />} />
+           <Route
+                path="/collab/:sessionId"
+                element={<CollaborationPage />}
+              />
           </Route>
       </Routes>
 
@@ -41,6 +47,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
+
 
   </ThemeProvider>
 );

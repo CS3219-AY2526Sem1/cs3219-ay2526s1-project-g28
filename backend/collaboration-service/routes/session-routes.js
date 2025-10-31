@@ -1,8 +1,9 @@
 import express from "express";
-import { createSession, endSession } from "../controller/session-controller.js";
+import { createSession, endSession, getSession } from "../controller/session-controller.js";
 const router = express.Router();
 
 router.post("/", createSession);
-router.delete("/:sessionId", endSession);
+router.delete("/:correlationId", endSession);
+router.get("/:correlationId", getSession);
 
 export default router;
