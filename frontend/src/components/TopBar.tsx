@@ -21,6 +21,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
 
   const displayName = user?.fullname || "User";
   const displayEmail = user?.email || "";
+  console.log("User in TopBar:", user.avatarUrl);
   const avatarUrl =
     user && (user as any).avatarUrl
       ? (user as any).avatarUrl
