@@ -23,7 +23,13 @@ export type HeaderProps =
       onToggleSidebar: () => void;
       onNavigate: (p: Page) => void;
   }
-  | {variant: "authing";};
+  | {variant: "authing";}
+  | {
+      variant: "settings";
+      title?: string;           // defaults to "Settings"
+      showBack?: boolean;       // optional "Back" to dashboard
+      backTo?: string;          // defaults to "/home" or "/dashboard"
+    };
 
 const AUThed_NAV = [
   { to: "/history", label: "History" },
@@ -102,6 +108,36 @@ export default function Header(props: HeaderProps) {
           <nav className="flex items-center gap-6">
             <ThemeButton />
           </nav>
+        </div>
+      </header>
+    );
+  } else if (props.variant === "settings") {
+    const { title = "Settings", showBack = false, backTo = "/dashboard" } = props;
+    return (
+      <header className="w-full bg-white dark:bg-black border-b border-neutral-200 dark:border-neutral-800">
+        <div className="mx-auto max-w-6xl flex items-center justify-between py-3 px-4">
+          <div className="flex items-center gap-3">
+            {showBack && (
+              <Link
+                to={backTo}
+                className="px-3 py-1.5 rounded-md border border-neutral-300 bg-white text-black
+                           hover:bg-neutral-100 transition
+                           dark:border-neutral-600 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700"
+              >
+                ← Back
+              </Link>
+            )}
+            <Link to="/" className="text-lg font-semibold dark:text-white">PeerPrep</Link>
+          </div>
+
+          <div className="text-sm font-medium dark:text-white hidden sm:block">
+            {title}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <ThemeButton />
+            <AvatarMenu avatarUrl={user?.avatarUrl} />
+          </div>
         </div>
       </header>
     );
@@ -198,7 +234,9 @@ function AvatarMenu({ avatarUrl }: { avatarUrl?: string }) {
       </button>
 
       {open && (
-        <div role="menu" className="absolute right-0 mt-2 w-44 rounded-lg bg-white text-black shadow-md border border-neutral-200">
+        <div role="menu" 
+              className="absolute right-0 mt-2 w-44 rounded-lg bg-white text-black shadow-md border border-neutral-200 z-50 pointer-events-auto">
+
           <Link to="/profile" role="menuitem" className="block px-4 py-2 hover:bg-neutral-100">Profile</Link>
           <Link to="/settings" role="menuitem" className="block px-4 py-2 hover:bg-neutral-100">Settings</Link>
           <button

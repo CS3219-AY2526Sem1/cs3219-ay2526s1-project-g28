@@ -6,8 +6,9 @@ import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 import { runCodeApi } from "../lib/services/executionService";
 import Chat from "./Chat";
+import FloatingCallPopup from "../components/FloatingCallPopup";
 
-const COLLAB_SERVICE_URL = "http://localhost:3004";
+const COLLAB_SERVICE_URL = "http://localhost:3003";
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
@@ -563,6 +564,8 @@ export default function CollaborationPage() {
   const [code, setCode] = useState(defaultSnippets["python"]);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>("");
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [showCallPopup, setShowCallPopup] = useState(false);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
 
@@ -763,13 +766,38 @@ export default function CollaborationPage() {
               </div>
             )}
             {activeTab === "call" && (
-              <div className="text-center text-gray-500">
-                Voice/Video placeholder
+              <div className="flex flex-col h-full w-full items-center justify-center gap-4">
+                <button
+                  disabled={isCallActive}
+                  onClick={() => {
+                    setIsCallActive(true);
+                    setShowCallPopup(true);
+                  }}
+                  className={`px-4 py-2 rounded text-white font-medium transition ${
+                    isCallActive
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
+                >
+                  {isCallActive ? "Call Started" : "Start Video Call"}
+                </button>
               </div>
             )}
           </div>
         </div>
       </div>
+      {showCallPopup && (
+      <FloatingCallPopup
+        sessionId={sessionId}
+        socketRef={socketRef}
+        onCallEnd={() => {
+          setIsCallActive(false);
+          setShowCallPopup(false);
+        }}
+        collabServiceUrl={COLLAB_SERVICE_URL} // 👈 pass it from parent
+      />
+    )}
+
     </div>
   );
 }

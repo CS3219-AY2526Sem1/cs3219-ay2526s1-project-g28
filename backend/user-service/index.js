@@ -1,13 +1,16 @@
 import express from "express";
 import cors from "cors";
+import passport from "./config/passport.js";
 
+import cloudinaryRouter from "./routes/cloudinary-routes.js";
 import userRoutes from "./routes/user-routes.js";
 import authRoutes from "./routes/auth-routes.js";
-
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+app.use(passport.initialize());
+
 const FRONTEND =
   process.env.FRONTEND_ORIGIN ||
   "http://localhost:5173" ||
@@ -27,9 +30,11 @@ app.use(
   })
 );
 
+
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
 app.get("/health", (_req, res) => res.json({ ok: true }));
+app.use("/api", cloudinaryRouter);
 
 app.get("/", (req, res, next) => {
   console.log("Sending Greetings!");
