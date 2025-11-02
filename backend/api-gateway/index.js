@@ -94,6 +94,26 @@ app.use(
   })
 );
 
+app.use(
+  "/api/cloudinary",
+  createProxyMiddleware({
+    target: process.env.USER_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/api/cloudinary${path}`,
+  })
+);
+
+app.use(
+  "/socket.io",
+  createProxyMiddleware({
+    target: process.env.COLLABORATION_SERVICE_URL,
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path) => `/socket.io${path}`,
+  })
+);
+
 app.use((req, res) => {
   res.status(404).json({ error: { message: "Route Not Found" } });
 });
