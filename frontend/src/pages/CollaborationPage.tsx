@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
+import * as monaco from "monaco-editor";
 import Editor, { OnChange } from "@monaco-editor/react";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
@@ -90,10 +91,12 @@ function MonacoEditor({
   language,
   value,
   onChange,
+  onMount,
 }: {
   language: string;
   value: string;
   onChange: OnChange;
+  onMount?: (editor: any, monaco: any) => void; 
 }) {
   return (
     <Editor
@@ -102,6 +105,7 @@ function MonacoEditor({
       theme="vs-dark"
       value={value}
       onChange={onChange}
+      onMount={onMount}
       options={{
         minimap: { enabled: false },
         fontSize: 14,
@@ -118,12 +122,123 @@ function CodeEditorTab({
   code,
   setCode,
   testCases,
+  socketRef,
+  sessionId,
+  currentUsername,
   timeout,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
   code: string;
   setCode: (c: string) => void;
+  testCases: { input: any; expected: string }[];
+  socketRef: React.MutableRefObject<any>;
+  sessionId: string | undefined;  
+  currentUsername: string;
+}) {
+    const [showTests, setShowTests] = useState(true);
+    const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+    const cursorWidgetRef = useRef<monaco.editor.IContentWidget | null>(null);
+    const [remoteCursor, setRemoteCursor] = useState<{
+      lineNumber: number;
+      column: number;
+      username: string;
+    } | null>(null);
+    const [decorationIds, setDecorationIds] = useState<string[]>([]);
+
+
+    const handleCodeChange: OnChange = (val) => setCode(val || "");
+
+    // Mount editor and listen for local cursor movement
+    const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
+      editorRef.current = editor;
+
+      editor.onDidChangeCursorPosition((e) => {
+        const pos = e.position;
+        socketRef.current?.emit("cursor-change", {
+          sessionId,
+          position: { lineNumber: pos.lineNumber, column: pos.column },
+          username: currentUsername,
+        });
+      });
+    };
+
+    // Listen for remote cursor updates
+    useEffect(() => {
+      if (!socketRef.current) return;
+
+      socketRef.current.on(
+        "remote-cursor-change",
+        ({ position, username }: { position: { lineNumber: number; column: number }; username: string }) => {
+          if (username !== currentUsername) {
+            setRemoteCursor({ ...position, username });
+          }
+        }
+      );
+
+      return () => {
+        socketRef.current.off("remote-cursor-change");
+      };
+    }, [socketRef, currentUsername]);
+
+    // Update Monaco Content Widget for remote cursor
+    useEffect(() => {
+      if (!editorRef.current || !remoteCursor) return;
+
+      const editor = editorRef.current;
+
+      // Remove previous widget
+      if (cursorWidgetRef.current) {
+        try {
+          editor.removeContentWidget(cursorWidgetRef.current);
+        } catch {}
+        cursorWidgetRef.current = null;
+      }
+
+      // Create DOM node for username
+      const domNode = document.createElement("div");
+      domNode.className = "remote-cursor-label";
+      domNode.textContent = remoteCursor.username;
+
+      // Define content widget
+      const widget: monaco.editor.IContentWidget = {
+        getId: () => "remoteCursorWidget",
+        getDomNode: () => domNode,
+        getPosition: () => ({
+          position: {
+            lineNumber: remoteCursor.lineNumber,
+            column: remoteCursor.column,
+          },
+          preference: [
+            monaco.editor.ContentWidgetPositionPreference.ABOVE,
+            monaco.editor.ContentWidgetPositionPreference.BELOW,
+          ],
+        }),
+      };
+
+      editor.addContentWidget(widget);
+      cursorWidgetRef.current = widget;
+
+      // Remove previous cursor decorations
+      const newDecorations = [
+        {
+          range: new monaco.Range(
+            remoteCursor.lineNumber,
+            remoteCursor.column,
+            remoteCursor.lineNumber,
+            remoteCursor.column
+          ),
+          options: {
+            className: "remote-cursor", // CSS for vertical line
+            isWholeLine: false,
+          },
+        },
+      ];
+
+      const newIds = editor.deltaDecorations(decorationIds, newDecorations);
+      setDecorationIds(newIds);
+    }, [remoteCursor]);
+
   testCases: {
     hidden: boolean;
     input: any;
@@ -194,48 +309,34 @@ function CodeEditorTab({
   };
 
   return (
-    <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
-      {/* Tabs */}
-      <div className="flex gap-2 mb-3">
-        {["editor", "console"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as "editor" | "console")}
-            className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${
-              activeTab === tab
-                ? "bg-white shadow text-slate-900"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
+    <div className="flex-1 flex flex-col gap-3 min-h-0">
+      {/* Toolbar */}
+      <div className="flex justify-between mb-2">
+        <select
+          value={language}
+          onChange={(e) => setLanguage(e.target.value as Language)}
+          className="border rounded px-2 py-1"
+        >
+          <option value="python">Python</option>
+          <option value="javascript">JavaScript</option>
+        </select>
+        <button
+          onClick={() => setCode(defaultSnippets[language])}
+          className="border rounded px-2 py-1"
+        >
+          Reset Code
+        </button>
       </div>
 
-      {/* Editor Tab */}
-      {activeTab === "editor" && (
-        <>
-          {/* Toolbar */}
-          <div className="flex justify-between mb-2 items-center gap-2">
-            <select
-              value={language}
-              onChange={(e) => {
-                const lang = e.target.value as Language;
-                setLanguage(lang);
-                setCode(defaultSnippets[lang]);
-              }}
-              className="border rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              <option value="python">Python</option>
-              <option value="javascript">JavaScript</option>
-            </select>
-            <button
-              onClick={() => setCode(defaultSnippets[language])}
-              className="border rounded px-3 py-1 shadow-sm hover:bg-slate-50 transition"
-            >
-              Reset Code
-            </button>
-          </div>
+      {/* Editor */}
+      <div className="flex-1 rounded-xl border overflow-hidden min-h-0">
+        <MonacoEditor
+          language={language}
+          value={code}
+          onChange={handleCodeChange}
+          onMount={handleEditorMount}
+        />
+      </div>
 
           {/* Editor */}
           <div className="flex-1 rounded-xl border overflow-hidden shadow-sm min-h-[300px]">
@@ -462,10 +563,20 @@ export default function CollaborationPage() {
   const [language, setLanguage] = useState<Language>("python");
   const [code, setCode] = useState(defaultSnippets["python"]);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
+  const [currentUsername, setCurrentUsername] = useState<string>("");
   const [isCallActive, setIsCallActive] = useState(false);
   const [showCallPopup, setShowCallPopup] = useState(false);
   const socketRef = useRef<any>(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const userObj = JSON.parse(storedUser);
+      setCurrentUsername(userObj.username);
+      console.log("Current username:", userObj.username);
+    }
+  }, []);
 
   // Fetch session/question
   useEffect(() => {
@@ -485,6 +596,7 @@ export default function CollaborationPage() {
             setLanguage(data.question.codeSnippets[0].language);
             setCode(data.question.codeSnippets[0].code);
           }
+
           window.clearInterval(interval);
           setLoading(false);
         }
@@ -520,6 +632,13 @@ export default function CollaborationPage() {
       setCode(newCode);
     });
 
+    // Listen for language changes from others
+    socket.on("language-change", ({ language: newLang }: { language: Language }) => {
+      console.log("Language changed to:", newLang);
+      setLanguage(newLang);
+      setCode(defaultSnippets[newLang]); // optional: reset snippet to match
+    });
+
     socket.on("user-left", () => {
       alert("The other user has left the session");
     });
@@ -537,6 +656,12 @@ export default function CollaborationPage() {
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
     socketRef.current?.emit("code-change", { sessionId, code: newCode });
+  };
+
+  const handleLanguageChange = (newLang: Language) => {
+    setLanguage(newLang);
+    setCode(defaultSnippets[newLang]);
+    socketRef.current?.emit("language-change", { sessionId, language: newLang });
   };
 
   const handleLeaveSession = async () => {
@@ -626,14 +751,20 @@ export default function CollaborationPage() {
             {activeTab === "editor" && (
               <CodeEditorTab
                 language={language}
-                setLanguage={setLanguage}
+                setLanguage={handleLanguageChange}
                 code={code}
                 setCode={handleCodeChange}
                 testCases={question.testCases}
-                timeout={timeout}
+                socketRef={socketRef}
+                sessionId={sessionId}
+                currentUsername={currentUsername}
               />
             )}
-            {activeTab === "chat" && <Chat />}
+            {activeTab === "chat" && (
+              <div className="text-center text-gray-500">
+                <Chat />
+              </div>
+            )}
             {activeTab === "call" && (
               <div className="flex flex-col h-full w-full items-center justify-center gap-4">
                 <button

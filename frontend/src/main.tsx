@@ -14,10 +14,10 @@ import LoginSuccess from "./pages/LoginSuccess";
 import QuestionsPage from "./pages/QuestionsPage";
 import Chat from "./pages/Chat";
 import CollaborationPage from "./pages/CollaborationPage";
-
-
 import { ThemeProvider } from "./theme/ThemeProvider";
+import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
+
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
