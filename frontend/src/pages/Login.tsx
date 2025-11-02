@@ -65,14 +65,14 @@ export default function Login() {
   <button
     type="button"
     onClick={() => (window.location.href = "http://localhost:3001/auth/google")}
-    className="w-full rounded-md border-2 border-black py-2.5"
+    className="w-full rounded-md border-2 border-black py-2.5 dark:text-black"
   >
     Continue with Google
   </button>
   <button
     type="button"
     onClick={() => (window.location.href = "http://localhost:3001/auth/github")}
-    className="w-full rounded-md border-2 border-black py-2.5"
+    className="w-full rounded-md border-2 border-black py-2.5 dark:text-black"
   >
     Continue with GitHub
   </button>
