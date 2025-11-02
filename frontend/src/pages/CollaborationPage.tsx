@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import Editor, { OnChange } from "@monaco-editor/react";
-import DailyIframe from "@daily-co/daily-js";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 import { runCodeApi } from "../lib/services/executionService";
@@ -636,83 +635,23 @@ export default function CollaborationPage() {
             )}
             {activeTab === "chat" && <Chat />}
             {activeTab === "call" && (
-          //   <div className="flex flex-col h-full w-full items-center justify-center gap-4">
-          //   <div
-          //     id="daily-container"
-          //     className="relative w-full max-w-[600px] h-[350px] rounded-lg overflow-hidden border shadow"
-          //   ></div> */}
-
-          //   <button
-          //     onClick={async () => {
-          //       try {
-          //         const res = await fetch(
-          //           `${COLLAB_SERVICE_URL}/collaboration/create-daily-room/${sessionId?.split(":")[1]}`,
-          //           { method: "POST" }
-          //         );
-          //         const data = await res.json();
-          //         if (!data.url) throw new Error("No room URL returned from server");
-
-          //         const container = document.getElementById("daily-container");
-          //         if (!container) throw new Error("Daily container not found");
-
-          //         // 🧠 Attach the call inside this container
-          //         const callFrame = DailyIframe.createFrame(container, {
-          //           showLeaveButton: true,
-          //           iframeStyle: {
-          //             position: "absolute",
-          //             width: "100%",
-          //             height: "100%",
-          //             top: "0",
-          //             left: "0",
-          //             border: "0",
-          //             borderRadius: "0.75rem",
-          //           },
-          //         });
-
-          //         await callFrame.join({ url: data.url });
-
-          //         // 🧹 Clean up when call ends
-          //         callFrame.on("left-meeting", async () => {
-          //           await fetch(
-          //             `${COLLAB_SERVICE_URL}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,
-          //             { method: "DELETE" }
-          //           );
-          //           socketRef.current?.emit("end-call", {
-          //             sessionId: sessionId?.split(":")[1],
-          //           });
-          //           callFrame.destroy();
-          //         });
-          //       } catch (err) {
-          //         console.error("Daily error:", err);
-          //         alert("Could not start video call.");
-          //       }
-          //     }}
-          //     className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-          //   >
-          //     Start Video Call
-          //   </button>
-          // </div>
-  <div className="flex flex-col h-full w-full items-center justify-center gap-4">
-    <button
-      disabled={isCallActive}
-      onClick={() => {
-        setIsCallActive(true);
-        setShowCallPopup(true);
-      }}
-      className={`px-4 py-2 rounded text-white font-medium transition ${
-        isCallActive
-          ? "bg-gray-400 cursor-not-allowed"
-          : "bg-indigo-600 hover:bg-indigo-700"
-      }`}
-    >
-      {isCallActive ? "Call Started" : "Start Video Call"}
-    </button>
-  </div>
-)}
-
-
-
-
+              <div className="flex flex-col h-full w-full items-center justify-center gap-4">
+                <button
+                  disabled={isCallActive}
+                  onClick={() => {
+                    setIsCallActive(true);
+                    setShowCallPopup(true);
+                  }}
+                  className={`px-4 py-2 rounded text-white font-medium transition ${
+                    isCallActive
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-indigo-600 hover:bg-indigo-700"
+                  }`}
+                >
+                  {isCallActive ? "Call Started" : "Start Video Call"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
