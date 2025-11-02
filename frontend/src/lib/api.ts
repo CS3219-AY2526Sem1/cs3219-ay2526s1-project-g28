@@ -4,7 +4,7 @@ export type ApiOptions = {
 };
 
 export async function api(path: string, opts: ApiOptions = {}) {
-  const base = import.meta.env.VITE_API_URL || "http://localhost:3000";
+  const base = import.meta.env.VITE_API_URL || "http://localhost:3001";
   const token = localStorage.getItem("token");
 
   const res = await fetch(`${base}${path}`, {

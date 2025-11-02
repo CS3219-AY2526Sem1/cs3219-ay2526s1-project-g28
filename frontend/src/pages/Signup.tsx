@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth } from "../auth/AuthContext";
 import Header from "@/components/Header";
+import OAuthButtons from "@/components/OAuthButtons";
 export default function Signup() {
   const [username, setUsername] = useState("");
   const [fullname, setFullname] = useState("");
@@ -87,7 +88,7 @@ export default function Signup() {
           type="text"
           placeholder="Full Name"
           value={fullname}
-          onChange={(e) => setUsername(e.target.value.trim())}
+          onChange={(e) => setFullname(e.target.value)}
         />
         <Input
           type="email"
@@ -123,7 +124,7 @@ export default function Signup() {
         >
           {loading ? "Creating…" : "Sign up"}
         </button>
-
+        <OAuthButtons className="pt-2" labelPrefix="Sign up" />
         <p className="text-center text-sm text-neutral-700 dark:text-neutral-300">
           Already have an account?{" "}
           <Link to="/login" className="font-semibold underline">
