@@ -122,6 +122,7 @@ const QuestionsModelSchema = new Schema({
     required: false,
   },
   entryPoint: { type: String, required: true },
+  timeout: { type: Number, default: 1, min: 1, },
   signature: { type: SignatureSchema, default: undefined },
 
   testCases: {

@@ -4,7 +4,7 @@ import * as monaco from "monaco-editor";
 import Editor, { OnChange } from "@monaco-editor/react";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
-import { runCodeApi, submitCodeApi } from "../lib/services/executionService";
+import { runCodeApi } from "../lib/services/executionService";
 import Chat from "./Chat";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
@@ -65,8 +65,8 @@ function ProblemViewer({
       {examples.length > 0 && (
         <div className="mt-4">
           <h3 className="font-semibold">Examples</h3>
-          {examples.map((ex) => (
-            <div key={ex.id} className="border rounded p-2 my-1 bg-gray-50">
+          {examples.map((ex, idx) => (
+            <div key={idx} className="border rounded p-2 my-1 bg-gray-50">
               <div>
                 <strong>Input:</strong> {ex.input}
               </div>
@@ -115,35 +115,6 @@ function MonacoEditor({
   );
 }
 
-function RunButton({
-  code,
-  testCases,
-}: {
-  code: string;
-  testCases: { input: any; expected: string }[];
-}) {
-  const [status, setStatus] = useState<boolean | null>(null); // null = default, true = success, false = fail
-
-  const handleClick = async (): Promise<void> => {
-    const result = await runCodeApi(code, testCases);
-    const { data } = result;
-    setStatus(data.output === true ? true : false);
-  };
-
-  // Determine button classes based on status
-  let bgClass = "bg-slate-900 text-white hover:bg-slate-800"; // default
-  if (status === true) bgClass = "bg-green-500 text-white hover:bg-green-600"; // success
-  if (status === false) bgClass = "bg-red-500 text-white hover:bg-red-600"; // failure
-
-  return (
-    <button
-      className={`rounded-lg border px-3 py-2 text-sm font-medium shadow-sm active:scale-[0.99] ${bgClass}`}
-      onClick={handleClick}
-    >
-      Run
-    </button>
-  );
-}
 function CodeEditorTab({
   language,
   setLanguage,
@@ -153,6 +124,7 @@ function CodeEditorTab({
   socketRef,
   sessionId,
   currentUsername,
+  timeout,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -266,6 +238,74 @@ function CodeEditorTab({
       setDecorationIds(newIds);
     }, [remoteCursor]);
 
+  testCases: {
+    hidden: boolean;
+    input: any;
+    expected: string;
+  }[];
+  timeout: number;
+}) {
+  const [showTests, setShowTests] = useState(true);
+  const [runResults, setRunResults] = useState<any[]>([]);
+  const [submitResults, setSubmitResults] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"editor" | "console">("editor");
+  const [error, setError] = useState<string | null>(null);
+  const handleCodeChange: OnChange = (val) => setCode(val || "");
+
+  const handleRun = async () => {
+    setLoading(true);
+    setError(null);
+    const toRun = testCases.filter((tc) => !tc.hidden);
+    try {
+      const res = await runCodeApi(code, toRun, timeout);
+      if (res.data.success) {
+        const firstFail = res.data.output.findIndex(
+          (r: { result: boolean }) => !r.result
+        );
+        if (firstFail !== -1) {
+          const tc = res.data.output[firstFail];
+          setError(tc.error);
+          setActiveTab("console");
+        }
+        setRunResults(res.data.output);
+      } else {
+        setError(res.data.error);
+        setSubmitResults([]);
+        setRunResults([]);
+        setActiveTab("console");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Unknown error");
+      setActiveTab("console");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await runCodeApi(code, testCases, timeout);
+      if (res.data.success) {
+        setSubmitResults(res.data.output);
+        setActiveTab("console");
+      } else {
+        setError(res.data.error);
+        setSubmitResults([]);
+        setRunResults([]);
+        setActiveTab("console");
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || "Unknown error");
+      setActiveTab("console");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0">
@@ -297,63 +337,186 @@ function CodeEditorTab({
         />
       </div>
 
-      {/* Collapsible Test Cases */}
-      <div className="mt-3 rounded-xl border bg-white">
-        <button
-          onClick={() => setShowTests((s) => !s)}
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium text-slate-800 hover:bg-slate-50"
-        >
-          <span>Test Cases</span>
-          <span>{showTests ? "Hide" : "Show"}</span>
-        </button>
-        {showTests && (
-          <div className="border-t p-3 grid gap-2 text-xs text-slate-700 max-h-40 overflow-auto">
-            {testCases.map((tcItem, idx) => {
-              const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
+          {/* Editor */}
+          <div className="flex-1 rounded-xl border overflow-hidden shadow-sm min-h-[300px]">
+            <MonacoEditor
+              language={language}
+              value={code}
+              onChange={handleCodeChange}
+            />
+          </div>
 
-              return tcs.map((tc) => {
+          {/* Test Cases */}
+          <div className="mt-3 rounded-xl border bg-white overflow-hidden transition-all duration-300">
+            <div
+              className="flex justify-between items-center px-4 py-2 cursor-pointer"
+              onClick={() => setShowTests(!showTests)}
+            >
+              <h3 className="text-sm font-medium text-slate-800">Test Cases</h3>
+              <span className="text-indigo-600 text-sm hover:underline">
+                {showTests ? "Hide" : "Show"}
+              </span>
+            </div>
+
+            <div
+              className={`overflow-x-auto transition-all duration-300 ${
+                showTests ? "max-h-64 opacity-100 p-3" : "max-h-0 opacity-0 p-0"
+              }`}
+            >
+              <div className="flex gap-4">
+                {testCases
+                  .filter((tcItem) => !tcItem.hidden)
+                  .map((tcItem, idx) => {
+                    const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
+                    return tcs.map((tc, subIdx) => {
+                      const result = runResults[idx]?.result;
+                      let bgColor = "bg-white";
+                      if (result !== undefined) {
+                        bgColor = result
+                          ? "bg-green-50 border border-green-400"
+                          : "bg-red-50 border border-red-400";
+                      }
+                      return (
+                        <div
+                          key={`${idx}-${subIdx}`}
+                          className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
+                        >
+                          <div className="font-semibold text-slate-800 mb-1">
+                            Case {idx + 1}
+                          </div>
+                          <div className="text-sm text-slate-600 mb-1">
+                            Input:{" "}
+                            <code>
+                              {Array.isArray(tc.args)
+                                ? JSON.stringify(tc.args)
+                                : tc.args}
+                            </code>
+                          </div>
+                          <div className="text-sm text-slate-600 mb-1">
+                            Expected: <code>{JSON.stringify(tc.expected)}</code>
+                          </div>
+                          {runResults[idx]?.output && (
+                            <div className="text-sm text-slate-700 mb-1">
+                              Output:{" "}
+                              <code>
+                                {JSON.stringify(runResults[idx].output)}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="sticky bottom-0 mt-3 flex items-center gap-3 rounded-xl border bg-white px-3 py-2 shadow-sm">
+            <button
+              onClick={handleRun}
+              disabled={loading}
+              className="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-indigo-700 disabled:opacity-70 transition"
+            >
+              Run
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading}
+              className="bg-green-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-green-700 disabled:opacity-70 transition"
+            >
+              Submit
+            </button>
+            {loading && (
+              <span className="flex items-center gap-2 text-sm text-slate-700">
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+                Running...
+              </span>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* Console Tab */}
+      {activeTab === "console" && (
+        <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-4 max-h-[400px] overflow-auto">
+          {error && (
+            <div className="text-red-600 font-medium text-sm">
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+
+          {!error &&
+            (submitResults.length || runResults.length) &&
+            (() => {
+              const results = submitResults.length ? submitResults : runResults;
+              const firstFail = results.findIndex((r) => !r.result);
+
+              if (firstFail === -1) {
                 return (
-                  <div
-                    key={`${idx}`}
-                    className="rounded-lg bg-slate-50 px-3 py-2 my-2"
-                  >
-                    <div className="font-semibold text-slate-800">
-                      Case {idx + 1}
-                    </div>
-                    <div>
-                      Input:{" "}
-                      <code>
-                        {Array.isArray(tc.args)
-                          ? JSON.stringify(tc.args)
-                          : tc.args}
-                      </code>
-                    </div>
-                    <div>
-                      Expected:{" "}
-                      <code>
-                        {Array.isArray(tc.expected)
-                          ? JSON.stringify(tc.expected)
-                          : tc.expected}
-                      </code>
-                    </div>
+                  <div className="text-green-600 font-semibold text-center">
+                    Good job! ✅ All test cases passed.
                   </div>
                 );
-              });
-            })}
-          </div>
-        )}
-      </div>
+              } else {
+                const tc = results[firstFail];
+                const item = Array.isArray(tc) ? tc : [tc];
+                const total = results.length;
 
-      {/* Footer Bar */}
-      <div className="sticky bottom-0 mt-3 flex items-center justify-between rounded-xl border bg-white px-3 py-2">
-        <div className="flex gap-2">
-          <RunButton code={code} testCases={testCases} />{" "}
-          <button className="rounded-lg border bg-white px-3 py-2 text-sm font-medium shadow-sm hover:bg-slate-50 active:scale-[0.99]">
-            Submit
-          </button>
+                return (
+                  <div
+                    key={firstFail}
+                    className="min-w-[220px] rounded-xl border p-3 shadow-sm flex flex-col gap-1 bg-red-50 border-red-400"
+                  >
+                    <div className="font-semibold text-slate-800 mb-1">
+                      Case {firstFail + 1} / {total}
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      <strong>Input:</strong>{" "}
+                      <code>
+                        {Array.isArray(item[0].args)
+                          ? JSON.stringify(item[0].args)
+                          : [item[0].args]}
+                      </code>
+                    </div>
+                    <div className="text-sm text-slate-600">
+                      <strong>Expected:</strong>{" "}
+                      <code>{JSON.stringify(tc.expected)}</code>
+                    </div>
+                    <div className="text-sm text-slate-700">
+                      <strong>Output:</strong>{" "}
+                      <code>{JSON.stringify(tc.output)}</code>
+                    </div>
+                    {tc.error && (
+                      <div className="text-red-600 font-medium text-sm">
+                        <strong>Error:</strong> {tc.error}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            })()}
         </div>
-        <div className="text-xs text-slate-500">ETA: 00:42</div>
-      </div>
+      )}
     </div>
   );
 }
@@ -394,6 +557,7 @@ export default function CollaborationPage() {
   const { sessionId } = useParams();
   const [question, setQuestion] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [timeout, setTimeout] = useState<number>(1000);
   const [activeTab, setActiveTab] = useState<TabKey>("editor");
   const [language, setLanguage] = useState<Language>("python");
   const [code, setCode] = useState(defaultSnippets["python"]);
@@ -424,7 +588,7 @@ export default function CollaborationPage() {
         if (data.question) {
           setQuestion(data.question);
           setStartedAt(data.startedAt);
-
+          setTimeout(data.question.timeout);
           if (data.question?.codeSnippets?.[0]) {
             setLanguage(data.question.codeSnippets[0].language);
             setCode(data.question.codeSnippets[0].code);

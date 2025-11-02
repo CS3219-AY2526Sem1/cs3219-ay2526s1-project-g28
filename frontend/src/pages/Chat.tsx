@@ -42,7 +42,7 @@ export default function Chat() {
     abortRef.current = ac;
 
     try {
-      const resp = await fetch(`${API_BASE}/ai/chat`, {
+      const resp = await fetch(`http://localhost:${API_BASE}/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -90,7 +90,10 @@ export default function Chat() {
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
+                  copy[copy.length - 1] = {
+                    ...last,
+                    content: (last.content || "") + delta,
+                  };
                   return copy;
                 });
               }
@@ -109,7 +112,8 @@ export default function Chat() {
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError")
+        setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
@@ -121,14 +125,35 @@ export default function Chat() {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh" }}>
-      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        maxHeight: "100vh",
+      }}
+    >
+      <header
+        style={{
+          padding: 12,
+          borderBottom: "1px solid #e5e7eb",
+          fontWeight: 600,
+        }}
+      >
         Chat
       </header>
 
       <div
         ref={scrollerRef}
-        style={{ flex: 1, overflow: "auto", padding: 12, gap: 12, display: "flex", flexDirection: "column", background: "#f9fafb" }}
+        style={{
+          flex: 1,
+          overflow: "auto",
+          padding: 12,
+          gap: 12,
+          display: "flex",
+          flexDirection: "column",
+          background: "#f9fafb",
+        }}
       >
         {messages.map((m, i) => (
           <div
@@ -151,21 +176,45 @@ export default function Chat() {
         {err && <div style={{ color: "#ef4444", fontSize: 12 }}>{err}</div>}
       </div>
 
-      <form onSubmit={send} style={{ padding: 12, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
+      <form
+        onSubmit={send}
+        style={{
+          padding: 12,
+          borderTop: "1px solid #e5e7eb",
+          display: "flex",
+          gap: 8,
+        }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
-          style={{ flex: 1, border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}
+          style={{
+            flex: 1,
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            padding: "10px 12px",
+          }}
         />
         <button
           type="submit"
           disabled={loading}
-          style={{ padding: "10px 16px", borderRadius: 10, background: "#111827", color: "#fff", opacity: loading ? 0.6 : 1 }}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: "#111827",
+            color: "#fff",
+            opacity: loading ? 0.6 : 1,
+          }}
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "10px 12px", borderRadius: 10 }}>
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={!loading}
+          style={{ padding: "10px 12px", borderRadius: 10 }}
+        >
           Cancel
         </button>
       </form>
