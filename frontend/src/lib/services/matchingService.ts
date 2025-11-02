@@ -3,7 +3,7 @@ export async function startMatchApi(body: {
   difficulty: string;
   topics: string[];
 }) {
-  const response = await fetch("http://localhost:3004/matching/", {
+  const response = await fetch(`${import.meta.env.VITE_API_URL}/matching/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -18,7 +18,7 @@ export async function respondMatchApi(body: {
   matchId: string;
 }) {
   const response = await fetch(
-    `http://localhost:3004/matching/${body.action}`,
+    `${import.meta.env.VITE_API_URL}/matching/${body.action}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -33,8 +33,11 @@ export async function respondMatchApi(body: {
 }
 
 export async function cancelMatchApi(userId: string) {
-  const response = await fetch(`http://localhost:3004/matching/${userId}`, {
-    method: "DELETE",
-  });
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}/matching/${userId}`,
+    {
+      method: "DELETE",
+    }
+  );
   return response;
 }

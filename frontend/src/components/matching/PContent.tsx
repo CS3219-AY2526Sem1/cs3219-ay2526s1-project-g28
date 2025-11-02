@@ -9,7 +9,16 @@ interface PContentProps {
   isQueueing: boolean;
 }
 
-const ALL_TOPICS = ["Arrays", "Graphs", "DP", "Strings"];
+const ALL_TOPICS = [
+  "Strings",
+  "Linked Lists",
+  "Dynamic Programming",
+  "Heaps",
+  "Hashmap",
+  "Arrays",
+  "Graphs",
+  "Trees",
+];
 const difficultySelectStyles: { [key: string]: React.CSSProperties } = {
   Easy: {
     backgroundColor: "#28a745", // Green
@@ -71,7 +80,7 @@ const PContent: React.FC<PContentProps> = ({
   isQueueing,
 }) => {
   const [difficulty, setDifficulty] = useState("Easy");
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(["Arrays"]);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>(["Strings"]);
 
   const handleTopicToggle = (topicToToggle: string) => {
     if (isQueueing) return;

@@ -182,9 +182,9 @@ export function useSocket(user?: User) {
         }
         setModalMessage(data.message);
         setTimeout(() => {
+          setShowButtons(false);
           setPendingMatch(null);
           setIsWaiting(false);
-          setShowButtons(true);
           setCountdown(DEFAULT_COUNTDOWN);
         }, 3000);
       }
