@@ -37,6 +37,14 @@ const AUThed_NAV = [
   { to: "/custom-lobby", label: "Custom Lobby" },
 ];
 
+const NAME_TO_PATH: Record<string, string> = {
+  "Challenges": "/home",
+  "My Sessions": "/sessions",
+  "Leaderboard": "/leaderboard",
+  "User Management": "/users",
+  "Questions": "/questions",
+};
+
 export default function Header(props: HeaderProps) {
  function ThemeButton() {
   const { theme, resolved, setTheme, toggle } = useTheme();
@@ -84,6 +92,7 @@ export default function Header(props: HeaderProps) {
     );
   } else   if (props.variant === "beta") {
     const { isSidebarOpen, currentPage, onToggleSidebar, onNavigate } = props;
+    const navigate = useNavigate();
     return (
       <div>
         <TopBar
@@ -96,7 +105,10 @@ export default function Header(props: HeaderProps) {
           isOpen={isSidebarOpen}
           isAdmin={!!user?.isAdmin}
           currentPage={currentPage}
-          onNavigate={onNavigate}
+          onNavigate={(name) => {
+                      const path = NAME_TO_PATH[name] ?? "/";
+                      navigate(path);
+                     }}
         />
       </div>
     );

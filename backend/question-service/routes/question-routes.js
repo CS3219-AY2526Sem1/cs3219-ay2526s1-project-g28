@@ -8,21 +8,22 @@ import {
   getRandomQuestion,
 } from "../controller/question-controller.js";
 import { uploadExampleImage, upload } from "../controller/upload-controller.js"
+import { requireAuth, adminOnly } from "../middleware.js/auth.js";
 
 const router = express.Router();
 
 router.get("/", getAllQuestions);
 
-router.post("/", createQuestion);
+router.post("/", requireAuth, adminOnly, createQuestion);
 
-router.patch("/id/:id", updateQuestion);
+router.patch("/id/:id", requireAuth, adminOnly, updateQuestion);
 
 router.get("/id/:id", getQuestion);
 
-router.delete("/id/:id", deleteQuestion);
+router.delete("/id/:id", requireAuth, adminOnly, deleteQuestion);
 
 router.get("/random", getRandomQuestion);
 
-router.post("/uploads/image", upload.single("image"), uploadExampleImage);
+router.post("/uploads/image", requireAuth, adminOnly, upload.single("image"), uploadExampleImage);
 
 export default router;
