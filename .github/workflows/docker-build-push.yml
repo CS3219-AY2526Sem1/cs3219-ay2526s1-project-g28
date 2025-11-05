@@ -2,11 +2,11 @@ name: Build and Push to GHCR
 
 on:
   push:
-    branches: "master"
+    branches: ["master"]
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ghcr.io/cs3219-ay2526sem1/g28
+  IMAGE_NAMESPACE: cs3219-ay2526sem1/g28
 
 jobs:
   build-and-push:
@@ -35,6 +35,16 @@ jobs:
 
           for svc in "${SERVICES[@]}"; do
             echo "🚀 Building $svc"
-            docker build -t "${IMAGE_NAMESPACE}-${svc}:latest" -f "./backend/${svc}/Dockerfile" "./backend/${svc}"
-            docker push "${IMAGE_NAMESPACE}-${svc}:latest"
+
+            IMAGE="${REGISTRY}/${IMAGE_NAMESPACE}/${svc}:latest" 
+            DOCKERFILE="./backend/${svc}/Dockerfile"
+
+            if [ ! -f "$DOCKERFILE" ]; then
+              echo "⚠️ Skipping ${svc}: Dockerfile not found at ${DOCKERFILE}"
+              continue
+            fi
+
+            docker build -t "$IMAGE" -f "$DOCKERFILE" "./backend/${svc}"
+            echo "📦 Pushing $IMAGE"
+            docker push "$IMAGE"
           done
