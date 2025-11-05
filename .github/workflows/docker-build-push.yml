@@ -3,10 +3,12 @@ on:
   push:
     branches: ["**"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   publish_images:
     runs-on: ubuntu-latest
+    environment: "Docker push and build images"
 
     steps:
       - name: Checkout repository
