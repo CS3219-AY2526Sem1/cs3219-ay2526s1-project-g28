@@ -1,4 +1,5 @@
 name: Build and Publish image to Docker Hub
+
 on:
   push:
     branches: ["**"]
@@ -7,14 +8,17 @@ on:
 jobs:
   publish_images:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: build image
-        run: |
-          docker build -t local/user-service:dev -f ./backend/user-service/Dockerfile ./backend/user-service
 
-      - name: push image to docker Hub
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Build and Push user-service image
         run: |
-          docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-          docker push local/user-service:dev
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"  # or replace with your org name
+
+          docker build -t "$NS/user-service:dev" -f ./backend/user-service/Dockerfile ./backend/user-service
+          docker push "$NS/user-service:dev"
