@@ -174,25 +174,27 @@ function CodeEditorTab({
 
   // Listen for remote cursor updates
   useEffect(() => {
-    if (!socketRef.current) return;
+    const socket = socketRef.current;
+    if (!socket) return;
 
-    socketRef.current.on(
-      "remote-cursor-change",
-      ({
-        position,
-        username,
-      }: {
-        position: { lineNumber: number; column: number };
-        username: string;
-      }) => {
-        if (username !== currentUsername) {
-          setRemoteCursor({ ...position, username });
-        }
+    const handleRemoteCursor = ({
+      position,
+      username,
+    }: {
+      position: { lineNumber: number; column: number };
+      username: string;
+    }) => {
+      if (username !== currentUsername) {
+        setRemoteCursor({ ...position, username });
       }
-    );
+    };
+
+    socket.on("remote-cursor-change", handleRemoteCursor);
 
     return () => {
-      socketRef.current.off("remote-cursor-change");
+      if (socket && socket.off) {
+        socket.off("remote-cursor-change", handleRemoteCursor);
+      }
     };
   }, [socketRef, currentUsername]);
 

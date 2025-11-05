@@ -42,7 +42,7 @@ export default function Chat() {
     abortRef.current = ac;
 
     try {
-      const resp = await fetch(`http://localhost:${API_BASE}/ai/chat`, {
+      const resp = await fetch(`${API_BASE}/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
