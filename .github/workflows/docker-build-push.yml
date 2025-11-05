@@ -101,22 +101,31 @@ jobs:
             [ -z "$svc" ] && continue
             image="local/${svc}:${tag}"
             echo "🧪 Running $image to ensure it doesn't crash"
-            
-            # Run container in detached mode
-            docker run --rm -d --name "${svc}-check" "$image" || (echo "❌ Failed to start ${svc}" && exit 1)
-            
-            # Wait a bit for it to start
+
+            # Start the container in detached mode
+            docker run -d --name "${svc}-check" "$image" || (echo "❌ Failed to start ${svc}" && exit 1)
+
+            # Wait for startup
             sleep 10
 
-            # Check if it exited unexpectedly
-            if docker ps -a --filter "name=${svc}-check" --filter "status=exited" | grep "${svc}-check"; then
-              echo "❌ ${svc} exited unexpectedly during startup"
+            # Get container state
+            exit_code=$(docker inspect "${svc}-check" --format='{{.State.ExitCode}}')
+            status=$(docker inspect "${svc}-check" --format='{{.State.Status}}')
+
+            if [ "$status" = "exited" ] && [ "$exit_code" != "0" ]; then
+              echo "❌ ${svc} crashed (exit code $exit_code)"
               docker logs "${svc}-check" || true
+              docker rm -f "${svc}-check" || true
               exit 1
+            elif [ "$status" = "exited" ]; then
+              echo "⚠️ ${svc} exited gracefully but did not stay running (check expected behavior)"
+              docker logs "${svc}-check" || true
+              docker rm -f "${svc}-check" || true
             else
               echo "✅ ${svc} is running fine (no crash detected)"
               docker logs "${svc}-check" || true
               docker stop "${svc}-check" || true
+              docker rm -f "${svc}-check" || true
             fi
           done <<< "${{ steps.changed.outputs.services }}"
 
