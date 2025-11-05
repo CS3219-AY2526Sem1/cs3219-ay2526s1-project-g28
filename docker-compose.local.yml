@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  user-service:
+    container_name: user-service
+    build: ./backend/user-service
+    image: local/user:dev
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./backend/user-service/.env
+    restart: unless-stopped
