@@ -1,126 +1,35 @@
-name: Build, Dev Smoke, & Test Services (No Secrets)
-
+name: Build and Publish image to Docker Hub
 on:
   push:
     branches: ["**"]
   pull_request:
 
 jobs:
-  build-test:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install, Dev smoke test, and Tests per service
-        run: |
-          set -euo pipefail
-          echo "🔍 Finding Node.js services under services/*"
-          mkdir -p dev-logs
-          any_crashed=0
-
-          for dir in services/*; do
-            [ -f "$dir/package.json" ] || continue
-            svc="$(basename "$dir")"
-            echo "::group::🧩 Service: $svc"
-            pushd "$dir" >/dev/null
-
-            echo "📦 Installing dependencies in $dir"
-            npm ci || npm install
-
-            echo "🏗️  Building (if build script exists)"
-            npm run build --if-present
-
-            # Check if a dev script exists
-            has_dev="$(npm pkg get scripts.dev 2>/dev/null | tr -d '\"')"
-            if [ "$has_dev" = "undefined" ] || [ -z "$has_dev" ]; then
-              echo "ℹ️  No 'dev' script found. Skipping dev smoke test for $svc."
-            else
-              log_file="../../dev-logs/${svc}.log"
-              echo "🚀 Starting 'npm run dev' for $svc (logs -> $log_file)"
-              # Start in its own session so we can kill the whole process group later.
-              setsid bash -lc 'npm run -s dev' > "$log_file" 2>&1 & 
-              dev_pid=$!
-
-              # Observe for 30s. If it exits early, mark as crashed.
-              crashed=0
-              for i in $(seq 1 30); do
-                if ! kill -0 "$dev_pid" 2>/dev/null; then
-                  echo "❌ $svc crashed/exited before 30s. See $log_file"
-                  crashed=1
-                  any_crashed=1
-                  break
-                fi
-                sleep 1
-              done
-
-              # If still running after observation window, stop it gracefully.
-              if [ "$crashed" -eq 0 ]; then
-                echo "✅ $svc stayed up for 30s."
-                # Kill the whole process group started by setsid
-                kill -TERM -"$dev_pid" 2>/dev/null || true
-                # Give it a moment to exit, then force if needed
-                sleep 3
-                kill -KILL -"$dev_pid" 2>/dev/null || true
-              fi
-            fi
-
-            echo "🧪 Running tests (if test script exists)"
-            npm run test --if-present || echo "ℹ️  No test script or tests failed; continuing to collect results."
-
-            popd >/dev/null
-            echo "::endgroup::"
-          done
-
-          if [ "$any_crashed" -ne 0 ]; then
-            echo "❗ One or more services crashed during 'npm run dev' smoke test."
-            exit 1
-          fi
-
-      - name: Upload dev logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dev-logs
-          path: dev-logs
-          if-no-files-found: ignore
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Detect changed services
-        id: changed
-        run: |
-          BASE_SHA="${{ github.event.before || github.event.pull_request.base.sha || 'HEAD~1' }}"
-          HEAD_SHA="${{ github.sha }}"
-          services=$(bash scripts/list_changed_services.sh "$BASE_SHA" "$HEAD_SHA" || true)
-          echo "services<<EOF" >> $GITHUB_OUTPUT
-          echo "${services}" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "Changed services:"
-          echo "${services}"
-
-      - name: Set image tag
-        id: tag
-        run: echo "value=$(bash scripts/image_tag.sh)" >> $GITHUB_OUTPUT
-
-      - name: Build Docker Images (no secrets)
-        if: steps.changed.outputs.services != ''
-        run: |
-          tag='${{ steps.tag.outputs.value }}'
-          while read svc; do
-            [ -z "$svc" ] && continue
-            image="local/${svc}:${tag}"
-            echo "🔧 Building $image from services/$svc"
-            docker build -t "$image" "services/$svc"
-          done <<< "${{ steps.changed.outputs.services }}"
-
-      - name: List built images
-        run: docker images
+  publish_images:
+  runs-on: ubuntu-latest
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    - name: build image
+      run: |
+        docker build -t local/user-service:dev -f ./backend/user-service/Dockerfile ./backend/user-service
+        docker build -t local/question-service:dev -f ./backend/question-service/Dockerfile ./backend/question-service
+        docker build -t local/matching-service:dev -f ./backend/matching-service/Dockerfile ./backend/matching-service
+        docker build -t local/collaboration-service:dev -f ./backend/collaboration-service/Dockerfile ./backend/collaboration-service
+        docker build -t local/notification-service:dev -f ./backend/notification-service/Dockerfile ./backend/notification-service
+        docker build -t local/execution-service:dev -f ./backend/execution-service/Dockerfile ./backend/execution-service
+        docker build -t local/ai-service:dev -f ./backend/ai-service/Dockerfile ./backend/ai-service
+        docker build -t local/api-gateway:dev -f ./backend/api-gateway/Dockerfile ./backend/api-gateway
+        docker build -t local/frontend:dev -f ./frontend/Dockerfile ./frontend
+    - name: push image to docker Hub
+      run: |
+        docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+        docker push local/user-service:dev
+        docker push local/question-service:dev
+        docker push local/matching-service:dev
+        docker push local/collaboration-service:dev
+        docker push local/notification-service:dev
+        docker push local/execution-service:dev
+        docker push local/ai-service:dev
+        docker push local/api-gateway:dev
+        docker push local/frontend:dev
