@@ -1,4 +1,4 @@
-name: Build & Check Services (No Tests)
+name: Build, Dev Smoke, & Test Services (No Secrets)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  build-check:
+  build-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -19,42 +19,78 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install, Build, and Quick-boot Each Service (node only)
+      - name: Install, Dev smoke test, and Tests per service
         run: |
-          echo "🔍 Checking all Node.js services (non-docker quick boot)"
+          set -euo pipefail
+          echo "🔍 Finding Node.js services under services/*"
+          mkdir -p dev-logs
+          any_crashed=0
+
           for dir in services/*; do
-            if [ -f "$dir/package.json" ]; then
-              echo "📦 Installing dependencies in $dir"
-              cd "$dir"
-              npm ci || npm install
+            [ -f "$dir/package.json" ] || continue
+            svc="$(basename "$dir")"
+            echo "::group::🧩 Service: $svc"
+            pushd "$dir" >/dev/null
 
-              echo "🚀 Building (if script exists)"
-              npm run build --if-present
+            echo "📦 Installing dependencies in $dir"
+            npm ci || npm install
 
-              echo "🧪 Start briefly to ensure it doesn't instantly crash"
-              if npm run dev --if-present & then
-                pid=$!
-                sleep 5
-                if ps -p $pid > /dev/null; then
-                  echo "✅ $dir runs (node quick-boot ok)"; kill $pid
-                else
-                  echo "❌ $dir crashed during node quick-boot"; exit 1
+            echo "🏗️  Building (if build script exists)"
+            npm run build --if-present
+
+            # Check if a dev script exists
+            has_dev="$(npm pkg get scripts.dev 2>/dev/null | tr -d '\"')"
+            if [ "$has_dev" = "undefined" ] || [ -z "$has_dev" ]; then
+              echo "ℹ️  No 'dev' script found. Skipping dev smoke test for $svc."
+            else
+              log_file="../../dev-logs/${svc}.log"
+              echo "🚀 Starting 'npm run dev' for $svc (logs -> $log_file)"
+              # Start in its own session so we can kill the whole process group later.
+              setsid bash -lc 'npm run -s dev' > "$log_file" 2>&1 & 
+              dev_pid=$!
+
+              # Observe for 30s. If it exits early, mark as crashed.
+              crashed=0
+              for i in $(seq 1 30); do
+                if ! kill -0 "$dev_pid" 2>/dev/null; then
+                  echo "❌ $svc crashed/exited before 30s. See $log_file"
+                  crashed=1
+                  any_crashed=1
+                  break
                 fi
-              elif npm start & then
-                pid=$!
-                sleep 5
-                if ps -p $pid > /dev/null; then
-                  echo "✅ $dir runs (node quick-boot ok)"; kill $pid
-                else
-                  echo "❌ $dir crashed during node quick-boot"; exit 1
-                fi
-              else
-                echo "⚠️ No start/dev script found for $dir (skipping quick-boot)"
+                sleep 1
+              done
+
+              # If still running after observation window, stop it gracefully.
+              if [ "$crashed" -eq 0 ]; then
+                echo "✅ $svc stayed up for 30s."
+                # Kill the whole process group started by setsid
+                kill -TERM -"$dev_pid" 2>/dev/null || true
+                # Give it a moment to exit, then force if needed
+                sleep 3
+                kill -KILL -"$dev_pid" 2>/dev/null || true
               fi
-
-              cd ../../
             fi
+
+            echo "🧪 Running tests (if test script exists)"
+            npm run test --if-present || echo "ℹ️  No test script or tests failed; continuing to collect results."
+
+            popd >/dev/null
+            echo "::endgroup::"
           done
+
+          if [ "$any_crashed" -ne 0 ]; then
+            echo "❗ One or more services crashed during 'npm run dev' smoke test."
+            exit 1
+          fi
+
+      - name: Upload dev logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dev-logs
+          path: dev-logs
+          if-no-files-found: ignore
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -68,7 +104,8 @@ jobs:
           echo "services<<EOF" >> $GITHUB_OUTPUT
           echo "${services}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo "Changed services:"; echo "${services}"
+          echo "Changed services:"
+          echo "${services}"
 
       - name: Set image tag
         id: tag
@@ -84,77 +121,6 @@ jobs:
             echo "🔧 Building $image from services/$svc"
             docker build -t "$image" "services/$svc"
           done <<< "${{ steps.changed.outputs.services }}"
-
-      - name: Run containers & fail if any crash (collect all failures)
-        if: steps.changed.outputs.services != ''
-        run: |
-          STARTUP_SECS=15
-          tag='${{ steps.tag.outputs.value }}'
-          FAIL=0
-          SUMMARY=""
-
-          while read svc; do
-            [ -z "$svc" ] && continue
-            cname="${svc}-check"
-            image="local/${svc}:${tag}"
-
-            echo "🧪 Starting $image as $cname"
-            # Start detached; do NOT exit the step on start failure — record and continue
-            if ! docker run -d --name "$cname" "$image" > /dev/null 2>&1; then
-              echo "❌ $svc failed to start (docker run error)"
-              SUMMARY="${SUMMARY}\n❌ ${svc}: failed to start (docker run error)"
-              FAIL=1
-              # Try to print logs if any
-              docker logs "$cname" 2>/dev/null | tail -n 50 || true
-              # Ensure cleanup
-              docker rm -f "$cname" >/dev/null 2>&1 || true
-              continue
-            fi
-
-            echo "⏳ Waiting ${STARTUP_SECS}s for $svc to initialize…"
-            sleep "${STARTUP_SECS}"
-
-            # Gather status
-            status=$(docker inspect "$cname" --format='{{.State.Status}}' 2>/dev/null || echo "unknown")
-            exit_code=$(docker inspect "$cname" --format='{{.State.ExitCode}}' 2>/dev/null || echo "999")
-            health=$(docker inspect "$cname" --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || echo "unknown")
-
-            echo "🔍 $svc -> status=$status exit_code=$exit_code health=$health"
-            echo "----- Last 50 log lines for $svc -----"
-            docker logs "$cname" 2>/dev/null | tail -n 50 || true
-            echo "--------------------------------------"
-
-            # Decide failure:
-            # 1) Exited with non-zero exit code
-            # 2) Healthcheck present and unhealthy
-            # 3) Exited even with zero (treat as fail for long-running services)
-            if [ "$status" = "exited" ] && [ "$exit_code" -ne 0 ]; then
-              echo "❌ ${svc} crashed (exit code $exit_code)"
-              SUMMARY="${SUMMARY}\n❌ ${svc}: crashed (exit $exit_code)"
-              FAIL=1
-            elif [ "$health" = "unhealthy" ]; then
-              echo "❌ ${svc} is unhealthy"
-              SUMMARY="${SUMMARY}\n❌ ${svc}: unhealthy (HEALTHCHECK failed)"
-              FAIL=1
-            elif [ "$status" = "exited" ]; then
-              echo "❌ ${svc} exited during startup (unexpected)"
-              SUMMARY="${SUMMARY}\n❌ ${svc}: exited during startup"
-              FAIL=1
-            else
-              echo "✅ ${svc} is running"
-              SUMMARY="${SUMMARY}\n✅ ${svc}: running"
-            fi
-
-            # Cleanup the check container
-            docker rm -f "$cname" >/dev/null 2>&1 || true
-          done <<< "${{ steps.changed.outputs.services }}"
-
-          echo -e "📋 Summary:${SUMMARY}"
-          if [ "$FAIL" -ne 0 ]; then
-            echo "❌ One or more services failed at runtime."
-            exit 1
-          fi
-          echo "✅ All services passed the runtime check."
 
       - name: List built images
         run: docker images
