@@ -6,15 +6,15 @@ on:
 
 jobs:
   publish_images:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    - name: build image
-      run: |
-        docker build -t local/user-service:dev -f ./backend/user-service/Dockerfile ./backend/user-service
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: build image
+        run: |
+          docker build -t local/user-service:dev -f ./backend/user-service/Dockerfile ./backend/user-service
 
-    - name: push image to docker Hub
-      run: |
-        docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-        docker push local/user-service:dev
+      - name: push image to docker Hub
+        run: |
+          docker login -u ${{ secrets.DOCKER_HUB_USERNAME }} -p ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+          docker push local/user-service:dev
