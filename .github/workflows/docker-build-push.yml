@@ -92,5 +92,33 @@ jobs:
             docker build -t "$image" "services/$svc"
           done <<< "${{ steps.changed.outputs.services }}"
 
+      - name: Run built containers to check for crashes
+        if: steps.changed.outputs.services != ''
+        run: |
+          tag='${{ steps.tag.outputs.value }}'
+
+          while read svc; do
+            [ -z "$svc" ] && continue
+            image="local/${svc}:${tag}"
+            echo "🧪 Running $image to ensure it doesn't crash"
+            
+            # Run container in detached mode
+            docker run --rm -d --name "${svc}-check" "$image" || (echo "❌ Failed to start ${svc}" && exit 1)
+            
+            # Wait a bit for it to start
+            sleep 10
+
+            # Check if it exited unexpectedly
+            if docker ps -a --filter "name=${svc}-check" --filter "status=exited" | grep "${svc}-check"; then
+              echo "❌ ${svc} exited unexpectedly during startup"
+              docker logs "${svc}-check" || true
+              exit 1
+            else
+              echo "✅ ${svc} is running fine (no crash detected)"
+              docker logs "${svc}-check" || true
+              docker stop "${svc}-check" || true
+            fi
+          done <<< "${{ steps.changed.outputs.services }}"
+
       - name: List built images
         run: docker images
