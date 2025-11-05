@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 });
 
 app.use("/execute", executeRoutes);
+app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 
 app.get("/", (req, res, next) => {
   console.log("Execution service responding!");

@@ -9,6 +9,8 @@ const port = process.env.GATEWAY_PORT || 3000;
 const app = express();
 app.use(cors());
 
+app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
+
 app.use((req, res, next) => {
   console.log(`[Gateway] ${req.method} ${req.originalUrl}`);
   next();

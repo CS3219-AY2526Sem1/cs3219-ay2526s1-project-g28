@@ -30,10 +30,9 @@ app.use(
   })
 );
 
-
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 app.use("/api", cloudinaryRouter);
 
 app.get("/", (req, res, next) => {
