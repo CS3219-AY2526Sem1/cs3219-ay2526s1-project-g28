@@ -12,4 +12,5 @@ COPY . .
 # App uses port 3005 inside the container
 ENV PORT=5173
 EXPOSE 5173
+
 CMD ["npm", "start"]

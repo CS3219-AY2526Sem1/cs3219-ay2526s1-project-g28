@@ -30,7 +30,7 @@ app.use(
   })
 );
 
-app.use("/users", userRoutes);
+aspp.use("/users", userRoutes);
 app.use("/auth", authRoutes);
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 app.use("/api", cloudinaryRouter);

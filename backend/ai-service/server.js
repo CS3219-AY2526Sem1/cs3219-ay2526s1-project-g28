@@ -9,6 +9,7 @@ app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use("/ai/", rateLimit({ windowMs: 60_000, max: 60 }));
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
+
 // --- OpenRouter client ---
 const openai = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
