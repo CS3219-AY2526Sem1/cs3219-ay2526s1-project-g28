@@ -66,6 +66,13 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
       setInCall(true);
 
       newCall.on("left-meeting", async () => {
+        newCall.destroy();
+        setInCall(false);
+        onCallEnd();
+      });
+
+
+      newCall.on("left-meeting", async () => {
         try {
           await fetch(
             `${collabServiceUrl}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,

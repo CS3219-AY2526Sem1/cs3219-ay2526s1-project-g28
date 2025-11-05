@@ -7,7 +7,7 @@ import "./index.css";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import MatchingPage from "./pages/MatchingPage";
-import Dashboard from "./pages/Dashboard";
+import Dashboard from "./pages/DashBoard";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
