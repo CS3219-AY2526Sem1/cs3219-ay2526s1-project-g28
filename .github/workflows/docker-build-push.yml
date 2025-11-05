@@ -19,9 +19,9 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install, Build, and Check Each Service
+      - name: Install, Build, and Quick-boot Each Service (node only)
         run: |
-          echo "🔍 Checking all Node.js services"
+          echo "🔍 Checking all Node.js services (non-docker quick boot)"
           for dir in services/*; do
             if [ -f "$dir/package.json" ]; then
               echo "📦 Installing dependencies in $dir"
@@ -31,30 +31,25 @@ jobs:
               echo "🚀 Building (if script exists)"
               npm run build --if-present
 
-              echo "🧪 Starting service to verify it doesn't crash"
-              # Prefer npm run dev, fallback to npm start
+              echo "🧪 Start briefly to ensure it doesn't instantly crash"
               if npm run dev --if-present & then
                 pid=$!
                 sleep 5
                 if ps -p $pid > /dev/null; then
-                  echo "✅ $dir started successfully"
-                  kill $pid
+                  echo "✅ $dir runs (node quick-boot ok)"; kill $pid
                 else
-                  echo "❌ $dir crashed during startup"
-                  exit 1
+                  echo "❌ $dir crashed during node quick-boot"; exit 1
                 fi
               elif npm start & then
                 pid=$!
                 sleep 5
                 if ps -p $pid > /dev/null; then
-                  echo "✅ $dir started successfully"
-                  kill $pid
+                  echo "✅ $dir runs (node quick-boot ok)"; kill $pid
                 else
-                  echo "❌ $dir crashed during startup"
-                  exit 1
+                  echo "❌ $dir crashed during node quick-boot"; exit 1
                 fi
               else
-                echo "⚠️ No start/dev script found for $dir"
+                echo "⚠️ No start/dev script found for $dir (skipping quick-boot)"
               fi
 
               cd ../../
@@ -73,8 +68,7 @@ jobs:
           echo "services<<EOF" >> $GITHUB_OUTPUT
           echo "${services}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-          echo "Changed services:"
-          echo "${services}"
+          echo "Changed services:"; echo "${services}"
 
       - name: Set image tag
         id: tag
@@ -84,7 +78,6 @@ jobs:
         if: steps.changed.outputs.services != ''
         run: |
           tag='${{ steps.tag.outputs.value }}'
-
           while read svc; do
             [ -z "$svc" ] && continue
             image="local/${svc}:${tag}"
@@ -92,42 +85,76 @@ jobs:
             docker build -t "$image" "services/$svc"
           done <<< "${{ steps.changed.outputs.services }}"
 
-      - name: Run built containers to check for crashes
+      - name: Run containers & fail if any crash (collect all failures)
         if: steps.changed.outputs.services != ''
         run: |
+          STARTUP_SECS=15
           tag='${{ steps.tag.outputs.value }}'
+          FAIL=0
+          SUMMARY=""
 
           while read svc; do
             [ -z "$svc" ] && continue
+            cname="${svc}-check"
             image="local/${svc}:${tag}"
-            echo "🧪 Running $image to ensure it doesn't crash"
 
-            # Start the container in detached mode
-            docker run -d --name "${svc}-check" "$image" || (echo "❌ Failed to start ${svc}" && exit 1)
-
-            # Wait for startup
-            sleep 10
-
-            # Get container state
-            exit_code=$(docker inspect "${svc}-check" --format='{{.State.ExitCode}}')
-            status=$(docker inspect "${svc}-check" --format='{{.State.Status}}')
-
-            if [ "$status" = "exited" ] && [ "$exit_code" != "0" ]; then
-              echo "❌ ${svc} crashed (exit code $exit_code)"
-              docker logs "${svc}-check" || true
-              docker rm -f "${svc}-check" || true
-              exit 1
-            elif [ "$status" = "exited" ]; then
-              echo "⚠️ ${svc} exited gracefully but did not stay running (check expected behavior)"
-              docker logs "${svc}-check" || true
-              docker rm -f "${svc}-check" || true
-            else
-              echo "✅ ${svc} is running fine (no crash detected)"
-              docker logs "${svc}-check" || true
-              docker stop "${svc}-check" || true
-              docker rm -f "${svc}-check" || true
+            echo "🧪 Starting $image as $cname"
+            # Start detached; do NOT exit the step on start failure — record and continue
+            if ! docker run -d --name "$cname" "$image" > /dev/null 2>&1; then
+              echo "❌ $svc failed to start (docker run error)"
+              SUMMARY="${SUMMARY}\n❌ ${svc}: failed to start (docker run error)"
+              FAIL=1
+              # Try to print logs if any
+              docker logs "$cname" 2>/dev/null | tail -n 50 || true
+              # Ensure cleanup
+              docker rm -f "$cname" >/dev/null 2>&1 || true
+              continue
             fi
+
+            echo "⏳ Waiting ${STARTUP_SECS}s for $svc to initialize…"
+            sleep "${STARTUP_SECS}"
+
+            # Gather status
+            status=$(docker inspect "$cname" --format='{{.State.Status}}' 2>/dev/null || echo "unknown")
+            exit_code=$(docker inspect "$cname" --format='{{.State.ExitCode}}' 2>/dev/null || echo "999")
+            health=$(docker inspect "$cname" --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' 2>/dev/null || echo "unknown")
+
+            echo "🔍 $svc -> status=$status exit_code=$exit_code health=$health"
+            echo "----- Last 50 log lines for $svc -----"
+            docker logs "$cname" 2>/dev/null | tail -n 50 || true
+            echo "--------------------------------------"
+
+            # Decide failure:
+            # 1) Exited with non-zero exit code
+            # 2) Healthcheck present and unhealthy
+            # 3) Exited even with zero (treat as fail for long-running services)
+            if [ "$status" = "exited" ] && [ "$exit_code" -ne 0 ]; then
+              echo "❌ ${svc} crashed (exit code $exit_code)"
+              SUMMARY="${SUMMARY}\n❌ ${svc}: crashed (exit $exit_code)"
+              FAIL=1
+            elif [ "$health" = "unhealthy" ]; then
+              echo "❌ ${svc} is unhealthy"
+              SUMMARY="${SUMMARY}\n❌ ${svc}: unhealthy (HEALTHCHECK failed)"
+              FAIL=1
+            elif [ "$status" = "exited" ]; then
+              echo "❌ ${svc} exited during startup (unexpected)"
+              SUMMARY="${SUMMARY}\n❌ ${svc}: exited during startup"
+              FAIL=1
+            else
+              echo "✅ ${svc} is running"
+              SUMMARY="${SUMMARY}\n✅ ${svc}: running"
+            fi
+
+            # Cleanup the check container
+            docker rm -f "$cname" >/dev/null 2>&1 || true
           done <<< "${{ steps.changed.outputs.services }}"
+
+          echo -e "📋 Summary:${SUMMARY}"
+          if [ "$FAIL" -ne 0 ]; then
+            echo "❌ One or more services failed at runtime."
+            exit 1
+          fi
+          echo "✅ All services passed the runtime check."
 
       - name: List built images
         run: docker images
