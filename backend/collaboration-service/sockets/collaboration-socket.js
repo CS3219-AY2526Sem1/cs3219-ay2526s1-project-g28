@@ -1,11 +1,26 @@
-// src/sockets/collaboration-socket.js
+import Session from "../model/session-model.js";
+
 export function initCollaborationSocket(io, redis) {
     io.on("connection", (socket) => {
         console.log("User connected:", socket.id);
 
-        socket.on("join-session", ({ sessionId }) => {
+        socket.on("join-session", async ({ sessionId, username }) => {
             socket.join(sessionId);
-            console.log(`User joined session ${sessionId}`);
+            socket.data.sessionId = sessionId;
+            socket.data.username = username;
+
+            console.log(`User ${username} joined session ${sessionId}`);
+
+             // Add to Redis set atomically (avoids race conditions)
+            await redis.sadd(`session:${sessionId}:users`, username);
+
+            // Remove from disconnected list if present
+            await redis.srem(`session:${sessionId}:disconnected`, username);
+
+            const users = await redis.smembers(`session:${sessionId}:users`);
+            console.log("Current users in session", sessionId, ":", users);
+
+            socket.to(sessionId).emit("user-joined", { username });
         });
 
         socket.on("code-change", ({ sessionId, code }) => {
@@ -24,20 +39,70 @@ export function initCollaborationSocket(io, redis) {
             socket.to(sessionId).emit("remote-cursor-change", { position, username });
         });
 
-        // Custom event for leaving
-        socket.on("leave-session", ({ sessionId }) => {
+        // Leave session (voluntary)
+        socket.on("leave-session", async ({ sessionId, username }) => {
+            socket.data.voluntaryLeave = true
+            console.log(`User ${username} left session ${sessionId}`);
+
+            // Remove user completely (they can join another session)
+            await redis.srem(`session:${sessionId}:users`, username);
+            await redis.srem(`session:${sessionId}:disconnected`, username);
+
+            socket.to(sessionId).emit("user-left", { username });
+
+            // Cleanup check
+            await checkAndCleanup(sessionId, redis);
+
+            // Optional: Mark DB session inactive
+            // await Session.findOneAndUpdate(
+            //     { correlationId: sessionId },
+            //     { isActive: users.length > 0 }
+            // );
+
             socket.leave(sessionId);
-            console.log(`User left session: ${sessionId}`);
-            // Notify others in the same room
-            socket.to(sessionId).emit("user-left");
+            socket.disconnect(true)
         });
 
-        socket.on("disconnect", () => {
-            const { sessionId, username } = socket.data || {};
-            if (sessionId && username) {
-                socket.to(sessionId).emit("user-left", { username });
-                console.log(`${username} disconnected from ${sessionId}`);
-            }
+        // --- DISCONNECT (accidental) ---
+        socket.on("disconnect", async () => {
+            const { sessionId, username, voluntaryLeave } = socket.data || {};
+            if (!sessionId || !username) return;
+
+            if (voluntaryLeave) return;
+
+            console.log(`User ${username} disconnected from ${sessionId}`);
+
+            // Move to disconnected set (don’t remove from active users)
+            await redis.sadd(`session:${sessionId}:disconnected`, username);
+
+            // Notify other user(s)
+            socket.to(sessionId).emit("user-disconnected", { username });
+
+            // Cleanup check
+            await checkAndCleanup(sessionId, redis);
         });
     });
+}
+
+// --- Helper: Check if both users are gone ---
+async function checkAndCleanup(sessionId, redis) {
+  const users = await redis.smembers(`session:${sessionId}:users`);
+  const disconnected = await redis.smembers(`session:${sessionId}:disconnected`);
+
+  // If no active OR disconnected users left → delete Redis + mark inactive
+  if (users.length > 0 && disconnected.length === users.length) {
+    console.log(`Cleaning up empty session ${sessionId}`);
+    await redis.del(
+      `session:${sessionId}:users`,
+      `session:${sessionId}:disconnected`,
+      `session:${sessionId}:code`
+    );
+
+    await Session.findOneAndUpdate(
+      { correlationId: sessionId },
+      { isActive: false }
+    );
+
+    console.log(`Session ${sessionId} marked inactive and cleaned.`);
+  }
 }
