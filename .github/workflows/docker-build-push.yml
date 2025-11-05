@@ -16,9 +16,8 @@ jobs:
       - name: Log in to Docker Hub
         run: echo "${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
 
-      - name: Build and Push user-service image
+      - name: Build and Push image
         run: |
-          NS="${{ secrets.DOCKER_HUB_USERNAME }}"  # or replace with your org name
-
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"  # or your org name
           docker build -t "$NS/user-service:dev" -f ./backend/user-service/Dockerfile ./backend/user-service
           docker push "$NS/user-service:dev"
