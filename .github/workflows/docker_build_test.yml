@@ -4,7 +4,7 @@ on:
   pull_request:
     paths: ["services/user/**", ".github/workflows/user-health.yml"]
   push:
-    branches: [CI]
+    branches: [main]
     paths: ["services/user/**", ".github/workflows/user-health.yml"]
 
 jobs:
