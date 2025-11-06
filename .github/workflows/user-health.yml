@@ -17,7 +17,7 @@ jobs:
 
       - name: Build image
         run: |
-          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          NS="tanxingzhong"
           docker build -t "$NS/user-service:dev" \
             -f backend/user-service/Dockerfile \
             backend/user-service
