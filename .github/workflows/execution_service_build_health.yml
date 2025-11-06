@@ -30,7 +30,7 @@ jobs:
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name execution-service \
-            -p 3007:3007 \
+            -p 3006:3006 \
             "$NS/execution-service:dev"
 
       - name: Wait for /health (fail fast if container dies)
@@ -43,7 +43,7 @@ jobs:
               echo "Exit code: $(docker inspect execution-service --format='{{.State.ExitCode}}' || true)"
               exit 1
             fi
-            if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:3006/health >/dev/null; then
               echo "✅ /health OK"
               exit 0
             fi
