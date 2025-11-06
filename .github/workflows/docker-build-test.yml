@@ -1,53 +1,47 @@
-name: CI (PR build + health)
+name: Test with Google Secret Manager env
 
 on:
   pull_request:
-    branches: [master]
+  push:
 
 jobs:
-  build_and_health:
+  test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - service: user-service
-            port: 3001
-            health: /health
-          # add more services like:
-          # - service: question-service
-          #   port: 3000
-          #   health: /health
-    env:
-      DIR: ./backend/${{ matrix.service }}
-      IMG: ci/${{ matrix.service }}:${{ github.sha }}
+
     steps:
       - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
 
-      - name: Build (no push)
+      # 1) Auth to GCP with the JSON key stored in GitHub Secrets
+      - name: Google Auth (simple)
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      # 2) Fetch the .env blob from Secret Manager
+      - id: gsm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            USER_SERVICE_ENV: projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
+
+      # 3) Write .env for your service and mask it
+      - name: Write .env
+        working-directory: backend/user-service
+        shell: bash
         run: |
-          docker buildx build \
-            --file "$DIR/Dockerfile" \
-            --load "$DIR" \
-            --tag "$IMG"
+          printf "%s" "${{ steps.gsm.outputs.USER_SERVICE_ENV }}" > .env
+          while IFS= read -r line; do
+            [ -n "$line" ] && echo "::add-mask::$line"
+          done < .env
 
-      - name: Run & wait for health
+      # 4) Install and run tests with env loaded
+      - name: npm ci & test
+        working-directory: backend/user-service
+        shell: bash
         run: |
-          set -euo pipefail
-          HP=$((30000 + (RANDOM % 10000)))
-          docker run -d --rm -p "$HP:${{ matrix.port }}" --name "t-${{ matrix.service }}" "$IMG"
-
-          deadline=$((SECONDS+45))
-          until curl -fsS "http://127.0.0.1:$HP${{ matrix.health }}" >/dev/null; do
-            if [ $SECONDS -ge $deadline ]; then
-              echo "::error::${{ matrix.service }} failed health at ${{ matrix.health }}"
-              docker logs "t-${{ matrix.service }}" || true
-              exit 1
-            fi
-            sleep 1
-          done
-
-          docker kill "t-${{ matrix.service }}" >/dev/null 2>&1 || true
+          npm ci
+          # export all vars from .env into the shell so npm test sees them
+          set -a; source .env; set +a
+          npm test
