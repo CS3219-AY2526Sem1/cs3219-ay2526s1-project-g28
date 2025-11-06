@@ -1,70 +1,67 @@
-name: User Service - Health Check
+name: User Service Healthcheck
 
 on:
-  pull_request:
-    paths: ["services/user/**", ".github/workflows/user-health.yml"]
   push:
-    branches: [master, CI]
-    paths: ["services/user/**", ".github/workflows/user-health.yml"]
+    paths:
+      - "backend/user-service/**"
+      - ".github/workflows/user-health.yml"
+  pull_request:
+    paths:
+      - "backend/user-service/**"
+
+permissions:
+  contents: read
 
 jobs:
-  health-check:
+  user-health:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # 1) Simple auth with SA JSON key stored in GitHub Secrets
-      - name: Google Auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
-
-      # 2) Pull the .env blob from Google Secret Manager
-      - id: gsm
-        uses: google-github-actions/get-secretmanager-secrets@v2
-        with:
-          secrets: |
-            USER_SERVICE_ENV: projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
-
-      # 3) Write .env for the container and mask it in logs
-      - name: Write .env
-        working-directory: services/user
-        shell: bash
+      - name: Sanity check repo paths
         run: |
-          printf "%s" "${{ steps.gsm.outputs.USER_SERVICE_ENV }}" > .env
-          while IFS= read -r line; do
-            [ -n "$line" ] && echo "::add-mask::$line"
-          done < .env
+          ls -la
+          test -d backend/user-service && echo "Found backend/user-service" || (echo "Missing backend/user-service" && exit 1)
+          test -f backend/user-service/Dockerfile || (echo "Missing Dockerfile in backend/user-service" && exit 1)
 
-      # 4) Build image from services/user/Dockerfile
-      - name: Build Docker image
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
         run: |
-          docker build -t user-service:ci -f services/user/Dockerfile services/user
+          docker buildx build \
+            -f backend/user-service/Dockerfile \
+            -t local/user-service:ci \
+            backend/user-service
 
-      # 5) Run container and probe /health (up to ~60s)
-      - name: Run & health probe
-        shell: bash
+      - name: Run container
         run: |
-          docker run -d --rm --name user-service \
-            --env-file services/user/.env \
-            -p 3001:3001 user-service:ci
-
+          docker run -d --rm \
+            -p 3001:3001 \
+            --name user-service \
+            -e NODE_ENV=production \
+            local/user-service:ci
+          # wait for server to boot
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
-              echo "✅ Health OK"
-              break
-            fi
-            echo "waiting for health... ($i/30)"
-            sleep 2
-            if [ $i -eq 30 ]; then
-              echo "❌ Health check failed"
-              docker logs user-service || true
-              exit 1
-            fi
+            curl -fsS http://127.0.0.1:3001/health && break
+            echo "waiting for /health... ($i)"
+            sleep 1
           done
 
-          docker logs --tail=200 user-service || true
-          docker stop user-service
+      - name: Health check
+        run: |
+          curl -v http://127.0.0.1:3001/health
+
+      - name: Logs (if failed)
+        if: failure()
+        run: |
+          echo "Container logs:"
+          docker logs user-service || true
+
+      - name: Teardown
+        if: always()
+        run: |
+          docker ps -a
+          docker stop user-service || true
