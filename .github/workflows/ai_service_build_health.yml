@@ -1,8 +1,9 @@
 name: Build & Health (ai-service)
 
 on:
+  workflow_dispatch:
   push:
-    branches: ["**"]
+    branches: ["master"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
