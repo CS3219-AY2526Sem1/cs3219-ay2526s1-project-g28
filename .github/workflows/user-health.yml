@@ -22,12 +22,19 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
+      # Sanity: required secrets present?
+      - name: Check required secrets exist
+        run: |
+          [ -n "${{ secrets.GCP_SA_KEY }}" ] || (echo "::error::GCP_SA_KEY missing"; exit 1)
+          [ -n "${{ secrets.GCP_PROJECT_ID }}" ] || (echo "::error::GCP_PROJECT_ID missing"; exit 1)
+
+      # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # ⬇️ Easiest way to read GSM without installing gcloud
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
@@ -41,22 +48,60 @@ jobs:
           grep -q '^HOST=' user-service.env || echo 'HOST=0.0.0.0' >> user-service.env
           echo "Loaded $(wc -l < user-service.env) env lines"
 
-      - name: Run & wait for /health
+      # Start Mongo only if your env doesn't already supply MONGO_URI
+      - name: Start Mongo if needed
+        run: |
+          if ! grep -q '^MONGO_URI=' user-service.env; then
+            echo "MONGO_URI not found in env; starting local Mongo..."
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            # wait for mongo to accept connections
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+            # let the app reach the host's Mongo from inside container
+            echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> user-service.env
+          else
+            echo "MONGO_URI already set; not starting local Mongo."
+          fi
+
+      # Keep container (no --rm) so we can show logs if it exits
+      - name: Run user-service
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker run -d --rm --name user-service \
+          docker run -d --name user-service \
             -p 3001:3001 \
             --env-file ./user-service.env \
             "$NS/user-service:dev"
 
+      - name: Wait for /health (fail fast if container dies)
+        run: |
           for i in {1..40}; do
+            docker ps -a --filter "name=user-service" --format 'table {{.Names}}\t{{.Status}}'
             if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
-              echo "Container exited early"; docker logs user-service || true; exit 1
+              echo "Container exited"
+              docker logs --timestamps --tail=200 user-service || true
+              echo "Exit code: $(docker inspect user-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
             fi
-            curl -fsS http://127.0.0.1:3001/health && break
+            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
             echo "waiting for /health... ($i)"; sleep 1
           done
+          echo "❌ health never came up"; docker logs user-service || true; exit 1
 
-      - name: Stop
+      - name: Logs (always show last lines)
         if: always()
-        run: docker stop user-service || true
+        run: |
+          echo "----- user-service logs -----"
+          docker logs --timestamps --tail=150 user-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f user-service || true
+          docker rm -f mongo || true
