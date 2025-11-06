@@ -31,14 +31,8 @@ jobs:
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name execution-service \
             -p 3007:3007 \
-            --env-file ./execution-service.env \
             "$NS/execution-service:dev"
-      # Optional: prove key envs exist *inside* the container (lengths only)
-      - name: Confirm env inside container
-        run: |
-          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
-            docker exec execution-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
-          done
+
       - name: Wait for /health (fail fast if container dies)
         run: |
           for i in {1..40}; do
