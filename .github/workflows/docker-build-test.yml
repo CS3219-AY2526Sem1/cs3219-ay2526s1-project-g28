@@ -1,0 +1,30 @@
+name: CI (PR build + health)
+on: { pull_request: { branches: [main, dev] } }
+
+jobs:
+  build_and_health:
+    runs-on: ubuntu-latest
+    permissions: { contents: read }
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: user-service         port: 3001 health: /health
+    env:
+      DIR: ./backend/${{ matrix.service }}
+      IMG: ci/${{ matrix.service }}:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (no push)
+        run: docker buildx build --file "$DIR/Dockerfile" --load "$DIR" --tag "$IMG"
+      - name: Run & wait for health
+        run: |
+          HP=$((30000 + (RANDOM % 10000)))
+          docker run -d --rm -p "$HP:${{ matrix.port }}" --name "t-${{ matrix.service }}" "$IMG"
+          deadline=$((SECONDS+45))
+          until curl -fsS "http://127.0.0.1:$HP${{ matrix.health }}" >/dev/null; do
+            [ $SECONDS -ge $deadline ] && { echo "::error::${{ matrix.service }} failed health"; docker logs "t-${{ matrix.service }}" || true; exit 1; }
+            sleep 1
+          done
+          docker kill "t-${{ matrix.service }}" >/dev/null
