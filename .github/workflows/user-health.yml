@@ -56,12 +56,6 @@ jobs:
               echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> user-service.env
             fi
           fi
-          # CI does not need real OAuth — disable Passport strategies
-          echo 'DISABLE_OAUTH=true' >> user-service.env
-          # still add callbacks so code that reads them won't error if referenced
-          grep -q '^GOOGLE_CALLBACK_URL=' user-service.env || echo 'GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback' >> user-service.env
-          grep -q '^GITHUB_CALLBACK_URL=' user-service.env  || echo 'GITHUB_CALLBACK_URL=http://localhost:3001/auth/github/callback' >> user-service.env
-          echo "Loaded $(wc -l < user-service.env) env lines"
       # Start Mongo only if MONGO_URI points to host.docker.internal (local DB)
       - name: Start Mongo if needed
         run: |
