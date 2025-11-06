@@ -47,7 +47,6 @@ jobs:
           # ensure basics
           grep -q '^PORT=' notification-service.env || echo 'PORT=3005' >> notification-service.env
           grep -q '^HOST=' notification-service.env || echo 'HOST=0.0.0.0' >> notification-service.env
-          grep -q '^SESSION_SECRET=' notification-service.env || echo 'SESSION_SECRET=ci-session-secret' >> notification-service.env
       # Keep container (no --rm) so we can show logs if it exits
       - name: Run notification-service
         run: |
@@ -59,7 +58,7 @@ jobs:
       # Optional: prove key envs exist *inside* the container (lengths only)
       - name: Confirm env inside container
         run: |
-          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+          for k in PORT; do
             docker exec notification-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
           done
       - name: Wait for /health (fail fast if container dies)
