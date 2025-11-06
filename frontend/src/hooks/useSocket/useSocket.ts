@@ -122,7 +122,7 @@ export function useSocket(user?: User) {
 
   const handleStartMatch = async (difficulty: string, topics: string[]) => {
     if (!displayName || !difficulty || !topics) return;
-    setIsQueueing(true); // Start loading state
+    setIsQueueing(true);
     const matchRequest = {
       userId: displayName,
       difficulty: difficulty,
@@ -135,21 +135,19 @@ export function useSocket(user?: User) {
         console.log("Match found immediately!", data);
         setPendingMatch(data.data);
         setModalMessage("Ready to collaborate?");
-        setIsQueueing(false); // Match found, no longer queueing
+        setIsQueueing(false);
         setIsWaiting(false);
         setShowButtons(true);
         setCountdown(DEFAULT_COUNTDOWN);
       } else if (response.status === 202) {
         console.log("In queue, waiting for a match...");
-        // isQueueing is already true, so we just wait
       } else {
-        // Handle other error statuses
         console.error("Failed to start match:", data);
-        setIsQueueing(false); // Stop loading on failure
+        setIsQueueing(false);
       }
     } catch (error) {
       console.error("Error starting match:", error);
-      setIsQueueing(false); // Stop loading on error
+      setIsQueueing(false);
     }
   };
 

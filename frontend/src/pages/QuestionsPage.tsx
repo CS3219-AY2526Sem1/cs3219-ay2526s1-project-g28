@@ -228,7 +228,6 @@ const QuestionsPage: React.FC = () => {
 
       {showForm && (
         <QuestionFormModal
-          open={showForm}
           initial={editingQuestion || undefined}
           onClose={() => setShowForm(false)}
           onSaved={(saved) => { upsertQuestion(saved); setShowForm(false); }}
