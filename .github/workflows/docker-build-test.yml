@@ -2,7 +2,7 @@ name: CI (PR build + health)
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build_and_health:
