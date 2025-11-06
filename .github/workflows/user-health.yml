@@ -28,7 +28,6 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Read the dotenv-style secret from GSM (no gcloud install needed)
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
