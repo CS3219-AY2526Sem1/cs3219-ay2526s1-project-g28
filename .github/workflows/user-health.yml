@@ -5,8 +5,13 @@ on:
     branches: ["**"]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
-  contents: read # id-token NOT needed when using credentials_json
+  contents: read
+  packages: write
 
 jobs:
   user-service:
@@ -18,7 +23,7 @@ jobs:
 
       - name: Build image
         run: |
-          NS="tanxingzhong"
+          NS="secrets.DOCKER_HUB_USERNAME"
           docker build -t "$NS/user-service:dev" \
             -f backend/user-service/Dockerfile \
             backend/user-service
