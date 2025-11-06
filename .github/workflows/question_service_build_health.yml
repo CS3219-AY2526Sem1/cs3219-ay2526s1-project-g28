@@ -70,7 +70,7 @@ jobs:
       # Keep container (no --rm) so we can show logs if it exit
       - name: Run question-service
         run: |
-          NS="${{ secrets.DOCKER_HUB_questionNAME }}"
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name question-service \
             -p 3001:3001 \
             --env-file ./question-service.env \
