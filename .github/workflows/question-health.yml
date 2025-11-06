@@ -1,0 +1,131 @@
+name: Build & Health (question-service)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read   # id-token NOT needed when using credentials_json
+
+jobs:
+  question-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_questionNAME }}"
+          docker build -t "$NS/question-service:dev" \
+            -f backend/question-service/Dockerfile \
+            backend/question-service
+
+      # Authenticate to Google with SA JSON key (NO pool/WIF)
+      - name: Auth to Google with key
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/question-service-env/versions/latest
+
+      # Normalize env, add CI-safe defaults, disable OAuth for health
+      - name: Write & normalize .env + CI flags
+        run: |
+          # write env from GSM
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > question-service.env
+          # normalize Windows CRLF -> LF and trim trailing spaces
+          sed -i 's/\r$//' question-service.env
+          sed -i 's/[[:space:]]*$//' question-service.env
+
+          # ensure basics
+          grep -q '^PORT=' question-service.env || echo 'PORT=3001' >> question-service.env
+          grep -q '^HOST=' question-service.env || echo 'HOST=0.0.0.0' >> question-service.env
+          grep -q '^SESSION_SECRET=' question-service.env || echo 'SESSION_SECRET=ci-session-secret' >> question-service.env
+
+          # map DB_* to MONGO_URI if absent
+          if ! grep -q '^MONGO_URI=' question-service.env; then
+            if grep -q '^DB_LOCAL_URI=' question-service.env; then
+              echo "MONGO_URI=$(grep '^DB_LOCAL_URI=' question-service.env | cut -d= -f2-)" >> question-service.env
+            elif grep -q '^DB_CLOUD_URI=' question-service.env; then
+              echo "MONGO_URI=$(grep '^DB_CLOUD_URI=' question-service.env | cut -d= -f2-)" >> question-service.env
+            else
+              # fall back to local mongo we may start below
+              echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> question-service.env
+            fi
+          fi
+
+          # CI does not need real OAuth — disable Passport strategies
+          echo 'DISABLE_OAUTH=true' >> question-service.env
+          # still add callbacks so code that reads them won't error if referenced
+          grep -q '^GOOGLE_CALLBACK_URL=' question-service.env || echo 'GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback' >> question-service.env
+          grep -q '^GITHUB_CALLBACK_URL=' question-service.env  || echo 'GITHUB_CALLBACK_URL=http://localhost:3001/auth/github/callback' >> question-service.env
+
+          echo "Loaded $(wc -l < question-service.env) env lines"
+
+      # Start Mongo only if MONGO_URI points to host.docker.internal (local DB)
+      - name: Start Mongo if needed
+        run: |
+          if grep -q '^MONGO_URI=mongodb://host.docker.internal' question-service.env; then
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+          else
+            echo "External DB configured; not starting local Mongo."
+          fi
+
+      # Keep container (no --rm) so we can show logs if it exits
+      - name: Run question-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_questionNAME }}"
+          docker run -d --name question-service \
+            -p 3001:3001 \
+            --env-file ./question-service.env \
+            "$NS/question-service:dev"
+
+      # Optional: prove key envs exist *inside* the container (lengths only)
+      - name: Confirm env inside container
+        run: |
+          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+            docker exec question-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+          done
+
+      - name: Wait for /health (fail fast if container dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=question-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^question-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 question-service || true
+              echo "Exit code: $(docker inspect question-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs question-service || true; exit 1
+
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- question-service logs -----"
+          docker logs --timestamps --tail=150 question-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f question-service || true
+          docker rm -f mongo || true
