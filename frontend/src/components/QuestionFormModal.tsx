@@ -46,7 +46,6 @@ export interface Question {
 }
 
 export type QuestionFormModalProps = {
-  open: boolean;
   initial?: Question;
   onClose: () => void;
   onSaved: (q: Question) => void;
@@ -82,7 +81,7 @@ const normalizeSaved = (raw: any): Question => {
   } as Question;
 };
 
-const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, onClose, onSaved }) => {
+const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ initial, onClose, onSaved }) => {
   const mode: 'create' | 'edit' = initial ? 'edit' : 'create';
 
   // form state
@@ -276,8 +275,6 @@ const QuestionFormModal: React.FC<QuestionFormModalProps> = ({ open, initial, on
   };
 
   const closeIfNotSaving = () => { if (!saving) onClose(); };
-
-  if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-[1100] flex items-start justify-center bg-black/60 p-4 sm:p-6 md:p-8">

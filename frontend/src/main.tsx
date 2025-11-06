@@ -2,6 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import AdminRoute from "./auth/AdminRoute";
 import { AuthProvider } from "./auth/AuthContext";
 import "./index.css";
 import LandingPage from "./pages/LandingPage";
@@ -38,7 +39,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/matchingpage" element={<MatchingPage />} />
               <Route path="/home" element={<HomePage />} />
-              <Route path="/questions" element={<QuestionsPage />} />
+              <Route element={<AdminRoute />}>
+                <Route path="/questions" element={<QuestionsPage />} />
+              </Route>
               <Route
                 path="/collab/:sessionId"
                 element={<CollaborationPage />}
