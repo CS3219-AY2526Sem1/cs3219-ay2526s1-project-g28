@@ -1,18 +1,80 @@
-name: Build image
+name: Build & Health (user-service, simplest)
+
 on:
   push:
-    branches: ["**"]
+  branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+  id-token: write   # OIDC to Google
+
 jobs:
-  build image:
+  build_and_health:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
+      # Build the image (same as you do)
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker build -t "$NS/user-service:dev" -f ./backend/user-service/Dockerfile ./backend/user-service
+          docker build -t "$NS/user-service:dev" \
+            -f ./backend/user-service/Dockerfile \
+            ./backend/user-service
+
+      # --- Google auth (no JSON key files) ---
+      # Set these three in your repo/org secrets:
+      # GCP_WIF_PROVIDER = projects/1234567890/locations/global/workloadIdentityPools/github/providers/github-oidc
+      # GCP_SA_EMAIL     = github-ci@YOUR_PROJECT_ID.iam.gserviceaccount.com
+      # GCP_PROJECT_ID   = your-project-id
+      - name: Auth to Google
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Pull ONE dotenv-style secret from GSM (e.g., name: user-service-dotenv)
+      - name: Fetch .env from Secret Manager
+        run: |
+          gcloud secrets versions access latest \
+            --secret="user-service-dotenv" \
+            --project="${{ secrets.GCP_PROJECT_ID }}" > user-service.env
+          # Ensure basic defaults exist (safe to keep if already set)
+          grep -q '^PORT=' user-service.env || echo 'PORT=3001' >> user-service.env
+          grep -q '^HOST=' user-service.env || echo 'HOST=0.0.0.0' >> user-service.env
+          echo "Loaded $(wc -l < user-service.env) env lines"
+
+      # Run the container with the env file, wait for /health
+      - name: Run & wait for health
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --rm \
+            --name user-service \
+            -p 3001:3001 \
+            --env-file ./user-service.env \
+            "$NS/user-service:dev"
+
+          for i in {1..40}; do
+            # if container died, show logs and fail
+            if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
+              echo "Container exited early"; docker logs user-service || true; exit 1
+            fi
+            curl -fsS http://127.0.0.1:3001/health && break
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+
+      - name: Health check (verbose)
+        run: curl -v http://127.0.0.1:3001/health
+
+      - name: Logs if failed
+        if: failure()
+        run: docker logs user-service || true
+
+      - name: Stop container
+        if: always()
+        run: docker stop user-service || true
