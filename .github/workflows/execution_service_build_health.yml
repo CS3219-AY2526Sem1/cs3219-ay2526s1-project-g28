@@ -1,0 +1,90 @@
+name: Build & Health (execution-service)
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  execution-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/execution-service:dev" \
+            -f backend/execution-service/Dockerfile \
+            backend/execution-service
+      # Authenticate to Google with SA JSON key (NO pool/WIF)
+      - name: Auth to Google with key
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/execution-service-env/versions/latest
+      # Normalize env, add CI-safe defaults, disable OAuth for health
+      - name: Write & normalize .env + CI flags
+        run: |
+          # write env from GSM
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > execution-service.env
+          # normalize Windows CRLF -> LF and trim trexecutionling spaces
+          sed -i 's/\r$//' execution-service.env
+          sed -i 's/[[:space:]]*$//' execution-service.env
+          # ensure basics
+          grep -q '^PORT=' execution-service.env || echo 'PORT=3006' >> execution-service.env
+          grep -q '^HOST=' execution-service.env || echo 'HOST=0.0.0.0' >> execution-service.env
+          grep -q '^SESSION_SECRET=' execution-service.env || echo 'SESSION_SECRET=ci-session-secret' >> execution-service.env
+      # Keep contexecutionner (no --rm) so we can show logs if it exits
+      - name: Run execution-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name execution-service \
+            -p 3006:3006 \
+            --env-file ./execution-service.env \
+            "$NS/execution-service:dev"
+      # Optional: prove key envs exist *inside* the contexecutionner (lengths only)
+      - name: Confirm env inside contexecutionner
+        run: |
+          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+            docker exec execution-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+          done
+      - name: Wexecutiont for /health (fexecutionl fast if contexecutionner dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=execution-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^execution-service$'; then
+              echo "Contexecutionner exited"
+              docker logs --timestamps --texecutionl=200 execution-service || true
+              echo "Exit code: $(docker inspect execution-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3006/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "wexecutionting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs execution-service || true; exit 1
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- execution-service logs -----"
+          docker logs --timestamps --texecutionl=150 execution-service || true
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f execution-service || true

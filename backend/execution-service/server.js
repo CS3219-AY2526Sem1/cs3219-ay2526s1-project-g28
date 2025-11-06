@@ -3,7 +3,7 @@ import http from "http";
 import index from "./index.js";
 
 async function startServer() {
-  const port = process.env.PORT || 5173;
+  const port = process.env.PORT || 3006;
   const server = http.createServer(index);
 
   try {

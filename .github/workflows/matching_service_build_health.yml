@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read # id-token NOT needed when using credentials_json
 
@@ -82,10 +86,7 @@ jobs:
         run: |
           echo "----- matching-service logs -----"
           docker logs --timestamps --tail=150 matching-service || true
-          echo "----- mongo logs -----"
-          docker logs --timestamps --tail=80 mongo || true
       - name: Cleanup
         if: always()
         run: |
           docker rm -f matching-service || true
-          docker rm -f mongo || true

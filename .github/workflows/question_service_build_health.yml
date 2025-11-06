@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read # id-token NOT needed when using credentials_json
 
@@ -20,6 +24,7 @@ jobs:
           docker build -t "$NS/question-service:dev" \
             -f backend/question-service/Dockerfile \
             backend/question-service
+
       # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2

@@ -1,0 +1,90 @@
+name: Build & Health (notification-service)
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # id-token NOT needed when using credentials_json
+
+jobs:
+  notification-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/notification-service:dev" \
+            -f backend/notification-service/Dockerfile \
+            backend/notification-service
+      # Authenticate to Google with SA JSON key (NO pool/WIF)
+      - name: Auth to Google with key
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/notification-service-env/versions/latest
+      # Normalize env, add CI-safe defaults, disable OAuth for health
+      - name: Write & normalize .env + CI flags
+        run: |
+          # write env from GSM
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > notification-service.env
+          # normalize Windows CRLF -> LF and trim trailing spaces
+          sed -i 's/\r$//' notification-service.env
+          sed -i 's/[[:space:]]*$//' notification-service.env
+          # ensure basics
+          grep -q '^PORT=' notification-service.env || echo 'PORT=3005' >> notification-service.env
+          grep -q '^HOST=' notification-service.env || echo 'HOST=0.0.0.0' >> notification-service.env
+          grep -q '^SESSION_SECRET=' notification-service.env || echo 'SESSION_SECRET=ci-session-secret' >> notification-service.env
+      # Keep container (no --rm) so we can show logs if it exits
+      - name: Run notification-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name notification-service \
+            -p 3005:3005 \
+            --env-file ./notification-service.env \
+            "$NS/notification-service:dev"
+      # Optional: prove key envs exist *inside* the container (lengths only)
+      - name: Confirm env inside container
+        run: |
+          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+            docker exec notification-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+          done
+      - name: Wait for /health (fail fast if container dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=notification-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^notification-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 notification-service || true
+              echo "Exit code: $(docker inspect notification-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3005/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs notification-service || true; exit 1
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- notification-service logs -----"
+          docker logs --timestamps --tail=150 notification-service || true
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f notification-service || true
