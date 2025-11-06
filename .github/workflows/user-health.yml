@@ -4,7 +4,7 @@ on:
   push:
     branches: ["**"]
   pull_request:
-  
+
 permissions:
   contents: read   # id-token NOT needed when using credentials_json
 
@@ -22,7 +22,6 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
-      # 🔐 Authenticate to Google using the SA JSON key (ONE input ONLY)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
         with:
