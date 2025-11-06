@@ -1,8 +1,7 @@
 name: Build & Health (user-service)
 
 on:
-  push:
-    branches: ["**"]
+  workflow_dispatch: {} # manual trigger only
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
