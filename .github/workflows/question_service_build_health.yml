@@ -67,7 +67,7 @@ jobs:
           else
             echo "External DB configured; not starting local Mongo."
           fi
-      # Keep container (no --rm) so we can show logs if it exits
+      # Keep container (no --rm) so we can show logs if it exit
       - name: Run question-service
         run: |
           NS="${{ secrets.DOCKER_HUB_questionNAME }}"
