@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read # id-token NOT needed when using credentials_json
 
@@ -20,6 +24,7 @@ jobs:
           docker build -t "$NS/question-service:dev" \
             -f backend/question-service/Dockerfile \
             backend/question-service
+
       # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
@@ -42,8 +47,6 @@ jobs:
           sed -i 's/[[:space:]]*$//' question-service.env
           # ensure basics
           grep -q '^PORT=' question-service.env || echo 'PORT=3002' >> question-service.env
-          grep -q '^HOST=' question-service.env || echo 'HOST=0.0.0.0' >> question-service.env
-          grep -q '^SESSION_SECRET=' question-service.env || echo 'SESSION_SECRET=ci-session-secret' >> question-service.env
           # map DB_* to MONGO_URI if absent
           if ! grep -q '^MONGO_URI=' question-service.env; then
             if grep -q '^DB_LOCAL_URI=' question-service.env; then
@@ -78,7 +81,7 @@ jobs:
       # Optional: prove key envs exist *inside* the container (lengths only)
       - name: Confirm env inside container
         run: |
-          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+          for k in PORT HOST MONGO_URI; do
             docker exec question-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
           done
       - name: Wait for /health (fail fast if container dies)

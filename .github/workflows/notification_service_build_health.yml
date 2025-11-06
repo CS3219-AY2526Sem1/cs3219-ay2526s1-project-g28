@@ -1,0 +1,91 @@
+# .github/workflows/build-health-notification.yml
+name: Build & Health (notification-service)
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  notification-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/notification-service:dev" \
+            -f backend/notification-service/Dockerfile \
+            backend/notification-service
+
+      - name: Auth to Google with key
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/notification-service-env/versions/latest
+
+      - name: Write & normalize .env + CI flags
+        run: |
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > notification-service.env
+          sed -i 's/\r$//' notification-service.env
+          sed -i 's/[[:space:]]*$//' notification-service.env
+          grep -q '^PORT=' notification-service.env || echo 'PORT=3005' >> notification-service.env
+          grep -q '^HOST=' notification-service.env || echo 'HOST=0.0.0.0' >> notification-service.env
+          # turn on the tiny health server for CI
+          echo 'ENABLE_HEALTH_SERVER=1' >> notification-service.env
+
+      - name: Run notification-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name notification-service \
+            -p 3005:3005 \
+            --env-file ./notification-service.env \
+            "$NS/notification-service:dev"
+
+      - name: Confirm env inside container
+        run: |
+          for k in PORT ENABLE_HEALTH_SERVER; do
+            docker exec notification-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+          done
+
+      - name: Wait for /health (fail fast if container dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=notification-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^notification-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 notification-service || true
+              echo "Exit code: $(docker inspect notification-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3005/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs notification-service || true; exit 1
+
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- notification-service logs -----"
+          docker logs --timestamps --tail=150 notification-service || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f notification-service || true

@@ -1,0 +1,61 @@
+name: Build & Health (execution-service)
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  execution-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/execution-service:dev" \
+            -f backend/execution-service/Dockerfile \
+            backend/execution-service
+
+      # Keep container (no --rm) so we can show logs if it exits
+      - name: Run execution-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name execution-service \
+            -p 3006:3006 \
+            "$NS/execution-service:dev"
+
+      - name: Wait for /health (fail fast if container dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=execution-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^execution-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 execution-service || true
+              echo "Exit code: $(docker inspect execution-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3006/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs execution-service || true; exit 1
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- execution-service logs -----"
+          docker logs --timestamps --tail=150 execution-service || true
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f execution-service || true

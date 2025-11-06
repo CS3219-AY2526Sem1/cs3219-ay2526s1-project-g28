@@ -1,0 +1,92 @@
+name: Build & Health (matching-service)
+
+on:
+  push:
+    branches: ["**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # id-token NOT needed when using credentials_json
+
+jobs:
+  matching-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/matching-service:dev" \
+            -f backend/matching-service/Dockerfile \
+            backend/matching-service
+
+      # Authenticate to Google with SA JSON key (NO pool/WIF)
+      - name: Auth to Google with key
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/matching-service-env/versions/latest
+      # Normalize env, add CI-safe defaults, disable OAuth for health
+      - name: Write & normalize .env + CI flags
+        run: |
+          # write env from GSM
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > matching-service.env
+          # normalize Windows CRLF -> LF and trim trailing spaces
+          sed -i 's/\r$//' matching-service.env
+          sed -i 's/[[:space:]]*$//' matching-service.env
+          # ensure basics
+          grep -q '^PORT=' matching-service.env || echo 'PORT=3003' >> matching-service.env
+          grep -q '^HOST=' matching-service.env || echo 'HOST=0.0.0.0' >> matching-service.env
+          grep -q '^SESSION_SECRET=' matching-service.env || echo 'SESSION_SECRET=ci-session-secret' >> matching-service.env
+
+      # Keep container (no --rm) so we can show logs if it exit
+      - name: Run matching-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name matching-service \
+            -p 3003:3003 \
+            --env-file ./matching-service.env \
+            "$NS/matching-service:dev"
+      # Optional: prove key envs exist *inside* the container (lengths only)
+      - name: Confirm env inside container
+        run: |
+          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
+            docker exec matching-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+          done
+      - name: Wait for /health (fail fast if container dies)
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=matching-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^matching-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 matching-service || true
+              echo "Exit code: $(docker inspect matching-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3003/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs matching-service || true; exit 1
+      - name: Logs (always show last lines)
+        if: always()
+        run: |
+          echo "----- matching-service logs -----"
+          docker logs --timestamps --tail=150 matching-service || true
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f matching-service || true

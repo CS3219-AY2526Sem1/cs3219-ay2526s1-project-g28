@@ -1,4 +1,4 @@
-name: Build & Health (user-service)
+name: Build & Health (collaboration-service)
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
   contents: read # id-token NOT needed when using credentials_json
 
 jobs:
-  user-service:
+  collaboration-service:
     runs-on: ubuntu-latest
 
     steps:
@@ -21,9 +21,9 @@ jobs:
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker build -t "$NS/user-service:dev" \
-            -f backend/user-service/Dockerfile \
-            backend/user-service
+          docker build -t "$NS/collaboration-service:dev" \
+            -f backend/collaboration-service/Dockerfile \
+            backend/collaboration-service
       # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
@@ -35,34 +35,34 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
-            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/collaboration-service-env/versions/latest
       # Normalize env, add CI-safe defaults, disable OAuth for health
       - name: Write & normalize .env + CI flags
         run: |
           # write env from GSM
-          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > user-service.env
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > collaboration-service.env
           # normalize Windows CRLF -> LF and trim trailing spaces
-          sed -i 's/\r$//' user-service.env
-          sed -i 's/[[:space:]]*$//' user-service.env
+          sed -i 's/\r$//' collaboration-service.env
+          sed -i 's/[[:space:]]*$//' collaboration-service.env
           # ensure basics
-          grep -q '^PORT=' user-service.env || echo 'PORT=3001' >> user-service.env
-          grep -q '^HOST=' user-service.env || echo 'HOST=0.0.0.0' >> user-service.env
-          grep -q '^SESSION_SECRET=' user-service.env || echo 'SESSION_SECRET=ci-session-secret' >> user-service.env
+          grep -q '^PORT=' collaboration-service.env || echo 'PORT=3004' >> collaboration-service.env
+          grep -q '^HOST=' collaboration-service.env || echo 'HOST=0.0.0.0' >> collaboration-service.env
+          grep -q '^SESSION_SECRET=' collaboration-service.env || echo 'SESSION_SECRET=ci-session-secret' >> collaboration-service.env
           # map DB_* to MONGO_URI if absent
-          if ! grep -q '^MONGO_URI=' user-service.env; then
-            if grep -q '^DB_LOCAL_URI=' user-service.env; then
-              echo "MONGO_URI=$(grep '^DB_LOCAL_URI=' user-service.env | cut -d= -f2-)" >> user-service.env
-            elif grep -q '^DB_CLOUD_URI=' user-service.env; then
-              echo "MONGO_URI=$(grep '^DB_CLOUD_URI=' user-service.env | cut -d= -f2-)" >> user-service.env
+          if ! grep -q '^MONGO_URI=' collaboration-service.env; then
+            if grep -q '^DB_LOCAL_URI=' collaboration-service.env; then
+              echo "MONGO_URI=$(grep '^DB_LOCAL_URI=' collaboration-service.env | cut -d= -f2-)" >> collaboration-service.env
+            elif grep -q '^DB_CLOUD_URI=' collaboration-service.env; then
+              echo "MONGO_URI=$(grep '^DB_CLOUD_URI=' collaboration-service.env | cut -d= -f2-)" >> collaboration-service.env
             else
               # fall back to local mongo we may start below
-              echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> user-service.env
+              echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> collaboration-service.env
             fi
           fi
       # Start Mongo only if MONGO_URI points to host.docker.internal (local DB)
       - name: Start Mongo if needed
         run: |
-          if grep -q '^MONGO_URI=mongodb://host.docker.internal' user-service.env; then
+          if grep -q '^MONGO_URI=mongodb://host.docker.internal' collaboration-service.env; then
             docker run -d --name mongo -p 27017:27017 mongo:7
             for i in {1..40}; do
               docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
@@ -72,45 +72,45 @@ jobs:
             echo "External DB configured; not starting local Mongo."
           fi
       # Keep container (no --rm) so we can show logs if it exits
-      - name: Run user-service
+      - name: Run collaboration-service
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker run -d --name user-service \
-            -p 3001:3001 \
-            --env-file ./user-service.env \
-            "$NS/user-service:dev"
+          docker run -d --name collaboration-service \
+            -p 3004:3004 \
+            --env-file ./collaboration-service.env \
+            "$NS/collaboration-service:dev"
       # Optional: prove key envs exist *inside* the container (lengths only)
       - name: Confirm env inside container
         run: |
           for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
-            docker exec user-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
+            docker exec collaboration-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
           done
       - name: Wait for /health (fail fast if container dies)
         run: |
           for i in {1..40}; do
-            docker ps -a --filter "name=user-service" --format 'table {{.Names}}\t{{.Status}}'
-            if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
+            docker ps -a --filter "name=collaboration-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^collaboration-service$'; then
               echo "Container exited"
-              docker logs --timestamps --tail=200 user-service || true
-              echo "Exit code: $(docker inspect user-service --format='{{.State.ExitCode}}' || true)"
+              docker logs --timestamps --tail=200 collaboration-service || true
+              echo "Exit code: $(docker inspect collaboration-service --format='{{.State.ExitCode}}' || true)"
               exit 1
             fi
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:3004/health >/dev/null; then
               echo "✅ /health OK"
               exit 0
             fi
             echo "waiting for /health... ($i)"; sleep 1
           done
-          echo "❌ health never came up"; docker logs user-service || true; exit 1
+          echo "❌ health never came up"; docker logs collaboration-service || true; exit 1
       - name: Logs (always show last lines)
         if: always()
         run: |
-          echo "----- user-service logs -----"
-          docker logs --timestamps --tail=150 user-service || true
+          echo "----- collaboration-service logs -----"
+          docker logs --timestamps --tail=150 collaboration-service || true
           echo "----- mongo logs -----"
           docker logs --timestamps --tail=80 mongo || true
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f user-service || true
+          docker rm -f collaboration-service || true
           docker rm -f mongo || true
