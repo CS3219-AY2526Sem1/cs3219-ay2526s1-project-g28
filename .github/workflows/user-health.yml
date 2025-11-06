@@ -6,12 +6,11 @@ on:
   pull_request:
 
 permissions:
-  contents: read  # no id-token needed when using a key
+  contents: read   # id-token NOT needed for key auth
 
 jobs:
   user-service:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
@@ -22,28 +21,25 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
-      # Authenticate to Google using the SA JSON key (no WIF/pool)
+      # 🔐 Auth with SA JSON key (one input ONLY)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Option A: Fetch the dotenv with the official Secret Manager action (no gcloud)
+      # Fetch the dotenv from Secret Manager
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-dotenv/versions/latest
 
-      - name: Write .env for Docker
+      - name: Write .env and run health
         run: |
           printf '%s' "${{ steps.sm.outputs.DOTENV }}" > user-service.env
           grep -q '^PORT=' user-service.env || echo 'PORT=3001' >> user-service.env
           grep -q '^HOST=' user-service.env || echo 'HOST=0.0.0.0' >> user-service.env
-          echo "Loaded $(wc -l < user-service.env) env lines"
 
-      - name: Run & wait for /health
-        run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --rm --name user-service \
             -p 3001:3001 \
@@ -52,12 +48,8 @@ jobs:
 
           for i in {1..40}; do
             if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
-              echo "Container exited early"; docker logs user-service || true; exit 1
+              echo "Container exited"; docker logs user-service || true; exit 1
             fi
             curl -fsS http://127.0.0.1:3001/health && break
             echo "waiting for /health... ($i)"; sleep 1
           done
-
-      - name: Stop
-        if: always()
-        run: docker stop user-service || true
