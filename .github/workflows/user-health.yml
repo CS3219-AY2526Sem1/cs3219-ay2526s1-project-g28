@@ -5,13 +5,8 @@ on:
     branches: ["**"]
   pull_request:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
-  contents: read
-  packages: write
+  contents: read # id-token NOT needed when using credentials_json
 
 jobs:
   user-service:
@@ -26,19 +21,18 @@ jobs:
           docker build -t "$NS/user-service:dev" \
             -f backend/user-service/Dockerfile \
             backend/user-service
-
       # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # Read the dotenv-style secret from GSM (no gcloud install needed)
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
-            DOTENV:projects/${{ env.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
-
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
       # Normalize env, add CI-safe defaults, disable OAuth for health
       - name: Write & normalize .env + CI flags
         run: |
@@ -47,12 +41,10 @@ jobs:
           # normalize Windows CRLF -> LF and trim trailing spaces
           sed -i 's/\r$//' user-service.env
           sed -i 's/[[:space:]]*$//' user-service.env
-
           # ensure basics
           grep -q '^PORT=' user-service.env || echo 'PORT=3001' >> user-service.env
           grep -q '^HOST=' user-service.env || echo 'HOST=0.0.0.0' >> user-service.env
           grep -q '^SESSION_SECRET=' user-service.env || echo 'SESSION_SECRET=ci-session-secret' >> user-service.env
-
           # map DB_* to MONGO_URI if absent
           if ! grep -q '^MONGO_URI=' user-service.env; then
             if grep -q '^DB_LOCAL_URI=' user-service.env; then
@@ -64,15 +56,12 @@ jobs:
               echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> user-service.env
             fi
           fi
-
           # CI does not need real OAuth — disable Passport strategies
           echo 'DISABLE_OAUTH=true' >> user-service.env
           # still add callbacks so code that reads them won't error if referenced
           grep -q '^GOOGLE_CALLBACK_URL=' user-service.env || echo 'GOOGLE_CALLBACK_URL=http://localhost:3001/auth/google/callback' >> user-service.env
           grep -q '^GITHUB_CALLBACK_URL=' user-service.env  || echo 'GITHUB_CALLBACK_URL=http://localhost:3001/auth/github/callback' >> user-service.env
-
           echo "Loaded $(wc -l < user-service.env) env lines"
-
       # Start Mongo only if MONGO_URI points to host.docker.internal (local DB)
       - name: Start Mongo if needed
         run: |
@@ -85,7 +74,6 @@ jobs:
           else
             echo "External DB configured; not starting local Mongo."
           fi
-
       # Keep container (no --rm) so we can show logs if it exits
       - name: Run user-service
         run: |
@@ -94,14 +82,12 @@ jobs:
             -p 3001:3001 \
             --env-file ./user-service.env \
             "$NS/user-service:dev"
-
       # Optional: prove key envs exist *inside* the container (lengths only)
       - name: Confirm env inside container
         run: |
           for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
             docker exec user-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
           done
-
       - name: Wait for /health (fail fast if container dies)
         run: |
           for i in {1..40}; do
@@ -119,7 +105,6 @@ jobs:
             echo "waiting for /health... ($i)"; sleep 1
           done
           echo "❌ health never came up"; docker logs user-service || true; exit 1
-
       - name: Logs (always show last lines)
         if: always()
         run: |
@@ -127,7 +112,6 @@ jobs:
           docker logs --timestamps --tail=150 user-service || true
           echo "----- mongo logs -----"
           docker logs --timestamps --tail=80 mongo || true
-
       - name: Cleanup
         if: always()
         run: |
