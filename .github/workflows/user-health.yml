@@ -22,12 +22,6 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
-      # Sanity: required secrets present?
-      - name: Check required secrets exist
-        run: |
-          [ -n "${{ secrets.GCP_SA_KEY }}" ] || (echo "::error::GCP_SA_KEY missing"; exit 1)
-          [ -n "${{ secrets.GCP_PROJECT_ID }}" ] || (echo "::error::GCP_PROJECT_ID missing"; exit 1)
-
       # Authenticate to Google with SA JSON key (NO pool/WIF)
       - name: Auth to Google with key
         uses: google-github-actions/auth@v2
