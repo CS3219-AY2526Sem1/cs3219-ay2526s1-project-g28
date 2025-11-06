@@ -6,11 +6,12 @@ on:
   pull_request:
 
 permissions:
-  contents: read   # id-token NOT needed when using credentials_json
+  contents: read # id-token NOT needed when using credentials_json
 
 jobs:
   user-service:
     runs-on: ubuntu-latest
+    environment: CI
 
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +33,7 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
-            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
+            DOTENV:projects/${{ env.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
 
       # Normalize env, add CI-safe defaults, disable OAuth for health
       - name: Write & normalize .env + CI flags
