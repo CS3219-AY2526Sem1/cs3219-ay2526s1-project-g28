@@ -1,3 +1,4 @@
+# .github/workflows/user-health.yml
 name: User Service Healthcheck
 
 on:
@@ -11,31 +12,38 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # if you later use GCP OIDC
 
 jobs:
   user-health:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Sanity check repo paths
+      - name: Sanity check paths
         run: |
-          ls -la
-          test -d backend/user-service && echo "Found backend/user-service" || (echo "Missing backend/user-service" && exit 1)
-          test -f backend/user-service/Dockerfile || (echo "Missing Dockerfile in backend/user-service" && exit 1)
+          ls -la backend/user-service
+          test -f backend/user-service/Dockerfile
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # IMPORTANT: --load so docker run can see the image
       - name: Build image (no push)
         run: |
           docker buildx build \
-            -f backend/user-service/Dockerfile \
+            --platform=linux/amd64 \
+            --load \
             -t local/user-service:ci \
+            -f backend/user-service/Dockerfile \
             backend/user-service
 
+      - name: Show images
+        run: docker images | grep user-service || true
+
+      # If your /health doesn't need DB, you can run straight away.
+      # If it DOES need DB, uncomment the Mongo service block below.
       - name: Run container
         run: |
           docker run -d --rm \
@@ -43,7 +51,6 @@ jobs:
             --name user-service \
             -e NODE_ENV=production \
             local/user-service:ci
-          # wait for server to boot
           for i in {1..30}; do
             curl -fsS http://127.0.0.1:3001/health && break
             echo "waiting for /health... ($i)"
@@ -51,17 +58,12 @@ jobs:
           done
 
       - name: Health check
-        run: |
-          curl -v http://127.0.0.1:3001/health
+        run: curl -v http://127.0.0.1:3001/health
 
-      - name: Logs (if failed)
+      - name: Logs if failed
         if: failure()
-        run: |
-          echo "Container logs:"
-          docker logs user-service || true
+        run: docker logs user-service || true
 
       - name: Teardown
         if: always()
-        run: |
-          docker ps -a
-          docker stop user-service || true
+        run: docker stop user-service || true
