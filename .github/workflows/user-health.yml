@@ -2,7 +2,7 @@ name: Build & Health (user-service, simplest)
 
 on:
   push:
-  branches: ["**"]
+    branches: ["**"]
   pull_request:
 
 permissions:
