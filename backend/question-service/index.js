@@ -29,6 +29,7 @@ app.use((req, res, next) => {
 });
 
 app.use("/questions", questionRoutes);
+app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 
 app.get("/", (req, res, next) => {
   console.log("Sending Greetings!");

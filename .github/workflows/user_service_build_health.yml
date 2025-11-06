@@ -3,7 +3,6 @@ name: Build & Health (user-service)
 on:
   push:
     branches: ["**"]
-  pull_request:
 
 permissions:
   contents: read # id-token NOT needed when using credentials_json
