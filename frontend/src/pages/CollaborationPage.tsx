@@ -174,25 +174,27 @@ function CodeEditorTab({
 
   // Listen for remote cursor updates
   useEffect(() => {
-    if (!socketRef.current) return;
+    const socket = socketRef.current;
+    if (!socket) return;
 
-    socketRef.current.on(
-      "remote-cursor-change",
-      ({
-        position,
-        username,
-      }: {
-        position: { lineNumber: number; column: number };
-        username: string;
-      }) => {
-        if (username !== currentUsername) {
-          setRemoteCursor({ ...position, username });
-        }
+    const handleRemoteCursor = ({
+      position,
+      username,
+    }: {
+      position: { lineNumber: number; column: number };
+      username: string;
+    }) => {
+      if (username !== currentUsername) {
+        setRemoteCursor({ ...position, username });
       }
-    );
+    };
+
+    socket.on("remote-cursor-change", handleRemoteCursor);
 
     return () => {
-      socketRef.current.off("remote-cursor-change");
+      if (socket && socket.off) {
+        socket.off("remote-cursor-change", handleRemoteCursor);
+      }
     };
   }, [socketRef, currentUsername]);
 
@@ -582,6 +584,7 @@ export default function CollaborationPage() {
   const [isCallActive, setIsCallActive] = useState(false);
   const [showCallPopup, setShowCallPopup] = useState(false);
   const socketRef = useRef<any>(null);
+  const knownUsersRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -630,46 +633,73 @@ export default function CollaborationPage() {
 
   // Setup socket
   useEffect(() => {
-    if (!sessionId || socketRef.current) return;
+    if (!sessionId || socketRef.current || !currentUsername) return;
 
     const socket = io(COLLAB_SERVICE_URL, {
       transports: ["polling", "websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
     });
     socketRef.current = socket;
 
     socket.on("connect", () => {
       console.log("Connected:", socket.id);
-      socket.emit("join-session", { sessionId });
+      socket.emit("join-session", { sessionId, username: currentUsername });
+      localStorage.setItem("activeSessionId", sessionId);
     });
 
-    // Listen for code changes from others
-    socket.on("code-change", ({ code: newCode }: { code: string }) => {
-      setCode(newCode);
+    // Auto rejoin if reconnected
+    socket.on("reconnect", () => {
+      console.log("Reconnected to socket");
+      socket.emit("join-session", { sessionId, username: currentUsername });
+      localStorage.setItem("activeSessionId", sessionId);
     });
 
-    // Listen for language changes from others
-    socket.on(
-      "language-change",
-      ({ language: newLang }: { language: Language }) => {
-        console.log("Language changed to:", newLang);
-        setLanguage(newLang);
-        setCode(defaultSnippets[newLang]); // optional: reset snippet to match
+    // Listen for peer events
+    socket.on("user-joined", ({ username }) => {
+      if (username === currentUsername) return;
+
+      if (knownUsersRef.current.has(username)) {
+        alert(`${username} has rejoined the session.`);
+      } else {
+        knownUsersRef.current.add(username);
+        console.log(`${username} joined the session`);
       }
-    );
+    });
 
-    socket.on("user-left", () => {
-      alert("The other user has left the session");
+    socket.on("user-left", ({ username }) => {
+      if (username !== currentUsername) {
+        alert(`${username} has left the session`);
+      }
     });
 
     socket.on("disconnect", (reason) => {
       console.log("Socket disconnected:", reason);
     });
 
+    socket.on("user-disconnected", ({ username }) => {
+      if (username !== currentUsername) {
+        alert(`${username} has been disconnected from the session.`);
+      }
+    });
+
+    // Existing code-change / language-change handlers
+    socket.on("code-change", ({ code: newCode }: { code: string }) => {
+      setCode(newCode);
+    });
+
+    socket.on("language-change", ({ language: newLang }: { language: Language }) => {
+      console.log("Language changed to:", newLang);
+      setLanguage(newLang);
+      setCode(defaultSnippets[newLang]);
+    });
+
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [sessionId]);
+  }, [sessionId, currentUsername]);
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
@@ -685,33 +715,32 @@ export default function CollaborationPage() {
     });
   };
 
-  const handleLeaveSession = async () => {
-    if (!sessionId) return;
+const handleLeaveSession = async () => {
+  if (!sessionId || !currentUsername) return;
 
-    if (!window.confirm("Are you sure you want to leave this session?")) return;
+  if (!window.confirm("Are you sure you want to leave this session?")) return;
 
-    try {
-      // Notify other users via socket
-      socketRef.current?.emit("leave-session", {
-        sessionId,
-      });
+  try {
+    // Notify backend (voluntary leave)
+    socketRef.current?.emit("leave-session", {
+      sessionId,
+      username: currentUsername,
+    });
 
-      // End session on backend
-      await fetch(`${COLLAB_SERVICE_URL}/collaboration/${sessionId}`, {
-        method: "DELETE",
-      });
+    // Optionally mark session inactive locally
+    localStorage.removeItem("activeSessionId");
 
-      // Disconnect socket
-      socketRef.current?.disconnect();
-      socketRef.current = null;
+    // Disconnect socket
+    // socketRef.current?.disconnect();
+    // socketRef.current = null;
 
-      // Navigate back to home page
-      navigate("/home");
-    } catch (err) {
-      console.error("Failed to leave session:", err);
-      alert("Could not leave session. Try again.");
-    }
-  };
+    // Navigate back to home
+    navigate("/home");
+  } catch (err) {
+    console.error("Failed to leave session:", err);
+    alert("Could not leave session. Try again.");
+  }
+};
 
   if (loading) {
     return (

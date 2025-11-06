@@ -39,12 +39,20 @@ export async function getSession(req, res) {
       return res.status(404).json({ error: "Session not found" });
     }
 
+    // Optionally fetch participants from Redis
+    const redisUsers = await req.redis?.smembers(`session:${correlationId}:users`);
+
     // If startedAt is null, set it now (first time anyone opens the session)
     if (!session.startedAt) {
       session.startedAt = new Date();
       await session.save();
     }
-    res.status(200).json(session);
+    
+    res.status(200).json({
+      ...session.toObject(),
+      participants: redisUsers || [],
+      isActive: session.isActive,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
