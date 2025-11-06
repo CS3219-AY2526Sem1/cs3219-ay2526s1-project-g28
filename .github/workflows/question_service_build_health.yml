@@ -16,7 +16,7 @@ jobs:
 
       - name: Build image
         run: |
-          NS="${{ secrets.DOCKER_HUB_questionNAME }}"
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker build -t "$NS/question-service:dev" \
             -f backend/question-service/Dockerfile \
             backend/question-service
