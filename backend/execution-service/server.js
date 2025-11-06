@@ -8,7 +8,7 @@ async function startServer() {
 
   try {
     server.listen(port, () => {
-      console.log(`Matching service listening on http://localhost:${port}`);
+      console.log(`Execution service listening on http://localhost:${port}`);
     });
   } catch (err) {
     console.error("Failed to start server:");
