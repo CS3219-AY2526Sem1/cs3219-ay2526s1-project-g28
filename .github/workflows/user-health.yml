@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  publish_images:
+  build image:
     runs-on: ubuntu-latest
 
     steps:
