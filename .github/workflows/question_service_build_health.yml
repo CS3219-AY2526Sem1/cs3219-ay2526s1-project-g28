@@ -41,7 +41,7 @@ jobs:
           sed -i 's/\r$//' question-service.env
           sed -i 's/[[:space:]]*$//' question-service.env
           # ensure basics
-          grep -q '^PORT=' question-service.env || echo 'PORT=3001' >> question-service.env
+          grep -q '^PORT=' question-service.env || echo 'PORT=3002' >> question-service.env
           grep -q '^HOST=' question-service.env || echo 'HOST=0.0.0.0' >> question-service.env
           grep -q '^SESSION_SECRET=' question-service.env || echo 'SESSION_SECRET=ci-session-secret' >> question-service.env
           # map DB_* to MONGO_URI if absent
@@ -72,7 +72,7 @@ jobs:
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name question-service \
-            -p 3001:3001 \
+            -p 3002:3002 \
             --env-file ./question-service.env \
             "$NS/question-service:dev"
       # Optional: prove key envs exist *inside* the container (lengths only)
@@ -91,7 +91,7 @@ jobs:
               echo "Exit code: $(docker inspect question-service --format='{{.State.ExitCode}}' || true)"
               exit 1
             fi
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
               echo "✅ /health OK"
               exit 0
             fi
