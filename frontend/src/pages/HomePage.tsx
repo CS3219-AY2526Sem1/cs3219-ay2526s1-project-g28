@@ -6,6 +6,7 @@ import { useSocket } from "../hooks/useSocket";
 import PContent from "../components/matching/PContent";
 import { cancelMatchApi } from "../lib/services/matchingService";
 import { useNavigate } from "react-router-dom";
+import { theme } from "../theme";
 
 const HomePage: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -46,13 +47,15 @@ const HomePage: React.FC = () => {
       if (!sessionId || !user?.username) return;
 
       try {
-        const res = await fetch(`http://localhost:3004/collaboration/${sessionId}`);
+        const res = await fetch(
+          `http://localhost:3004/collaboration/${sessionId}`
+        );
         if (!res.ok) {
           console.warn("Session fetch failed:", res.status);
           return;
         }
         const data = await res.json();
-        console.log(data)
+        console.log(data);
 
         if (
           !data.isActive ||
@@ -61,7 +64,9 @@ const HomePage: React.FC = () => {
               u.username === user.username || u.id === user.username
           )
         ) {
-          console.log("Session inactive or user not participant → clearing key");
+          console.log(
+            "Session inactive or user not participant → clearing key"
+          );
           localStorage.removeItem("activeSessionId");
           return;
         }
@@ -116,7 +121,14 @@ const HomePage: React.FC = () => {
   );
 
   return (
-    <div style={styles.appContainer}>
+    <div
+      style={{
+        backgroundColor: theme.backgroundDark,
+        color: theme.textPrimary,
+        fontFamily: "'Inter','Segoe UI', Roboto, sans-serif",
+        minHeight: "100vh",
+      }}
+    >
       <Header
         variant="beta"
         isSidebarOpen={isSidebarOpen}
@@ -133,42 +145,32 @@ const HomePage: React.FC = () => {
         {content}
       </main>
 
+      {/* Match Found Modal — styled like other modals */}
       {pendingMatch && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <h2 style={{ margin: 0 }}>Match Found!</h2>
-              <span style={{ fontSize: "18px", fontWeight: "bold" }}>
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]">
+            <div className="flex items-start justify-between">
+              <h2 className="text-xl font-semibold text-gray-900 m-0">
+                Match Found!
+              </h2>
+              <span className="inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">
                 {countdown}s
               </span>
             </div>
-            <p style={{ marginTop: "1rem", minHeight: "24px" }}>
-              {modalMessage}
-            </p>
+
+            <p className="text-gray-700 mt-4 min-h-[24px]">{modalMessage}</p>
+
             {showButtons && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "1rem",
-                  justifyContent: "flex-end",
-                  marginTop: "1rem",
-                }}
-              >
+              <div className="flex gap-3 justify-end mt-5">
                 <button
                   onClick={() => handleMatchResponse("reject")}
-                  style={styles.secondaryBtn}
+                  className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
                 >
                   Decline
                 </button>
                 <button
                   onClick={() => handleMatchResponse("accept")}
-                  style={styles.primaryBtn}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
                 >
                   Accept
                 </button>

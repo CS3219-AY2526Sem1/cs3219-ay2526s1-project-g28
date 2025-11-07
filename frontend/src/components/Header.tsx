@@ -7,7 +7,14 @@ import TopBar from "../components/TopBar";
 import CollapsibleSidebar from "../components/CollapsibleSidebar";
 import { useTheme } from "../theme/ThemeProvider";
 
-
+export type Page =
+  | "Challenges"
+  | "My History"
+  | "Leaderboard"
+  | "User Management"
+  | "Questions"
+  | "Custom Lobby"
+  | "Admin";
 
 export type HeaderProps =
   | { variant: "public" }
@@ -15,84 +22,104 @@ export type HeaderProps =
       variant: "authed";
       level?: number;
       avatarUrl?: string;
-
     }
-  | { variant: "beta";
+  | {
+      variant: "beta";
       isSidebarOpen: boolean;
       currentPage: Page;
       onToggleSidebar: () => void;
       onNavigate: (p: Page) => void;
-  }
-  | {variant: "authing";}
+    }
+  | { variant: "authing" }
   | {
       variant: "settings";
-      title?: string;           // defaults to "Settings"
-      showBack?: boolean;       // optional "Back" to dashboard
-      backTo?: string;          // defaults to "/home" or "/dashboard"
+      title?: string; // defaults to "Settings"
+      showBack?: boolean; // optional "Back" to dashboard
+      backTo?: string; // defaults to "/home"
     };
 
+// Updated to align with new labels
 const AUThed_NAV = [
-  { to: "/history", label: "History" },
-  { to: "/dashboard", label: "Play", exact: true },
+  { to: "/history", label: "My History" },
+  { to: "/home", label: "Play", exact: true },
   { to: "/custom-lobby", label: "Custom Lobby" },
 ];
 
+// Sidebar/Router name-to-path mapping
 const NAME_TO_PATH: Record<string, string> = {
-  "Challenges": "/home",
-  "My Sessions": "/sessions",
-  "Leaderboard": "/leaderboard",
+  Challenges: "/home",
+  "My History": "/history",
+  Leaderboard: "/leaderboard",
   "User Management": "/users",
-  "Questions": "/questions",
+  Questions: "/questions",
+  "Custom Lobby": "/custom-lobby",
+  Admin: "/admin",
 };
 
 export default function Header(props: HeaderProps) {
- function ThemeButton() {
-  const { theme, resolved, setTheme, toggle } = useTheme();
+  function ThemeButton() {
+    const { theme, resolved, setTheme } = useTheme();
 
-  // cycle through: light -> dark -> system -> light
-  function cycle() {
-    if (theme === "light") setTheme("dark");
-    else if (theme === "dark") setTheme("system");
-    else setTheme("light");
-  }
+    // cycle through: light -> dark -> system -> light
+    function cycle() {
+      if (theme === "light") setTheme("dark");
+      else if (theme === "dark") setTheme("system");
+      else setTheme("light");
+    }
 
-  const label =
-    theme === "system" ? `System (${resolved})` : resolved === "dark" ? "Dark" : "Light";
-  const icon = theme === "system" ? "🖥️" : resolved === "dark" ? "🌙" : "☀️";
+    const label =
+      theme === "system"
+        ? `System (${resolved})`
+        : resolved === "dark"
+        ? "Dark"
+        : "Light";
+    const icon = theme === "system" ? "🖥️" : resolved === "dark" ? "🌙" : "☀️";
 
-  return (
-    <button
-      onClick={cycle}
-      title={`Theme: ${label} (click to change)`}
-      className="px-2 py-1 rounded-md border border-neutral-300 bg-white text-black
+    return (
+      <button
+        onClick={cycle}
+        title={`Theme: ${label} (click to change)`}
+        className="px-2 py-1 rounded-md border border-neutral-300 bg-white text-black
                  hover:bg-neutral-100 transition
                  dark:border-neutral-600 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700"
-    >
-      <span className="mr-1">{icon}</span>
-      <span className="text-sm">{label}</span>
-    </button>
-  );
-}
+      >
+        <span className="mr-1">{icon}</span>
+        <span className="text-sm">{label}</span>
+      </button>
+    );
+  }
+
   const { user } = useAuth();
 
   if (props.variant === "public") {
     return (
       <header className="w-full bg-white dark:bg-black">
         <div className="mx-auto max-w-6xl flex items-center justify-between py-4 px-4">
-          <Link to="/" className="text-xl font-semibold dark:bg-black">PeerPrep</Link>
+          <Link to="/" className="text-xl font-semibold dark:bg-black">
+            PeerPrep
+          </Link>
           <nav className="flex items-center gap-6">
             <ThemeButton />
-            <Link to="/login" className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 ">Log in</Link>
-            <Link to="/signup" className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 ">
+            <Link
+              to="/login"
+              className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 "
+            >
+              Log in
+            </Link>
+            <Link
+              to="/signup"
+              className="text-sm rounded-lg bg-black text-white px-4 py-2 hover:opacity-90 "
+            >
               Sign up
             </Link>
           </nav>
         </div>
       </header>
     );
-  } else   if (props.variant === "beta") {
+  } else if (props.variant === "beta") {
     const { isSidebarOpen, currentPage, onToggleSidebar, onNavigate } = props;
     const navigate = useNavigate();
+
     return (
       <div>
         <TopBar
@@ -106,9 +133,11 @@ export default function Header(props: HeaderProps) {
           isAdmin={!!user?.isAdmin}
           currentPage={currentPage}
           onNavigate={(name) => {
-                      const path = NAME_TO_PATH[name] ?? "/";
-                      navigate(path);
-                     }}
+            // keep parent state + URL in sync
+            onNavigate(name as Page);
+            const path = NAME_TO_PATH[name] ?? "/";
+            navigate(path);
+          }}
         />
       </div>
     );
@@ -116,7 +145,9 @@ export default function Header(props: HeaderProps) {
     return (
       <header className="w-full bg-white dark:bg-black">
         <div className="mx-auto max-w-6xl flex items-center justify-between py-4 px-4">
-          <Link to="/" className="text-xl font-semibold dark:bg-black">PeerPrep</Link>
+          <Link to="/" className="text-xl font-semibold dark:bg-black">
+            PeerPrep
+          </Link>
           <nav className="flex items-center gap-6">
             <ThemeButton />
           </nav>
@@ -124,7 +155,7 @@ export default function Header(props: HeaderProps) {
       </header>
     );
   } else if (props.variant === "settings") {
-    const { title = "Settings", showBack = false, backTo = "/dashboard" } = props;
+    const { title = "Settings", showBack = false, backTo = "/home" } = props;
     return (
       <header className="w-full bg-white dark:bg-black border-b border-neutral-200 dark:border-neutral-800">
         <div className="mx-auto max-w-6xl flex items-center justify-between py-3 px-4">
@@ -139,7 +170,9 @@ export default function Header(props: HeaderProps) {
                 ← Back
               </Link>
             )}
-            <Link to="/" className="text-lg font-semibold dark:text-white">PeerPrep</Link>
+            <Link to="/" className="text-lg font-semibold dark:text-white">
+              PeerPrep
+            </Link>
           </div>
 
           <div className="text-sm font-medium dark:text-white hidden sm:block">
@@ -154,26 +187,44 @@ export default function Header(props: HeaderProps) {
       </header>
     );
   }
-  
 
-  const { level = 1, avatarUrl } = props;
+  // legacy authed header (if you still use it)
+  const { level = 1, avatarUrl } = props as Extract<
+    HeaderProps,
+    { variant: "authed"; level?: number; avatarUrl?: string }
+  >;
 
   return (
     <header className="w-full bg-neutral-800 text-white">
       <div className="mx-auto max-w-6xl flex items-center justify-between px-4 py-3">
         <nav className="flex items-center gap-3">
-          <Link to="/" className="px-4 py-2 rounded-md bg-neutral-700 hover:bg-neutral-600 transition" aria-label="Home">
+          <Link
+            to="/"
+            className="px-4 py-2 rounded-md bg-neutral-700 hover:bg-neutral-600 transition"
+            aria-label="Home"
+          >
             Logo
           </Link>
           {AUThed_NAV.map((n) => (
-            <NavItem key={n.to} to={n.to} label={n.label} exact={Boolean(n.exact)} />
+            <NavItem
+              key={n.to}
+              to={n.to}
+              label={n.label}
+              exact={Boolean(n.exact)}
+            />
           ))}
         </nav>
 
         <div className="flex items-center gap-4">
           <ThemeButton />
-          <span className="text-sm">Level <span className="font-semibold">{level}</span></span>
-          {user?.username && <span className="text-sm"><span className="font-semibold">{user?.username}</span></span>}
+          <span className="text-sm">
+            Level <span className="font-semibold">{level}</span>
+          </span>
+          {user?.username && (
+            <span className="text-sm">
+              <span className="font-semibold">{user?.username}</span>
+            </span>
+          )}
           {/* Avatar menu owns logout */}
           <AvatarMenu avatarUrl={avatarUrl} />
         </div>
@@ -182,14 +233,24 @@ export default function Header(props: HeaderProps) {
   );
 }
 
-function NavItem({ to, label, exact = false }: { to: string; label: string; exact?: boolean }) {
+function NavItem({
+  to,
+  label,
+  exact = false,
+}: {
+  to: string;
+  label: string;
+  exact?: boolean;
+}) {
   return (
     <NavLink
       to={to}
       end={exact}
       className={({ isActive }) =>
         `px-4 py-2 rounded-md transition ${
-          isActive ? "ring-2 ring-white/70 bg-neutral-700" : "bg-white text-black hover:bg-neutral-200"
+          isActive
+            ? "ring-2 ring-white/70 bg-neutral-700"
+            : "bg-white text-black hover:bg-neutral-200"
         }`
       }
     >
@@ -204,12 +265,13 @@ function AvatarMenu({ avatarUrl }: { avatarUrl?: string }) {
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const { logout } = useAuth();          // ← uses global auth store
-  const navigate = useNavigate();        // ← redirect after logout
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", onDocClick);
@@ -224,10 +286,9 @@ function AvatarMenu({ avatarUrl }: { avatarUrl?: string }) {
     if (busy) return;
     setBusy(true);
     try {
-      // Best effort: inform backend (ok if your backend doesn’t have this route)
       await api("/auth/logout", { method: "POST" }).catch(() => {});
     } finally {
-      logout();                          // clear token/user globally
+      logout();
       setOpen(false);
       setBusy(false);
       navigate("/login", { replace: true });
@@ -242,15 +303,36 @@ function AvatarMenu({ avatarUrl }: { avatarUrl?: string }) {
         aria-expanded={open}
         className="h-9 w-9 rounded-full bg-neutral-600 overflow-hidden grid place-items-center focus:outline-none focus:ring-2 focus:ring-white/60"
       >
-        {avatarUrl ? <img src={avatarUrl} alt="avatar" className="h-full w-full object-cover" /> : <span className="text-xl">🙂</span>}
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt="avatar"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="text-xl">🙂</span>
+        )}
       </button>
 
       {open && (
-        <div role="menu" 
-              className="absolute right-0 mt-2 w-44 rounded-lg bg-white text-black shadow-md border border-neutral-200 z-50 pointer-events-auto">
-
-          <Link to="/profile" role="menuitem" className="block px-4 py-2 hover:bg-neutral-100">Profile</Link>
-          <Link to="/settings" role="menuitem" className="block px-4 py-2 hover:bg-neutral-100">Settings</Link>
+        <div
+          role="menu"
+          className="absolute right-0 mt-2 w-44 rounded-lg bg-white text-black shadow-md border border-neutral-200 z-50 pointer-events-auto"
+        >
+          <Link
+            to="/profile"
+            role="menuitem"
+            className="block px-4 py-2 hover:bg-neutral-100"
+          >
+            Profile
+          </Link>
+          <Link
+            to="/settings"
+            role="menuitem"
+            className="block px-4 py-2 hover:bg-neutral-100"
+          >
+            Settings
+          </Link>
           <button
             role="menuitem"
             onClick={handleLogout}
