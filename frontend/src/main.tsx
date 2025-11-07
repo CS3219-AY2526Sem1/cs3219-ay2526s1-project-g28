@@ -13,6 +13,7 @@ import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
 import QuestionsPage from "./pages/QuestionsPage";
+import UsersPage from "./pages/UsersPage"
 import Chat from "./pages/Chat";
 import CollaborationPage from "./pages/CollaborationPage";
 import { ThemeProvider } from "./theme/ThemeProvider";
@@ -40,6 +41,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               <Route path="/matchingpage" element={<MatchingPage />} />
               <Route path="/home" element={<HomePage />} />
               <Route element={<AdminRoute />}>
+                <Route path="/users" element={<UsersPage />} />
                 <Route path="/questions" element={<QuestionsPage />} />
               </Route>
               <Route
