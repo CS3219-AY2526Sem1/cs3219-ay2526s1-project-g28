@@ -11,12 +11,7 @@ app.use("/ai/", rateLimit({ windowMs: 60_000, max: 60 }));
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 // --- OpenRouter client ---
 const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.SITE_URL || "http://localhost",
-    "X-Title": process.env.SITE_NAME || "PeerPrep",
-  },
+  apiKey: process.env.OPENAI_API_KEY, 
 });
 
 app.get("/health", (_, res) => res.json({ ok: true }));
@@ -60,7 +55,7 @@ app.post("/ai/explain", async (req, res) => {
 
   try {
     const stream = await openai.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL || "minimax/minimax-m2:free",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       stream: true,
       messages: [
         { role: "system", content: sys },
