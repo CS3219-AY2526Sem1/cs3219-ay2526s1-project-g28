@@ -61,9 +61,9 @@ export function initCollaborationSocket(io, redis) {
         socket.to(sessionId).emit("user-left", { username });
 
         // Cleanup check
-        await checkAndCleanup(
+        await checkAndCleanup(sessionId, redis);
+        await updateHistory(
           sessionId,
-          redis,
           code,
           submitResults,
           error,
@@ -104,34 +104,17 @@ export function initCollaborationSocket(io, redis) {
 }
 
 // --- Helper: Check if both users are gone ---
-async function checkAndCleanup(
-  sessionId,
-  redis,
-  code,
-  submitResults,
-  error,
-  language,
-  hasSubmitted
-) {
+async function checkAndCleanup(sessionId, redis) {
   const users = await redis.smembers(`session:${sessionId}:users`);
   const disconnected = await redis.smembers(
     `session:${sessionId}:disconnected`
   );
 
-  if (hasSubmitted) {
-    await Session.updateOne(
-      { correlationId: sessionId },
-      { $set: { code, submitResults, error, language } }
-    );
-  } else {
-    await Session.updateOne(
-      { correlationId: sessionId },
-      { $set: { hasSubmitted } }
-    );
-  }
+  console.log(users);
+  console.log(disconnected);
 
   // If no active OR disconnected users left → delete Redis + mark inactive
-  if (users.length > 0 && disconnected.length === users.length) {
+  if (disconnected.length === users.length) {
     console.log(`Cleaning up empty session ${sessionId}`);
     await redis.del(
       `session:${sessionId}:users`,
@@ -145,5 +128,42 @@ async function checkAndCleanup(
     );
 
     console.log(`Session ${sessionId} marked inactive and cleaned.`);
+  }
+}
+
+async function updateHistory(
+  sessionId,
+  code,
+  submitResults,
+  error,
+  language,
+  hasSubmitted
+) {
+  const endedAt = new Date();
+
+  if (hasSubmitted) {
+    await Session.updateOne(
+      { correlationId: sessionId },
+      {
+        $set: {
+          code,
+          submitResults: submitResults ?? [],
+          error: error ?? null,
+          language,
+          hasSubmitted: true,
+          endedAt, // Date, not function
+        },
+      }
+    );
+  } else {
+    await Session.updateOne(
+      { correlationId: sessionId },
+      {
+        $set: {
+          hasSubmitted: false,
+          endedAt, // Date, not function
+        },
+      }
+    );
   }
 }
