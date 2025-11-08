@@ -1,10 +1,10 @@
-// src/pages/HistoryPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import { EyeIcon } from "@heroicons/react/24/outline";
 import { theme } from "../theme";
 import { fetchHistory } from "../lib/services/collaborationService";
 import { useAuth } from "../auth/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 type Style = React.CSSProperties;
 
@@ -14,6 +14,7 @@ type Status = "Completed" | "In Progress" | "Cancelled" | "Failed";
 export interface HistoryEntry {
   id: string;
   startedAt: string;
+  endedAt: string;
   partner: string;
   difficulty: Difficulty;
   topics: string[];
@@ -24,13 +25,10 @@ export interface HistoryEntry {
 
 const ITEMS_PER_PAGE = 25;
 
-function toStatus(x: any, isActive?: boolean): Status {
-  const s = String(x ?? "").toLowerCase();
-  if (s === "success") return "Completed";
-  if (s === "cancelled") return "Cancelled";
-  if (s === "failed") return "Failed";
-  if (s === "in_progress") return "In Progress";
-  return "Completed";
+function toStatus(error: String, isActive?: boolean): Status {
+  if (error.length == 0) return "Completed";
+  if (error.length == 0 && !isActive) return "Failed";
+  return isActive ? "In Progress" : "Completed";
 }
 
 function pickId(obj: any) {
@@ -43,17 +41,12 @@ const HistoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [rawIndex, setRawIndex] = useState<Record<string, any>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const currentPageName = "My History";
 
-  // Modals
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [toDeleteId, setToDeleteId] = useState<string | null>(null);
-
-  const [showDetails, setShowDetails] = useState(false);
-  const [detailsItem, setDetailsItem] = useState<HistoryEntry | null>(null);
-
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const load = async () => {
@@ -61,43 +54,48 @@ const HistoryPage: React.FC = () => {
       setError(null);
 
       try {
-        if (!user?.username) {
-          throw new Error("User not logged in");
-        }
+        if (!user?.username) throw new Error("User not logged in");
 
         const res = await fetchHistory(user.username);
+        // Your service returns { message, data: [...] }
         const sessions = (res?.data as any[]) || [];
 
+        const localIndex: Record<string, any> = {};
         const items: HistoryEntry[] = sessions.map((s) => {
+          const id = pickId(s);
+          localIndex[id] = s;
+          console.log(s);
           const usersArr = Array.isArray(s?.users) ? s.users : [];
-          let partnerUser =
-            usersArr.find((u: any) =>
-              u.username != user.username
-            ) ?? usersArr[0];
+          const me = user.username;
+          const partnerUser =
+            usersArr.find((u: any) => u?.username !== me) ?? usersArr[0];
 
           const partnerName = partnerUser?.username || partnerUser?.id || "—";
-
-          const startedAt = s?.startedAt || s?.createdAt || new Date().toISOString();
-          const difficulty = s?.meta?.difficulty;
+          const startedAt = s?.startedAt || new Date().toISOString();
+          const endedAt = s?.endedAt || new Date().toISOString();
+          const difficulty = (s?.meta?.difficulty ?? "Easy") as Difficulty;
           const topics = Array.isArray(s?.meta?.topics) ? s.meta.topics : [];
           const status = toStatus(s?.status, s?.isActive);
 
           return {
-            id: pickId(s),
+            id,
             startedAt: String(startedAt),
+            endedAt: String(endedAt),
             partner: String(partnerName),
             difficulty,
             topics,
             status,
             roomId: s?.matchKey || undefined,
             questionTitle: s?.question?.title || s?.question?.name || undefined,
-          } as HistoryEntry;
+          };
         });
 
         const sorted = items.sort(
-          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+          (a, b) =>
+            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
         );
 
+        setRawIndex(localIndex);
         setHistory(sorted);
       } catch (err: any) {
         console.error("Fetch history error:", err);
@@ -108,7 +106,7 @@ const HistoryPage: React.FC = () => {
     };
 
     load();
-  }, []);
+  }, [user?.username]);
 
   const totalPages = Math.ceil(history.length / ITEMS_PER_PAGE) || 1;
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -129,18 +127,6 @@ const HistoryPage: React.FC = () => {
     } catch {
       return s;
     }
-  }
-
-  function fmtDurationSec(d?: number, startedAt?: string, endedAt?: string) {
-    let sec = d;
-    if (sec == null && startedAt && endedAt) {
-      sec =
-        (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000;
-    }
-    if (sec == null || !isFinite(sec)) return "—";
-    const mm = Math.floor(sec / 60);
-    const ss = Math.floor(sec % 60);
-    return `${mm}m ${ss}s`;
   }
 
   function badgeClasses(status: Status) {
@@ -169,15 +155,20 @@ const HistoryPage: React.FC = () => {
     }
   }
 
-  // Actions
-  const handleView = (item: HistoryEntry) => {
-    setDetailsItem(item);
-    setShowDetails(true);
-  };
+  function formatDuration(start: string, end: string) {
+    const diff = new Date(end).getTime() - new Date(start).getTime();
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${hours ? hours + "h " : ""}${
+      minutes ? minutes + "m " : ""
+    }${seconds}s`;
+  }
 
-  const requestDelete = (id: string) => {
-    setToDeleteId(id);
-    setShowDeleteConfirm(true);
+  const handleView = (item: HistoryEntry) => {
+    const raw = rawIndex[item.id];
+    // Pass the raw session so the details page can render instantly.
+    navigate(`/history/${item.id}`, { state: { session: raw } });
   };
 
   return (
@@ -274,11 +265,7 @@ const HistoryPage: React.FC = () => {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
-                          {fmtDurationSec(
-                            (item as any).durationSec,
-                            item.startedAt,
-                            (item as any).endedAt
-                          )}
+                          {formatDuration(item.startedAt, item.endedAt)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right space-x-3 whitespace-nowrap">
                           <button
@@ -322,113 +309,6 @@ const HistoryPage: React.FC = () => {
           )}
         </section>
       </main>
-
-      {/* Delete confirm modal */}
-      {showDeleteConfirm && (
-        <div style={styles.modalOverlay}>
-          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3 text-center">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Delete History Item
-              </h3>
-              <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500">
-                  Are you sure you want to delete this session? This action
-                  cannot be undone.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Details modal */}
-      {showDetails && detailsItem && (
-        <div style={styles.modalOverlay}>
-          <div className="relative p-5 border w-[34rem] max-w-[95vw] shadow-lg rounded-md bg-white">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg leading-6 font-semibold text-gray-900">
-                Session Details
-              </h3>
-              <button
-                onClick={() => setShowDetails(false)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Close"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-4 space-y-2 text-sm text-gray-800">
-              <div>
-                <span className="text-gray-500">Date:</span>{" "}
-                {fmtDate(detailsItem.startedAt)}
-              </div>
-              <div>
-                <span className="text-gray-500">Partner:</span>{" "}
-                {detailsItem.partner}
-              </div>
-              <div>
-                <span className="text-gray-500">Difficulty:</span>{" "}
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${diffClasses(
-                    detailsItem.difficulty
-                  )}`}
-                >
-                  {detailsItem.difficulty}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Topics:</span>{" "}
-                {detailsItem.topics.join(", ")}
-              </div>
-              <div>
-                <span className="text-gray-500">Status:</span>{" "}
-                <span
-                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${badgeClasses(
-                    detailsItem.status as Status
-                  )}`}
-                >
-                  {detailsItem.status}
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Duration:</span>{" "}
-                {fmtDurationSec(
-                  (detailsItem as any).durationSec,
-                  detailsItem.startedAt,
-                  (detailsItem as any).endedAt
-                )}
-              </div>
-              {detailsItem.questionTitle && (
-                <div>
-                  <span className="text-gray-500">Question:</span>{" "}
-                  {detailsItem.questionTitle}
-                </div>
-              )}
-              {detailsItem.roomId && (
-                <div>
-                  <span className="text-gray-500">Room ID:</span>{" "}
-                  {detailsItem.roomId}
-                </div>
-              )}
-              {(detailsItem as any).notes && (
-                <div className="text-gray-700">
-                  <span className="text-gray-500">Notes:</span>{" "}
-                  {(detailsItem as any).notes}
-                </div>
-              )}
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => setShowDetails(false)}
-                className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-md text-sm"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -439,15 +319,6 @@ const styles: { [key: string]: Style } = {
     color: theme.textPrimary,
     fontFamily: "'Inter','Segoe UI', Roboto, sans-serif",
     minHeight: "100vh",
-  },
-  modalOverlay: {
-    position: "fixed",
-    inset: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1000,
   },
 };
 
