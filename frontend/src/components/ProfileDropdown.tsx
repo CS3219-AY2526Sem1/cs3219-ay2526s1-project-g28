@@ -2,7 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import { theme } from "../theme";
 import { ProfileIcon, SettingsIcon, LogoutIcon } from "./Icons";
-
+import { useNavigate } from "react-router-dom";
 type Style = React.CSSProperties;
 
 interface ProfileDropdownProps {
@@ -18,7 +18,7 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose,userName,
   avatarUrl,
   onLogout, }) => {
   const dropdownRef = useRef<HTMLDivElement>(null);
-
+    const navigate = useNavigate();
   // Effect to handle clicks outside the dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -34,10 +34,13 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose,userName,
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [onClose]);
-
+    const go = (path: string) => {
+    navigate(path);
+    onClose();
+  };
     const menuItems = [
     { name: "Your Profile", icon: <ProfileIcon />, action: () => {/* navigate to /profile if you want */} },
-    { name: "Settings", icon: <SettingsIcon />, action: () => {/* navigate to /settings if you want */} },
+    { name: "Settings", icon: <SettingsIcon />, action:  () => go("/settings") },
     { name: "Logout", icon: <LogoutIcon />, action: onLogout },
   ];
 
