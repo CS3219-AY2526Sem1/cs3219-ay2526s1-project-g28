@@ -6,6 +6,8 @@ import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 
 SyntaxHighlighter.registerLanguage("python", python);
 SyntaxHighlighter.registerLanguage("javascript", javascript);
+const STICKY_THRESHOLD = 120;
+
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -142,6 +144,11 @@ export default function Chat({
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
+  const scrollToBottom = React.useCallback((smooth = false) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages, STORAGE_KEY]);
@@ -150,8 +157,13 @@ export default function Chat({
   }, [input, STORAGE_KEY]);
 
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
-  }, [messages, loading]);
+  const el = scrollerRef.current;
+  if (!el) return;
+  const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+  const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
+  // smooth when user just sent; instant while streaming to avoid jitter
+  scrollToBottom(!loading && isNearBottom);
+}, [messages, loading]);
 
   function buildContext() {
     const ctx = {
@@ -313,41 +325,50 @@ export default function Chat({
         </button>
       </div>
 
-      {/* Messages */}
-      <div
-    style={{
-      minHeight: "100%",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "flex-end", // anchor to bottom
-      gap: 12,
-    }}
-  >
-        {messages.map((m, i) => {
-      const isUser = m.role === "user";
-      return (
-        <div
-          key={i}
-          style={{
-            maxWidth: "75%",
-            alignSelf: isUser ? "flex-end" : "flex-start", // also aligns left/right
-            borderRadius: 16,
-            padding: "10px 14px",
-            whiteSpace: "pre-wrap",
-            background: isUser ? "#3b82f6" : "#fff",
-            color: isUser ? "#fff" : "#111",
-            border: !isUser ? "1px solid #e5e7eb" : "none",
-            boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-            textAlign: isUser ? "right" : "left",
-          }}
-        >
-          {isUser ? m.content : renderMarkdown(m.content)}
-        </div>
-      );
-    })}
-        {/* Spacer so the last bubble never kisses the composer */}
-    <div style={{ height: 8 }} />
-      </div>
+{/* Messages */}
+<div
+  ref={scrollerRef}
+  style={{
+    flex: 1,
+    overflow: "auto",
+    padding: 12,
+    background: "#f9fafb",
+  }}
+>
+  <div
+      style={{
+        minHeight: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "flex-end", // anchor to bottom
+        gap: 12,
+      }}
+    >
+      {messages.map((m, i) => {
+        const isUser = m.role === "user";
+        return (
+          <div
+            key={i}
+            style={{
+              maxWidth: "75%",
+              alignSelf: isUser ? "flex-end" : "flex-start",
+              borderRadius: 16,
+              padding: "10px 14px",
+              lineHeight: 1.5,
+              background: isUser ? "#3b82f6" : "#fff",
+              color: isUser ? "#fff" : "#111",
+              border: !isUser ? "1px solid #e5e7eb" : "none",
+              boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+              textAlign: isUser ? "right" : "left",
+            }}
+          >
+            {isUser ? m.content : renderMarkdown(m.content)}
+          </div>
+        );
+      })}
+      <div style={{ height: 8 }} /> {/* spacer above composer */}
+    </div>
+</div>
 
       {/* Composer (separate bar so it never overlaps the last message) */}
       <form

@@ -812,11 +812,8 @@ const handleLeaveSession = async () => {
               />
             )}
             {activeTab === "chat" && (
-              <div className="text-center text-gray-500">
-                <Chat question={question} language={language} code={code}
-      sessionId={sessionId as string}/>
-              </div>
-            )}
+  <Chat question={question} language={language} code={code} sessionId={sessionId as string}/>
+)}
             {activeTab === "call" && (
               <div className="flex flex-col h-full w-full items-center justify-center gap-4">
                 <button
