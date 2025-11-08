@@ -8,7 +8,6 @@ import "./index.css";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import MatchingPage from "./pages/MatchingPage";
-import Dashboard from "./pages/Dashboard";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
@@ -31,12 +30,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
               path="*"
               element={<div className="p-10">404 Not found</div>}
             />
-            <Route path="/chat" element={<Chat />} />
+            
             <Route path="/login/success" element={<LoginSuccess />} />
             {/* Everything below requires auth */}
             <Route element={<ProtectedRoute />}>
               <Route path="/settings" element={<Settings />} />
-              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/matchingpage" element={<MatchingPage />} />
               <Route path="/home" element={<HomePage />} />
               <Route element={<AdminRoute />}>
