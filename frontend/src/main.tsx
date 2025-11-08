@@ -9,6 +9,7 @@ import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import MatchingPage from "./pages/MatchingPage";
 import Dashboard from "./pages/Dashboard";
+import HistoryPage from "./pages/HistoryPage";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
@@ -37,6 +38,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route element={<ProtectedRoute />}>
               <Route path="/settings" element={<Settings />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/history" element={<HistoryPage />} />
               <Route path="/matchingpage" element={<MatchingPage />} />
               <Route path="/home" element={<HomePage />} />
               <Route element={<AdminRoute />}>

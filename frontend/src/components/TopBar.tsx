@@ -11,10 +11,10 @@ type Style = React.CSSProperties;
 
 interface TopBarProps {
   onMenuClick: () => void;
-  rightExtra?: React.ReactNode; 
+  rightExtra?: React.ReactNode;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
+const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra }) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -27,12 +27,12 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
       ? (user as any).avatarUrl
       : "https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg";
 
-    async function handleLogout() {
+  async function handleLogout() {
     try {
       // optional: backend endpoint; safe to ignore failure in dev
       await api("/auth/logout", { method: "POST" }).catch(() => {});
     } finally {
-      logout();                      // clear token/user from AuthContext + localStorage
+      logout(); // clear token/user from AuthContext + localStorage
       setDropdownOpen(false);
       navigate("/login", { replace: true });
     }
@@ -54,7 +54,7 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra}) => {
             onClick={() => setDropdownOpen(!isDropdownOpen)}
             style={styles.profileButton}
           >
-             <img src={avatarUrl} alt="User Avatar" style={styles.avatar} />
+            <img src={avatarUrl} alt="User Avatar" style={styles.avatar} />
           </button>
           {isDropdownOpen && (
             <ProfileDropdown
