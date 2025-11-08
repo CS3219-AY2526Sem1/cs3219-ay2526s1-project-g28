@@ -194,23 +194,37 @@ async function removeAvatar() {
            
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
-            <label style={styles.fileLabel}>
-              <input type="file" accept="image/*" onChange={onPickFile} disabled={uploading} style={{ display: "none" }} />
-              <span>{uploading ? "Uploading…" : "Upload image"}</span>
-            </label>
-          <button
-    onClick={removeAvatar}
-    disabled={busy || !avatarUrl}
-    style={{
-      ...styles.secondaryBtn,
-      opacity: avatarUrl ? 1 : 0.6,
-    }}
-    title={avatarUrl ? "Remove current image" : "No image to remove"}
-  >
-    Remove image
-  </button>
-          </div>
-          <p style={styles.mutedSmall}>limit 2MB.</p>
+  {isOAuth ? (
+    <p style={styles.mutedSmall}>
+      Profile picture is managed by {provider}. Use your provider to change it.
+    </p>
+  ) : (
+    <>
+      <label style={styles.fileLabel}>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={onPickFile}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+        <span>{uploading ? "Uploading…" : "Upload image"}</span>
+      </label>
+
+      <button
+        onClick={removeAvatar}
+        disabled={busy || !avatarUrl}
+        style={{ ...styles.secondaryBtn, opacity: avatarUrl ? 1 : 0.6 }}
+        title={avatarUrl ? "Remove current image" : "No image to remove"}
+      >
+        Remove image
+      </button>
+
+      {/* Limit note lives INSIDE the non-OAuth branch */}
+      <p style={{ ...styles.mutedSmall, margin: 0 }}>limit 2MB.</p>
+    </>
+  )}
+</div>
         </section>
 
         {/* Email */}

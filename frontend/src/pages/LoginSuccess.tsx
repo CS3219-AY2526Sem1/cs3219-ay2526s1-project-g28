@@ -35,7 +35,7 @@ export default function LoginSuccess() {
     window.history.replaceState({}, "", window.location.pathname);
 
     // Build a user object compatible with your AuthContext
-    const user = { id, username, fullname: displayName, email, displayName, avatarUrl };
+    const user = { id, username, fullname: displayName, email, displayName, avatarUrl,provider };
 
     // Reuse your existing localStorage-based login
     login(token, user);
