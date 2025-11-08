@@ -123,6 +123,11 @@ async function checkAndCleanup(
       { correlationId: sessionId },
       { $set: { code, submitResults, error, language } }
     );
+  } else {
+    await Session.updateOne(
+      { correlationId: sessionId },
+      { $set: { hasSubmitted } }
+    );
   }
 
   // If no active OR disconnected users left → delete Redis + mark inactive
