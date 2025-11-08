@@ -1,13 +1,10 @@
 // src/pages/HistoryPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
-import { api } from "../lib/api";
-import {
-  EyeIcon,
-  ArrowPathRoundedSquareIcon,
-  TrashIcon,
-} from "@heroicons/react/24/outline";
+import { EyeIcon } from "@heroicons/react/24/outline";
 import { theme } from "../theme";
+import { fetchHistory } from "../lib/services/collaborationService";
+import { useAuth } from "../auth/AuthContext";
 
 type Style = React.CSSProperties;
 
@@ -16,168 +13,29 @@ type Status = "Completed" | "In Progress" | "Cancelled" | "Failed";
 
 export interface HistoryEntry {
   id: string;
-  startedAt: string; // ISO string
-  endedAt?: string; // ISO string (optional if in-progress/cancelled)
-  partner: string; // partner username
+  startedAt: string;
+  partner: string;
   difficulty: Difficulty;
   topics: string[];
   status: Status;
   roomId?: string;
   questionTitle?: string;
-  durationSec?: number; // fallback: computed from start/end
-  notes?: string;
 }
 
 const ITEMS_PER_PAGE = 25;
 
-/** ===== MOCK DATA TOGGLE ===== */
-const USE_MOCK = true;
+function toStatus(x: any, isActive?: boolean): Status {
+  const s = String(x ?? "").toLowerCase();
+  if (s === "success") return "Completed";
+  if (s === "cancelled") return "Cancelled";
+  if (s === "failed") return "Failed";
+  if (s === "in_progress") return "In Progress";
+  return "Completed";
+}
 
-/** ===== MOCK HISTORY ===== */
-const MOCK_HISTORY: HistoryEntry[] = [
-  {
-    id: "h1",
-    startedAt: "2025-11-07T14:10:00Z",
-    endedAt: "2025-11-07T14:45:40Z",
-    partner: "Alice",
-    difficulty: "Medium",
-    topics: ["Graphs", "Dynamic Programming"],
-    status: "Completed",
-    roomId: "RM-7F9A",
-    questionTitle: "Shortest Path in Weighted Graph",
-    durationSec: 213, // 3m 33s (example)
-    notes: "Great discussion on Dijkstra vs. BFS.",
-  },
-  {
-    id: "h2",
-    startedAt: "2025-11-06T09:00:00Z",
-    endedAt: "2025-11-06T09:32:12Z",
-    partner: "Bob",
-    difficulty: "Hard",
-    topics: ["Trees"],
-    status: "Failed",
-    roomId: "RM-9K21",
-    questionTitle: "Serialize and Deserialize N-ary Tree",
-    durationSec: 1932,
-    notes: "Stuck on edge-cases for null children.",
-  },
-  {
-    id: "h3",
-    startedAt: "2025-11-05T20:15:00Z",
-    endedAt: "2025-11-05T20:55:00Z",
-    partner: "Clara",
-    difficulty: "Easy",
-    topics: ["Arrays", "Hashmap"],
-    status: "Completed",
-    roomId: "RM-1AA2",
-    questionTitle: "Two Sum Variants",
-    durationSec: 2400,
-  },
-  {
-    id: "h4",
-    startedAt: "2025-11-04T12:00:00Z",
-    partner: "Dan",
-    difficulty: "Medium",
-    topics: ["Heaps"],
-    status: "Cancelled",
-    roomId: "RM-HEAP",
-    questionTitle: "Top-K Frequent Elements",
-    notes: "Partner disconnected.",
-  },
-  {
-    id: "h5",
-    startedAt: "2025-11-03T16:30:00Z",
-    endedAt: "2025-11-03T17:05:41Z",
-    partner: "Eve",
-    difficulty: "Hard",
-    topics: ["Dynamic Programming"],
-    status: "Completed",
-    roomId: "RM-DP01",
-    questionTitle: "Edit Distance",
-    durationSec: 2121,
-  },
-  {
-    id: "h6",
-    startedAt: "2025-11-02T10:00:00Z",
-    endedAt: "2025-11-02T10:18:25Z",
-    partner: "Frank",
-    difficulty: "Easy",
-    topics: ["Strings"],
-    status: "Completed",
-    roomId: "RM-STR1",
-    questionTitle: "Valid Anagram",
-    durationSec: 1105,
-  },
-  {
-    id: "h7",
-    startedAt: "2025-11-01T19:40:00Z",
-    endedAt: "2025-11-01T20:20:00Z",
-    partner: "Grace",
-    difficulty: "Medium",
-    topics: ["Graphs"],
-    status: "In Progress",
-    roomId: "RM-GPHS",
-    questionTitle: "Course Schedule II",
-  },
-  {
-    id: "h8",
-    startedAt: "2025-10-30T07:15:00Z",
-    endedAt: "2025-10-30T07:45:59Z",
-    partner: "Heidi",
-    difficulty: "Medium",
-    topics: ["Linked Lists"],
-    status: "Completed",
-    roomId: "RM-LLST",
-    questionTitle: "Reverse Nodes in k-Group",
-    durationSec: 1859,
-  },
-  {
-    id: "h9",
-    startedAt: "2025-10-29T13:05:00Z",
-    endedAt: "2025-10-29T13:28:44Z",
-    partner: "Ivan",
-    difficulty: "Hard",
-    topics: ["Graphs", "Trees"],
-    status: "Cancelled",
-    roomId: "RM-TG01",
-    questionTitle: "Tree Diameter with Extra Edges",
-    durationSec: 1424,
-  },
-  {
-    id: "h10",
-    startedAt: "2025-10-27T21:00:00Z",
-    endedAt: "2025-10-27T21:50:00Z",
-    partner: "Judy",
-    difficulty: "Easy",
-    topics: ["Arrays"],
-    status: "Completed",
-    roomId: "RM-AR01",
-    questionTitle: "Merge Sorted Array",
-    durationSec: 3000,
-  },
-  {
-    id: "h11",
-    startedAt: "2025-10-25T08:30:00Z",
-    endedAt: "2025-10-25T08:58:10Z",
-    partner: "Ken",
-    difficulty: "Medium",
-    topics: ["Hashmap", "Strings"],
-    status: "Failed",
-    roomId: "RM-HS11",
-    questionTitle: "Minimum Window Substring",
-    durationSec: 1680,
-  },
-  {
-    id: "h12",
-    startedAt: "2025-10-22T15:20:00Z",
-    partner: "Lia",
-    difficulty: "Hard",
-    topics: ["Dynamic Programming", "Graphs"],
-    status: "In Progress",
-    roomId: "RM-DPG2",
-    questionTitle: "Longest Path in DAG",
-  },
-];
+function pickId(obj: any) {
+  return String(obj?._id ?? obj?.id ?? obj?.correlationId ?? "");
+}
 
 const HistoryPage: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -195,40 +53,55 @@ const HistoryPage: React.FC = () => {
   const [showDetails, setShowDetails] = useState(false);
   const [detailsItem, setDetailsItem] = useState<HistoryEntry | null>(null);
 
+  const { user } = useAuth();
+
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       setError(null);
 
-      // If mocking, simulate latency and set mock data.
-      if (USE_MOCK) {
-        await new Promise((r) => setTimeout(r, 500));
-        const items = [...MOCK_HISTORY].sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        );
-        setHistory(items);
-        setIsLoading(false);
-        return;
-      }
-
-      // Otherwise, call API with graceful fallback to mock on error.
       try {
-        const res = await api("/matches/history");
-        const items = ((res?.data as HistoryEntry[]) || []).sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+        if (!user?.username) {
+          throw new Error("User not logged in");
+        }
+
+        const res = await fetchHistory(user.username);
+        const sessions = (res?.data as any[]) || [];
+
+        const items: HistoryEntry[] = sessions.map((s) => {
+          const usersArr = Array.isArray(s?.users) ? s.users : [];
+          let partnerUser =
+            usersArr.find((u: any) =>
+              u.username != user.username
+            ) ?? usersArr[0];
+
+          const partnerName = partnerUser?.username || partnerUser?.id || "—";
+
+          const startedAt = s?.startedAt || s?.createdAt || new Date().toISOString();
+          const difficulty = s?.meta?.difficulty;
+          const topics = Array.isArray(s?.meta?.topics) ? s.meta.topics : [];
+          const status = toStatus(s?.status, s?.isActive);
+
+          return {
+            id: pickId(s),
+            startedAt: String(startedAt),
+            partner: String(partnerName),
+            difficulty,
+            topics,
+            status,
+            roomId: s?.matchKey || undefined,
+            questionTitle: s?.question?.title || s?.question?.name || undefined,
+          } as HistoryEntry;
+        });
+
+        const sorted = items.sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
         );
-        setHistory(items);
+
+        setHistory(sorted);
       } catch (err: any) {
         console.error("Fetch history error:", err);
         setError(err.message || "Failed to fetch history");
-        // Optional: fallback to mock if API fails
-        const items = [...MOCK_HISTORY].sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        );
-        setHistory(items);
       } finally {
         setIsLoading(false);
       }
@@ -302,39 +175,9 @@ const HistoryPage: React.FC = () => {
     setShowDetails(true);
   };
 
-  const handleRematch = (item: HistoryEntry) => {
-    alert(
-      `(placeholder) Re-matching with difficulty=${
-        item.difficulty
-      } topics=${item.topics.join(", ")}`
-    );
-  };
-
   const requestDelete = (id: string) => {
     setToDeleteId(id);
     setShowDeleteConfirm(true);
-  };
-
-  const confirmDelete = async () => {
-    if (!toDeleteId) return;
-    setShowDeleteConfirm(false);
-    setError(null);
-    try {
-      if (!USE_MOCK) {
-        await api(`/matches/history/${toDeleteId}`, { method: "DELETE" });
-      }
-      setHistory((prev) => prev.filter((h) => h.id !== toDeleteId));
-      setToDeleteId(null);
-    } catch (err: any) {
-      console.error("Delete history error:", err);
-      setError(err.message || "Failed to delete history item");
-      setToDeleteId(null);
-    }
-  };
-
-  const cancelDelete = () => {
-    setShowDeleteConfirm(false);
-    setToDeleteId(null);
   };
 
   return (
@@ -432,9 +275,9 @@ const HistoryPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {fmtDurationSec(
-                            item.durationSec,
+                            (item as any).durationSec,
                             item.startedAt,
-                            item.endedAt
+                            (item as any).endedAt
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-right space-x-3 whitespace-nowrap">
@@ -444,20 +287,6 @@ const HistoryPage: React.FC = () => {
                             title="View details"
                           >
                             <EyeIcon className="h-5 w-5 inline-block" />
-                          </button>
-                          <button
-                            onClick={() => handleRematch(item)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
-                            title="Re-match"
-                          >
-                            <ArrowPathRoundedSquareIcon className="h-5 w-5 inline-block" />
-                          </button>
-                          <button
-                            onClick={() => requestDelete(item.id)}
-                            className="text-red-600 hover:text-red-800 font-medium"
-                            title="Delete"
-                          >
-                            <TrashIcon className="h-5 w-5 inline-block" />
                           </button>
                         </td>
                       </tr>
@@ -507,20 +336,6 @@ const HistoryPage: React.FC = () => {
                   Are you sure you want to delete this session? This action
                   cannot be undone.
                 </p>
-              </div>
-              <div className="items-center px-4 py-3 space-x-4">
-                <button
-                  onClick={cancelDelete}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-base font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-base font-medium"
-                >
-                  Delete
-                </button>
               </div>
             </div>
           </div>
@@ -579,9 +394,9 @@ const HistoryPage: React.FC = () => {
               <div>
                 <span className="text-gray-500">Duration:</span>{" "}
                 {fmtDurationSec(
-                  detailsItem.durationSec,
+                  (detailsItem as any).durationSec,
                   detailsItem.startedAt,
-                  detailsItem.endedAt
+                  (detailsItem as any).endedAt
                 )}
               </div>
               {detailsItem.questionTitle && (
@@ -596,20 +411,14 @@ const HistoryPage: React.FC = () => {
                   {detailsItem.roomId}
                 </div>
               )}
-              {detailsItem.notes && (
+              {(detailsItem as any).notes && (
                 <div className="text-gray-700">
                   <span className="text-gray-500">Notes:</span>{" "}
-                  {detailsItem.notes}
+                  {(detailsItem as any).notes}
                 </div>
               )}
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => handleRematch(detailsItem)}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
-              >
-                Re-match
-              </button>
               <button
                 onClick={() => setShowDetails(false)}
                 className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-md text-sm"
