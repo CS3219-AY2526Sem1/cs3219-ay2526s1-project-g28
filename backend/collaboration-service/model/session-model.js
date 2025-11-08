@@ -15,6 +15,11 @@ const sessionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   startedAt: { type: Date },
   isActive: { type: Boolean, default: true },
+  code: { type: String },
+  submitResults: { type: Array },
+  error: { type: String },
+  language: { type: String },
+  hasSubmitted: { type: Boolean },
 });
 
 export default mongoose.model("Session", sessionSchema);
