@@ -4,14 +4,14 @@ import GoogleStrategy from "passport-google-oauth20";
 import GitHubStrategy from "passport-github2";
 
 
-const port = process.env.PORT || 3001;
+const port = process.env.PORT;
 
 passport.use(
   new GoogleStrategy.Strategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: `http://localhost:${port}/auth/google/callback`,
+      callbackURL: process.env.GOOGLE_CALLBACK_URL,
     },
     (accessToken, refreshToken, profile, done) => {
       // You could also save or find the user in your database here
@@ -25,7 +25,7 @@ passport.use(
     {
       clientID: process.env.GITHUB_CLIENT_ID,
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      callbackURL: `http://localhost:${port}/auth/github/callback`,
+      callbackURL: process.env.GITHUB_CALLBACK_URL,
     },
     (accessToken, refreshToken, profile, done) => {
       return done(null, profile);
