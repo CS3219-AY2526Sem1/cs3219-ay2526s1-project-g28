@@ -20,8 +20,9 @@ export default function LoginSuccess() {
     const id = params.get("id") || "oauth";
     const username = params.get("username") || displayName || "user";
     const email = params.get("email") || "";
+    const provider = params.get("providers") || "oauth";
 
-    console.log("OAuth login success, received params:", { token, displayName, avatarUrl, id, username, email });
+    console.log("OAuth login success, received params:", { token, displayName, avatarUrl, id, username, email,provider });
     
     if (!token) {
       navigate("/login", { replace: true });
