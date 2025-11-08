@@ -785,7 +785,7 @@ const handleLeaveSession = async () => {
               }`}
               onClick={() => setActiveTab("chat")}
             >
-              Chat
+              AI Chat
             </button>
             <button
               className={`px-3 py-1 border rounded ${
@@ -813,7 +813,8 @@ const handleLeaveSession = async () => {
             )}
             {activeTab === "chat" && (
               <div className="text-center text-gray-500">
-                <Chat />
+                <Chat question={question} language={language} code={code}
+      sessionId={sessionId as string}/>
               </div>
             )}
             {activeTab === "call" && (

@@ -8,7 +8,6 @@ type ChatQuestion = {
   difficulty: "Easy" | "Medium" | "Hard";
   problemStatement: string;
   examples?: Example[];
-  // keep it flexible; if you have more fields like testCases/functionSignature, add them:
   testCases?: any[];
   codeSnippets?: { language: "python" | "javascript"; code: string }[];
 };
@@ -18,28 +17,51 @@ const API_BASE = import.meta.env.VITE_API_URL || "";
 export default function Chat({
   question,
   language,
+  code,
+  sessionId,
 }: {
   question: ChatQuestion;
   language?: "python" | "javascript";
+  code?: string;
+  sessionId: string; // used for per-session persistence
 }) {
-  const [messages, setMessages] = useState<Msg[]>([
-    {
-      role: "assistant",
-      content:
-        "Hi! I know your current PeerPrep problem. Ask me to explain it, discuss approaches, or request hints.",
-    },
-  ]);
-  const [input, setInput] = useState("");
+  const STORAGE_KEY = `peerprep:${sessionId}:chat`;
+
+  // --- load persisted state (if any)
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw
+      ? JSON.parse(raw)
+      : [
+          {
+            role: "assistant",
+            content:
+              "Hi! I know your current PeerPrep problem. Ask me to explain it, discuss approaches, or request hints.",
+          },
+        ];
+  });
+  const [input, setInput] = useState(
+    () => sessionStorage.getItem(`${STORAGE_KEY}:input`) || ""
+  );
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
+  // persist on changes
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages, STORAGE_KEY]);
+  useEffect(() => {
+    sessionStorage.setItem(`${STORAGE_KEY}:input`, input);
+  }, [input, STORAGE_KEY]);
+
   useEffect(() => {
     scrollerRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
   }, [messages, loading]);
 
-  // Helper: make a compact context block the model can reliably use
+  // Build compact JSON context for the model
   function buildContext() {
     const ctx = {
       title: question?.title,
@@ -51,8 +73,9 @@ export default function Chat({
         explanation: e.explanation,
       })),
       languagePreference: language,
+      currentCode: code || "",
+      hasCode: Boolean(code && code.trim()),
     };
-    // Keep it small to avoid hitting token limits
     return JSON.stringify(ctx);
   }
 
@@ -64,7 +87,6 @@ export default function Chat({
     setErr(null);
     if (!forcedContent) setInput("");
 
-    // show the outgoing user message + a placeholder assistant bubble
     setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
     setLoading(true);
 
@@ -75,13 +97,11 @@ export default function Chat({
         {
           role: "system",
           content:
-            "You are a concise, helpful coding interview tutor. Use the provided JSON context about the current question. Explain clearly; give step-by-step reasoning at a high level, not full solutions unless asked.",
+            "You are a concise coding interview tutor. You receive CURRENT_QUESTION_CONTEXT_JSON. " +
+            "If hasCode=false or the user asks to explain code without code present, explain the question, outline an approach, pseudocode, and pitfalls. " +
+            "If hasCode=true and the user asks about code, review the provided currentCode.",
         },
-        {
-          role: "system",
-          content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}`,
-        },
-        // Conversation history (keep short — we already included context above)
+        { role: "system", content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}` },
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -140,10 +160,7 @@ export default function Chat({
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = {
-                    ...last,
-                    content: (last.content || "") + delta,
-                  };
+                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
                   return copy;
                 });
               }
@@ -173,21 +190,23 @@ export default function Chat({
     setLoading(false);
   }
 
-  // 👇 Quick actions to seed useful prompts
+  // Quick actions
   function quickExplain() {
-    return send(undefined, "Explain the current question in simple terms, then outline a plan and common pitfalls.");
+    return send(
+      undefined,
+      "Explain the current question in simple terms, then outline a plan, pseudocode, and common pitfalls."
+    );
   }
   function quickHint() {
     return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
       <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>
-        Chat
+        AI helper
       </header>
 
-      {/* Quick actions */}
       <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
         <button
           type="button"
@@ -248,7 +267,13 @@ export default function Chat({
         <button
           type="submit"
           disabled={loading}
-          style={{ padding: "10px 16px", borderRadius: 10, background: "#111827", color: "#fff", opacity: loading ? 0.6 : 1 }}
+          style={{
+            padding: "10px 16px",
+            borderRadius: 10,
+            background: "#111827",
+            color: "#fff",
+            opacity: loading ? 0.6 : 1,
+          }}
         >
           {loading ? "Sending…" : "Send"}
         </button>
