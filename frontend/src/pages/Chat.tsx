@@ -14,6 +14,97 @@ type ChatQuestion = {
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
+function renderMarkdown(text: string) {
+  const out: React.ReactNode[] = [];
+  const fence = /```([a-zA-Z0-9+\-_]*)?\n([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+
+  const renderInline = (t: string) => {
+    // first split out inline code spans so we don't format inside them
+    const codeSplit = t.split(/(`[^`]+`)/g);
+    return codeSplit.map((chunk, i) => {
+      if (chunk.startsWith("`") && chunk.endsWith("`")) {
+        return (
+          <code
+            key={`code-${i}`}
+            style={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              background: "#f3f4f6",
+              border: "1px solid #e5e7eb",
+              padding: "0 4px",
+              borderRadius: 6,
+            }}
+          >
+            {chunk.slice(1, -1)}
+          </code>
+        );
+      }
+      // handle **bold** and *italic* in the non-code parts
+      const parts = chunk.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+      return parts.map((p, j) => {
+        if (/^\*\*[^*]+\*\*$/.test(p)) {
+          return <strong key={`b-${i}-${j}`}>{p.slice(2, -2)}</strong>;
+        }
+        if (/^\*[^*]+\*$/.test(p)) {
+          return <em key={`i-${i}-${j}`}>{p.slice(1, -1)}</em>;
+        }
+        return <span key={`t-${i}-${j}`}>{p}</span>;
+      });
+    });
+  };
+
+  while ((m = fence.exec(text)) !== null) {
+    const before = text.slice(last, m.index);
+    if (before.trim().length) {
+      before.split(/\n{2,}/).forEach((para, i) => {
+        out.push(
+          <p key={`p-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+            {renderInline(para)}
+          </p>
+        );
+      });
+    }
+
+    const lang = m[1] || "";
+    const code = m[2].replace(/\n+$/, "");
+    out.push(
+      <pre
+        key={`code-${m.index}`}
+        style={{
+          background: "#0b1220",
+          color: "#e5e7eb",
+          borderRadius: 10,
+          border: "1px solid #111827",
+          padding: "12px 14px",
+          overflow: "auto",
+          fontSize: 13,
+          lineHeight: 1.5,
+        }}
+      >
+        <div style={{ opacity: 0.7, fontSize: 11, marginBottom: 6 }}>{lang}</div>
+        <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
+          {code}
+        </code>
+      </pre>
+    );
+
+    last = fence.lastIndex;
+  }
+
+  const tail = text.slice(last);
+  if (tail.trim().length) {
+    tail.split(/\n{2,}/).forEach((para, i) => {
+      out.push(
+        <p key={`tail-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+          {renderInline(para)}
+        </p>
+      );
+    });
+  }
+  return out;
+}
+
 export default function Chat({
   question,
   language,
@@ -23,11 +114,10 @@ export default function Chat({
   question: ChatQuestion;
   language?: "python" | "javascript";
   code?: string;
-  sessionId: string; // used for per-session persistence
+  sessionId: string;
 }) {
   const STORAGE_KEY = `peerprep:${sessionId}:chat`;
 
-  // --- load persisted state (if any)
   const [messages, setMessages] = useState<Msg[]>(() => {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     return raw
@@ -43,13 +133,11 @@ export default function Chat({
   const [input, setInput] = useState(
     () => sessionStorage.getItem(`${STORAGE_KEY}:input`) || ""
   );
-
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  // persist on changes
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages, STORAGE_KEY]);
@@ -61,7 +149,6 @@ export default function Chat({
     scrollerRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
   }, [messages, loading]);
 
-  // Build compact JSON context for the model
   function buildContext() {
     const ctx = {
       title: question?.title,
@@ -190,7 +277,6 @@ export default function Chat({
     setLoading(false);
   }
 
-  // Quick actions
   function quickExplain() {
     return send(
       undefined,
@@ -203,10 +289,9 @@ export default function Chat({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
-      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>
-        AI helper
-      </header>
+      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>Chat</header>
 
+      {/* Quick actions */}
       <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
         <button
           type="button"
@@ -224,51 +309,75 @@ export default function Chat({
         </button>
       </div>
 
+      {/* Messages */}
       <div
         ref={scrollerRef}
         style={{
           flex: 1,
           overflow: "auto",
-          padding: 12,
+          padding: "12px 12px 110px 12px", // 👈 big bottom padding so last bubble doesn't stick to input
           gap: 12,
           display: "flex",
           flexDirection: "column",
           background: "#f9fafb",
         }}
       >
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            style={{
-              maxWidth: "75%",
-              borderRadius: 16,
-              padding: "8px 12px",
-              whiteSpace: "pre-wrap",
-              marginLeft: m.role === "user" ? "auto" : undefined,
-              marginRight: m.role === "assistant" ? "auto" : undefined,
-              background: m.role === "user" ? "#3b82f6" : "#fff",
-              color: m.role === "user" ? "#fff" : "#111",
-              border: m.role === "assistant" ? "1px solid #e5e7eb" : "none",
-            }}
-          >
-            {m.content}
-          </div>
-        ))}
+        {messages.map((m, i) => {
+  const isUser = m.role === "user";
+  return (
+    <div
+      key={i}
+      style={{
+        maxWidth: "75%",
+        borderRadius: 16,
+        padding: "10px 14px",
+        whiteSpace: "pre-wrap",
+        marginLeft: isUser ? "auto" : undefined,    // user → right side
+        marginRight: !isUser ? "auto" : undefined,  // assistant → left side
+        background: isUser ? "#3b82f6" : "#fff",
+        color: isUser ? "#fff" : "#111",
+        border: !isUser ? "1px solid #e5e7eb" : "none",
+        boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+        textAlign: isUser ? "right" : "left",       // explicit alignment
+      }}
+    >
+      {isUser ? m.content : renderMarkdown(m.content)}
+    </div>
+  );
+})}
         {err && <div style={{ color: "#ef4444", fontSize: 12 }}>{err}</div>}
       </div>
 
-      <form onSubmit={send} style={{ padding: 12, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
+      {/* Composer (separate bar so it never overlaps the last message) */}
+      <form
+        onSubmit={send}
+        style={{
+          position: "sticky",
+          bottom: 0,
+          background: "#fff",
+          borderTop: "1px solid #e5e7eb",
+          display: "flex",
+          gap: 8,
+          padding: 12,
+        }}
+      >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
-          style={{ flex: 1, border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}
+          style={{
+            flex: 1,
+            border: "1px solid #e5e7eb",
+            borderRadius: 10,
+            padding: "12px 14px",
+            background: "#fff",
+          }}
         />
         <button
           type="submit"
           disabled={loading}
           style={{
-            padding: "10px 16px",
+            padding: "12px 16px",
             borderRadius: 10,
             background: "#111827",
             color: "#fff",
@@ -277,7 +386,7 @@ export default function Chat({
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "10px 12px", borderRadius: 10 }}>
+        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "12px 12px", borderRadius: 10 }}>
           Cancel
         </button>
       </form>
