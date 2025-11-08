@@ -2,12 +2,32 @@ import React, { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-// Only Vite env; fallback to same-origin (use a dev proxy)
+type Example = { id: number; input: string; output: string; explanation?: string };
+type ChatQuestion = {
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  problemStatement: string;
+  examples?: Example[];
+  // keep it flexible; if you have more fields like testCases/functionSignature, add them:
+  testCases?: any[];
+  codeSnippets?: { language: "python" | "javascript"; code: string }[];
+};
+
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-export default function Chat() {
+export default function Chat({
+  question,
+  language,
+}: {
+  question: ChatQuestion;
+  language?: "python" | "javascript";
+}) {
   const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi! I’m your test bot. Ask me anything." },
+    {
+      role: "assistant",
+      content:
+        "Hi! I know your current PeerPrep problem. Ask me to explain it, discuss approaches, or request hints.",
+    },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -19,19 +39,49 @@ export default function Chat() {
     scrollerRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
   }, [messages, loading]);
 
-  async function send(e?: React.FormEvent) {
+  // Helper: make a compact context block the model can reliably use
+  function buildContext() {
+    const ctx = {
+      title: question?.title,
+      difficulty: question?.difficulty,
+      statement: question?.problemStatement,
+      examples: (question?.examples || []).map((e) => ({
+        input: e.input,
+        output: e.output,
+        explanation: e.explanation,
+      })),
+      languagePreference: language,
+    };
+    // Keep it small to avoid hitting token limits
+    return JSON.stringify(ctx);
+  }
+
+  async function send(e?: React.FormEvent, forcedContent?: string) {
     e?.preventDefault();
-    const content = input.trim();
+    const content = (forcedContent ?? input).trim();
     if (!content || loading) return;
 
     setErr(null);
-    setInput("");
+    if (!forcedContent) setInput("");
+
+    // show the outgoing user message + a placeholder assistant bubble
     setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
     setLoading(true);
 
+    const contextJson = buildContext();
+
     const payload = {
       messages: [
-        { role: "system", content: "You are a concise, helpful assistant." },
+        {
+          role: "system",
+          content:
+            "You are a concise, helpful coding interview tutor. Use the provided JSON context about the current question. Explain clearly; give step-by-step reasoning at a high level, not full solutions unless asked.",
+        },
+        {
+          role: "system",
+          content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}`,
+        },
+        // Conversation history (keep short — we already included context above)
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -112,8 +162,7 @@ export default function Chat() {
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError")
-        setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
@@ -124,24 +173,37 @@ export default function Chat() {
     setLoading(false);
   }
 
+  // 👇 Quick actions to seed useful prompts
+  function quickExplain() {
+    return send(undefined, "Explain the current question in simple terms, then outline a plan and common pitfalls.");
+  }
+  function quickHint() {
+    return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
+  }
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        maxHeight: "100vh",
-      }}
-    >
-      <header
-        style={{
-          padding: 12,
-          borderBottom: "1px solid #e5e7eb",
-          fontWeight: 600,
-        }}
-      >
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh" }}>
+      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>
         Chat
       </header>
+
+      {/* Quick actions */}
+      <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
+        <button
+          type="button"
+          onClick={quickExplain}
+          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+        >
+          Explain this question
+        </button>
+        <button
+          type="button"
+          onClick={quickHint}
+          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+        >
+          Give me a hint
+        </button>
+      </div>
 
       <div
         ref={scrollerRef}
@@ -176,45 +238,21 @@ export default function Chat() {
         {err && <div style={{ color: "#ef4444", fontSize: 12 }}>{err}</div>}
       </div>
 
-      <form
-        onSubmit={send}
-        style={{
-          padding: 12,
-          borderTop: "1px solid #e5e7eb",
-          display: "flex",
-          gap: 8,
-        }}
-      >
+      <form onSubmit={send} style={{ padding: 12, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
-          style={{
-            flex: 1,
-            border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            padding: "10px 12px",
-          }}
+          style={{ flex: 1, border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px" }}
         />
         <button
           type="submit"
           disabled={loading}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 10,
-            background: "#111827",
-            color: "#fff",
-            opacity: loading ? 0.6 : 1,
-          }}
+          style={{ padding: "10px 16px", borderRadius: 10, background: "#111827", color: "#fff", opacity: loading ? 0.6 : 1 }}
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button
-          type="button"
-          onClick={cancel}
-          disabled={!loading}
-          style={{ padding: "10px 12px", borderRadius: 10 }}
-        >
+        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "10px 12px", borderRadius: 10 }}>
           Cancel
         </button>
       </form>
