@@ -39,7 +39,6 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ onClose,userName,
     onClose();
   };
     const menuItems = [
-    { name: "Your Profile", icon: <ProfileIcon />, action: () => {/* navigate to /profile if you want */} },
     { name: "Settings", icon: <SettingsIcon />, action:  () => go("/settings") },
     { name: "Logout", icon: <LogoutIcon />, action: onLogout },
   ];
