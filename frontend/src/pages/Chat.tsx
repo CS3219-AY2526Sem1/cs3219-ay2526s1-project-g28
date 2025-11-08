@@ -1,4 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
+import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
+import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
+import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+
+SyntaxHighlighter.registerLanguage("python", python);
+SyntaxHighlighter.registerLanguage("javascript", javascript);
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -69,24 +76,21 @@ function renderMarkdown(text: string) {
     const lang = m[1] || "";
     const code = m[2].replace(/\n+$/, "");
     out.push(
-      <pre
-        key={`code-${m.index}`}
-        style={{
-          background: "#0b1220",
-          color: "#e5e7eb",
-          borderRadius: 10,
-          border: "1px solid #111827",
-          padding: "12px 14px",
-          overflow: "auto",
-          fontSize: 13,
-          lineHeight: 1.5,
-        }}
-      >
-        <div style={{ opacity: 0.7, fontSize: 11, marginBottom: 6 }}>{lang}</div>
-        <code style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" }}>
-          {code}
-        </code>
-      </pre>
+      <SyntaxHighlighter
+    key={`code-${m.index}`}
+    language={(lang as any) || undefined}
+    style={oneDark}
+    customStyle={{
+      borderRadius: 10,
+      margin: 0,
+      border: "1px solid #111827",
+      fontSize: 13,
+    }}
+    showLineNumbers={false}
+    wrapLongLines
+  >
+    {code}
+  </SyntaxHighlighter>
     );
 
     last = fence.lastIndex;
@@ -311,41 +315,38 @@ export default function Chat({
 
       {/* Messages */}
       <div
-        ref={scrollerRef}
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: "12px 12px 110px 12px", // 👈 big bottom padding so last bubble doesn't stick to input
-          gap: 12,
-          display: "flex",
-          flexDirection: "column",
-          background: "#f9fafb",
-        }}
-      >
+    style={{
+      minHeight: "100%",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "flex-end", // anchor to bottom
+      gap: 12,
+    }}
+  >
         {messages.map((m, i) => {
-  const isUser = m.role === "user";
-  return (
-    <div
-      key={i}
-      style={{
-        maxWidth: "75%",
-        borderRadius: 16,
-        padding: "10px 14px",
-        whiteSpace: "pre-wrap",
-        marginLeft: isUser ? "auto" : undefined,    // user → right side
-        marginRight: !isUser ? "auto" : undefined,  // assistant → left side
-        background: isUser ? "#3b82f6" : "#fff",
-        color: isUser ? "#fff" : "#111",
-        border: !isUser ? "1px solid #e5e7eb" : "none",
-        boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-        textAlign: isUser ? "right" : "left",       // explicit alignment
-      }}
-    >
-      {isUser ? m.content : renderMarkdown(m.content)}
-    </div>
-  );
-})}
-        {err && <div style={{ color: "#ef4444", fontSize: 12 }}>{err}</div>}
+      const isUser = m.role === "user";
+      return (
+        <div
+          key={i}
+          style={{
+            maxWidth: "75%",
+            alignSelf: isUser ? "flex-end" : "flex-start", // also aligns left/right
+            borderRadius: 16,
+            padding: "10px 14px",
+            whiteSpace: "pre-wrap",
+            background: isUser ? "#3b82f6" : "#fff",
+            color: isUser ? "#fff" : "#111",
+            border: !isUser ? "1px solid #e5e7eb" : "none",
+            boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+            textAlign: isUser ? "right" : "left",
+          }}
+        >
+          {isUser ? m.content : renderMarkdown(m.content)}
+        </div>
+      );
+    })}
+        {/* Spacer so the last bubble never kisses the composer */}
+    <div style={{ height: 8 }} />
       </div>
 
       {/* Composer (separate bar so it never overlaps the last message) */}
