@@ -110,8 +110,7 @@ async function checkAndCleanup(sessionId, redis) {
     `session:${sessionId}:disconnected`
   );
 
-  console.log(users);
-  console.log(disconnected);
+  const endedAt = new Date();
 
   // If no active OR disconnected users left → delete Redis + mark inactive
   if (disconnected.length === users.length) {
@@ -124,7 +123,13 @@ async function checkAndCleanup(sessionId, redis) {
 
     await Session.findOneAndUpdate(
       { correlationId: sessionId },
-      { isActive: false }
+      {
+        $set: {
+          isActive: false,
+          endedAt: endedAt,
+        },
+      },
+      { new: true }
     );
 
     console.log(`Session ${sessionId} marked inactive and cleaned.`);
@@ -139,8 +144,6 @@ async function updateHistory(
   language,
   hasSubmitted
 ) {
-  const endedAt = new Date();
-
   if (hasSubmitted) {
     await Session.updateOne(
       { correlationId: sessionId },
@@ -151,7 +154,6 @@ async function updateHistory(
           error: error ?? null,
           language,
           hasSubmitted: true,
-          endedAt, // Date, not function
         },
       }
     );
@@ -161,7 +163,6 @@ async function updateHistory(
       {
         $set: {
           hasSubmitted: false,
-          endedAt, // Date, not function
         },
       }
     );
