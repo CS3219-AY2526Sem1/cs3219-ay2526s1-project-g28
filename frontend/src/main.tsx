@@ -13,7 +13,7 @@ import HomePage from "./pages/HomePage";
 import LoginSuccess from "./pages/LoginSuccess";
 import QuestionsPage from "./pages/QuestionsPage";
 import UsersPage from "./pages/UsersPage";
-import Chat from "./pages/Chat";
+import HistoryPage from "./pages/HistoryPage";
 import CollaborationPage from "./pages/CollaborationPage";
 import HistoryDetail from "./pages/HistoryDetail";
 import { ThemeProvider } from "./theme/ThemeProvider";
