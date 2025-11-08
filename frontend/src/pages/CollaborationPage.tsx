@@ -12,11 +12,20 @@ const COLLAB_SERVICE_URL = "http://localhost:3004";
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
-type Language = "python" | "javascript";
+type Language = "python" | "javascript" | "java";
+
+export interface ExecResult {
+  args: any[];
+  expected: any;
+  output: any;
+  result: boolean;
+  error?: string;
+}
 
 const defaultSnippets: Record<Language, string> = {
   python: "def solution():\n  # Write your code here\n  pass",
   javascript: "function solution() {\n  // Write your code here\n}",
+  java: "public static void main()",
 };
 
 const difficultyStyles: Record<Difficulty, string> = {
@@ -126,6 +135,9 @@ function CodeEditorTab({
   sessionId,
   currentUsername,
   timeout,
+  onResultsChange,
+  onErrorChange,
+  sethasSubmitted,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -140,6 +152,9 @@ function CodeEditorTab({
   sessionId: string | undefined;
   currentUsername: string;
   timeout: number;
+  onResultsChange?: (results: ExecResult[]) => void;
+  onErrorChange?: (err: string | null) => void;
+  sethasSubmitted: (v: boolean) => void;
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -149,6 +164,7 @@ function CodeEditorTab({
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const cursorWidgetRef = useRef<monaco.editor.IContentWidget | null>(null);
+  const [hasRunSubmitted, setHasRunSubmitted] = useState(false);
   const [remoteCursor, setRemoteCursor] = useState<{
     lineNumber: number;
     column: number;
@@ -259,17 +275,27 @@ function CodeEditorTab({
   const handleRun = async () => {
     setLoading(true);
     setError(null);
-    const toRun = testCases.filter((tc) => !tc.hidden);
+    setHasRunSubmitted(true);
+    const toRun = testCases
+      .filter((tc) => !tc.hidden)
+      .map((tc) => ({
+        ...tc,
+        // Replace tc.input with just its first element if it's an array
+        input: Array.isArray(tc.input) ? tc.input[0] : tc.input,
+      }));
     try {
-      const res = await runCodeApi(code, toRun, timeout);
+      const res = await runCodeApi(language, code, toRun, timeout);
+      console.log(res.data.output);
       if (res.data.success) {
         const firstFail = res.data.output.findIndex(
           (r: { result: boolean }) => !r.result
         );
         if (firstFail !== -1) {
           const tc = res.data.output[firstFail];
-          setError(tc.error);
-          setActiveTab("console");
+          if (tc.error) {
+            setError(tc.error);
+            setActiveTab("console");
+          }
         }
         setRunResults(res.data.output);
       } else {
@@ -290,13 +316,17 @@ function CodeEditorTab({
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    sethasSubmitted(true);
     try {
-      const res = await runCodeApi(code, testCases, timeout);
+      const res = await runCodeApi(language, code, testCases, timeout);
+
       if (res.data.success) {
         setSubmitResults(res.data.output);
+        onResultsChange?.(res.data.output);
         setActiveTab("console");
       } else {
         setError(res.data.error);
+        onErrorChange?.(res.data.error);
         setSubmitResults([]);
         setRunResults([]);
         setActiveTab("console");
@@ -345,6 +375,8 @@ function CodeEditorTab({
             >
               <option value="python">Python</option>
               <option value="javascript">JavaScript</option>
+              <option value="c++">C++</option>
+              <option value="java">Java</option>
             </select>
             <button
               onClick={() => setCode(defaultSnippets[language])}
@@ -405,19 +437,21 @@ function CodeEditorTab({
                           <div className="text-sm text-slate-600 mb-1">
                             Input:{" "}
                             <code>
-                              {Array.isArray(tc.args)
-                                ? JSON.stringify(tc.args)
-                                : tc.args}
+                              {Array.isArray(tc.args[0])
+                                ? JSON.stringify(tc.args[0])
+                                : tc.args[0]}
                             </code>
                           </div>
                           <div className="text-sm text-slate-600 mb-1">
                             Expected: <code>{JSON.stringify(tc.expected)}</code>
                           </div>
-                          {runResults[idx]?.output && (
+                          {runResults && hasRunSubmitted && (
                             <div className="text-sm text-slate-700 mb-1">
                               Output:{" "}
                               <code>
-                                {JSON.stringify(runResults[idx].output)}
+                                {runResults[idx]?.output
+                                  ? JSON.stringify(runResults[idx].output)
+                                  : "No output"}
                               </code>
                             </div>
                           )}
@@ -483,8 +517,16 @@ function CodeEditorTab({
             </div>
           )}
 
+          {/* If there’s no error but also no results → show message */}
+          {!error && (!submitResults || submitResults.length === 0) && (
+            <div className="text-center text-slate-600 italic py-4">
+              You must submit your code first
+            </div>
+          )}
+
+          {/* If there are results, render success/failure */}
           {!error &&
-            (submitResults.length || runResults.length) &&
+            submitResults.length > 0 &&
             (() => {
               const results = submitResults.length ? submitResults : runResults;
               const firstFail = results.findIndex((r) => !r.result);
@@ -497,7 +539,6 @@ function CodeEditorTab({
                 );
               } else {
                 const tc = results[firstFail];
-                const item = Array.isArray(tc) ? tc : [tc];
                 const total = results.length;
 
                 return (
@@ -511,9 +552,9 @@ function CodeEditorTab({
                     <div className="text-sm text-slate-600">
                       <strong>Input:</strong>{" "}
                       <code>
-                        {Array.isArray(item[0].args)
-                          ? JSON.stringify(item[0].args)
-                          : [item[0].args]}
+                        {Array.isArray(tc.args?.[0])
+                          ? JSON.stringify(tc.args[0])
+                          : JSON.stringify(tc.args)}
                       </code>
                     </div>
                     <div className="text-sm text-slate-600">
@@ -522,7 +563,9 @@ function CodeEditorTab({
                     </div>
                     <div className="text-sm text-slate-700">
                       <strong>Output:</strong>{" "}
-                      <code>{JSON.stringify(tc.output)}</code>
+                      <code>
+                        {tc.output ? JSON.stringify(tc.output) : "No output"}
+                      </code>
                     </div>
                     {tc.error && (
                       <div className="text-red-600 font-medium text-sm">
@@ -586,6 +629,10 @@ export default function CollaborationPage() {
   const socketRef = useRef<any>(null);
   const knownUsersRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
+
+  const [latestResults, setLatestResults] = useState<ExecResult[]>([]);
+  const [latestError, setLatestError] = useState<string | null>(null);
+  const [hasSubmitted, sethasSubmitted] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -689,11 +736,14 @@ export default function CollaborationPage() {
       setCode(newCode);
     });
 
-    socket.on("language-change", ({ language: newLang }: { language: Language }) => {
-      console.log("Language changed to:", newLang);
-      setLanguage(newLang);
-      setCode(defaultSnippets[newLang]);
-    });
+    socket.on(
+      "language-change",
+      ({ language: newLang }: { language: Language }) => {
+        console.log("Language changed to:", newLang);
+        setLanguage(newLang);
+        setCode(defaultSnippets[newLang]);
+      }
+    );
 
     return () => {
       socket.disconnect();
@@ -715,32 +765,37 @@ export default function CollaborationPage() {
     });
   };
 
-const handleLeaveSession = async () => {
-  if (!sessionId || !currentUsername) return;
+  const handleLeaveSession = async () => {
+    if (!sessionId || !currentUsername) return;
 
-  if (!window.confirm("Are you sure you want to leave this session?")) return;
+    if (!window.confirm("Are you sure you want to leave this session?")) return;
 
-  try {
-    // Notify backend (voluntary leave)
-    socketRef.current?.emit("leave-session", {
-      sessionId,
-      username: currentUsername,
-    });
+    try {
+      // Notify backend (voluntary leave)
+      socketRef.current?.emit("leave-session", {
+        sessionId,
+        username: currentUsername,
+        code,
+        submitResults: latestResults,
+        error: latestError,
+        language,
+        hasSubmitted,
+      });
 
-    // Optionally mark session inactive locally
-    localStorage.removeItem("activeSessionId");
+      // Optionally mark session inactive locally
+      localStorage.removeItem("activeSessionId");
 
-    // Disconnect socket
-    // socketRef.current?.disconnect();
-    // socketRef.current = null;
+      // Disconnect socket
+      // socketRef.current?.disconnect();
+      // socketRef.current = null;
 
-    // Navigate back to home
-    navigate("/home");
-  } catch (err) {
-    console.error("Failed to leave session:", err);
-    alert("Could not leave session. Try again.");
-  }
-};
+      // Navigate back to home
+      navigate("/home");
+    } catch (err) {
+      console.error("Failed to leave session:", err);
+      alert("Could not leave session. Try again.");
+    }
+  };
 
   if (loading) {
     return (
@@ -809,6 +864,9 @@ const handleLeaveSession = async () => {
                 sessionId={sessionId}
                 currentUsername={currentUsername}
                 timeout={timeout}
+                onResultsChange={setLatestResults}
+                onErrorChange={setLatestError}
+                sethasSubmitted={sethasSubmitted}
               />
             )}
             {activeTab === "chat" && (

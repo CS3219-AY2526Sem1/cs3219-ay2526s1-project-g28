@@ -193,6 +193,8 @@ export async function deleteUser(req, res) {
 
 /* ---------- response shape ---------- */
 export function formatUserResponse(user) {
+  const provider = user.providers?.[0]?.provider ?? "password";
+  
   return {
     id: user.id,
     username: user.username,
@@ -201,6 +203,6 @@ export function formatUserResponse(user) {
     avatarUrl: user.avatarUrl ?? "",
     isAdmin: !!user.isAdmin,
     createdAt: user.createdAt,
-    provider: user.provider || "password",
+    provider
   };
 }

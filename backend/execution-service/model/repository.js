@@ -7,7 +7,12 @@ import vm from "vm";
  * @param {number} timeout - Timeout in ms (default 1000)
  * @returns {Promise<Array<{args:any, expected:any, output:any, result:boolean, error:string|null}>>}
  */
-export async function executeUserCode(code, testCases, timeout = 1000) {
+export async function executeUserCode(
+  language,
+  code,
+  testCases,
+  timeout = 1000
+) {
   // Extract function name
   const matchFn = code.match(/function\s+([a-zA-Z0-9_]+)\s*\(/);
   if (!matchFn) throw new Error("No function found in user code");

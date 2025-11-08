@@ -41,7 +41,7 @@ const CollapsibleSidebar: React.FC<SidebarProps> = ({
   // Separate navigation items by role
   const userNavItems: NavItem[] = [
     { name: "Challenges", icon: <HomeIcon /> },
-    { name: "My Sessions", icon: <HistoryIcon /> },
+    { name: "My History", icon: <HistoryIcon /> },
     { name: "Leaderboard", icon: <LeaderboardIcon /> },
   ];
 
