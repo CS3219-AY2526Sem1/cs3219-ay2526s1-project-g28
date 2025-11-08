@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Header from "../components/Header";
 import { EyeIcon } from "@heroicons/react/24/outline";
 import { theme } from "../theme";
-import { fetchHistory } from "../lib/services/collobarationService";
+import { fetchHistory } from "../lib/services/collaborationService";
 import { useAuth } from "../auth/AuthContext";
 
 type Style = React.CSSProperties;
@@ -13,39 +13,29 @@ type Status = "Completed" | "In Progress" | "Cancelled" | "Failed";
 
 export interface HistoryEntry {
   id: string;
-  startedAt: string; // ISO string
-  endedAt?: string; // ISO string (optional if in-progress/cancelled)
-  partner: string; // partner username
+  startedAt: string;
+  partner: string;
   difficulty: Difficulty;
   topics: string[];
   status: Status;
   roomId?: string;
   questionTitle?: string;
-  durationSec?: number; // fallback: computed from start/end
-  notes?: string;
 }
 
 const ITEMS_PER_PAGE = 25;
 
-/** ===== MOCK DATA TOGGLE ===== */
-const USE_MOCK = true;
+function toStatus(x: any, isActive?: boolean): Status {
+  const s = String(x ?? "").toLowerCase();
+  if (s === "success") return "Completed";
+  if (s === "cancelled") return "Cancelled";
+  if (s === "failed") return "Failed";
+  if (s === "in_progress") return "In Progress";
+  return "Completed";
+}
 
-/** ===== MOCK HISTORY ===== */
-const MOCK_HISTORY: HistoryEntry[] = [
-  {
-    id: "h1",
-    startedAt: "2025-11-07T14:10:00Z",
-    endedAt: "2025-11-07T14:45:40Z",
-    partner: "Alice",
-    difficulty: "Medium",
-    topics: ["Graphs", "Dynamic Programming"],
-    status: "Completed",
-    roomId: "RM-7F9A",
-    questionTitle: "Shortest Path in Weighted Graph",
-    durationSec: 213, // 3m 33s (example)
-    notes: "Great discussion on Dijkstra vs. BFS.",
-  },
-];
+function pickId(obj: any) {
+  return String(obj?._id ?? obj?.id ?? obj?.correlationId ?? "");
+}
 
 const HistoryPage: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -62,44 +52,56 @@ const HistoryPage: React.FC = () => {
 
   const [showDetails, setShowDetails] = useState(false);
   const [detailsItem, setDetailsItem] = useState<HistoryEntry | null>(null);
+
   const { user } = useAuth();
+
   useEffect(() => {
     const load = async () => {
       setIsLoading(true);
       setError(null);
 
-      // If mocking, simulate latency and set mock data.
-      if (USE_MOCK) {
-        await new Promise((r) => setTimeout(r, 500));
-        const items = [...MOCK_HISTORY].sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        );
-        setHistory(items);
-        setIsLoading(false);
-        return;
-      }
-
-      // Otherwise, call API with graceful fallback to mock on error.
       try {
         if (!user?.username) {
           throw new Error("User not logged in");
         }
+
         const res = await fetchHistory(user.username);
-        const items = ((res?.data as HistoryEntry[]) || []).sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+        const sessions = (res?.data as any[]) || [];
+
+        const items: HistoryEntry[] = sessions.map((s) => {
+          const usersArr = Array.isArray(s?.users) ? s.users : [];
+          let partnerUser =
+            usersArr.find((u: any) =>
+              u.username != user.username
+            ) ?? usersArr[0];
+
+          const partnerName = partnerUser?.username || partnerUser?.id || "—";
+
+          const startedAt = s?.startedAt || s?.createdAt || new Date().toISOString();
+          const difficulty = s?.meta?.difficulty;
+          const topics = Array.isArray(s?.meta?.topics) ? s.meta.topics : [];
+          const status = toStatus(s?.status, s?.isActive);
+
+          return {
+            id: pickId(s),
+            startedAt: String(startedAt),
+            partner: String(partnerName),
+            difficulty,
+            topics,
+            status,
+            roomId: s?.matchKey || undefined,
+            questionTitle: s?.question?.title || s?.question?.name || undefined,
+          } as HistoryEntry;
+        });
+
+        const sorted = items.sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
         );
-        setHistory(items);
+
+        setHistory(sorted);
       } catch (err: any) {
         console.error("Fetch history error:", err);
         setError(err.message || "Failed to fetch history");
-        // Optional: fallback to mock if API fails
-        const items = [...MOCK_HISTORY].sort(
-          (a, b) =>
-            new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-        );
-        setHistory(items);
       } finally {
         setIsLoading(false);
       }
@@ -273,9 +275,9 @@ const HistoryPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-700">
                           {fmtDurationSec(
-                            item.durationSec,
+                            (item as any).durationSec,
                             item.startedAt,
-                            item.endedAt
+                            (item as any).endedAt
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-right space-x-3 whitespace-nowrap">
@@ -392,9 +394,9 @@ const HistoryPage: React.FC = () => {
               <div>
                 <span className="text-gray-500">Duration:</span>{" "}
                 {fmtDurationSec(
-                  detailsItem.durationSec,
+                  (detailsItem as any).durationSec,
                   detailsItem.startedAt,
-                  detailsItem.endedAt
+                  (detailsItem as any).endedAt
                 )}
               </div>
               {detailsItem.questionTitle && (
@@ -409,10 +411,10 @@ const HistoryPage: React.FC = () => {
                   {detailsItem.roomId}
                 </div>
               )}
-              {detailsItem.notes && (
+              {(detailsItem as any).notes && (
                 <div className="text-gray-700">
                   <span className="text-gray-500">Notes:</span>{" "}
-                  {detailsItem.notes}
+                  {(detailsItem as any).notes}
                 </div>
               )}
             </div>

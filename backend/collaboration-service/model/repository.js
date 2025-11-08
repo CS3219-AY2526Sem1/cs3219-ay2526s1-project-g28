@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import Session from "./session-model.js";
 
 export async function connectToDB() {
   try {
@@ -17,4 +18,16 @@ export async function connectToDB() {
     console.error("[MongoDB] Connection error:", error);
     throw error; // rethrow so server.js can handle failure
   }
+}
+
+export async function findSessionsByUsername(username) {
+  if (!username) return [];
+  return Session.find({
+    $or: [
+      { "users.username": username },
+      { "users.id": username },
+    ],
+  })
+    .sort({ createdAt: -1 })
+    .lean();
 }
