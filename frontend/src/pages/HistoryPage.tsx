@@ -25,10 +25,15 @@ export interface HistoryEntry {
 
 const ITEMS_PER_PAGE = 25;
 
-function toStatus(error: String, isActive?: boolean): Status {
-  if (error.length == 0) return "Completed";
-  if (error.length == 0 && !isActive) return "Failed";
-  return isActive ? "In Progress" : "Completed";
+function toStatus(
+  error: String,
+  isActive?: boolean,
+  hasSubmitted?: boolean
+): Status {
+  console.log(error);
+  if (!error && hasSubmitted) return "Completed";
+  if (!isActive) return "Failed";
+  return "In Progress";
 }
 
 function pickId(obj: any) {
@@ -64,18 +69,18 @@ const HistoryPage: React.FC = () => {
         const items: HistoryEntry[] = sessions.map((s) => {
           const id = pickId(s);
           localIndex[id] = s;
-          console.log(s);
+
           const usersArr = Array.isArray(s?.users) ? s.users : [];
           const me = user.username;
           const partnerUser =
             usersArr.find((u: any) => u?.username !== me) ?? usersArr[0];
-
           const partnerName = partnerUser?.username || partnerUser?.id || "—";
           const startedAt = s?.startedAt || new Date().toISOString();
           const endedAt = s?.endedAt || new Date().toISOString();
           const difficulty = (s?.meta?.difficulty ?? "Easy") as Difficulty;
           const topics = Array.isArray(s?.meta?.topics) ? s.meta.topics : [];
-          const status = toStatus(s?.status, s?.isActive);
+          const hasSubmitted = s?.hasSubmitted || false;
+          const status = toStatus(s?.error, s?.isActive, hasSubmitted);
 
           return {
             id,
