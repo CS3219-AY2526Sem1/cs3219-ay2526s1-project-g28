@@ -46,7 +46,7 @@ export default function Signup() {
       };
 
       login(token, user);
-      navigate("/dashboard", { replace: true });
+      navigate("/home", { replace: true });
     } catch (err: any) {
       setError(err?.message || "Signup failed");
     } finally {
