@@ -14,6 +14,14 @@ type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
 type Language = "python" | "javascript" | "java";
 
+export interface ExecResult {
+  args: any[];
+  expected: any;
+  output: any;
+  result: boolean;
+  error?: string;
+}
+
 const defaultSnippets: Record<Language, string> = {
   python: "def solution():\n  # Write your code here\n  pass",
   javascript: "function solution() {\n  // Write your code here\n}",
@@ -127,6 +135,9 @@ function CodeEditorTab({
   sessionId,
   currentUsername,
   timeout,
+  onResultsChange,
+  onErrorChange,
+  sethasSubmitted,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -141,6 +152,9 @@ function CodeEditorTab({
   sessionId: string | undefined;
   currentUsername: string;
   timeout: number;
+  onResultsChange?: (results: ExecResult[]) => void;
+  onErrorChange?: (err: string | null) => void;
+  sethasSubmitted: (v: boolean) => void;
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -150,7 +164,7 @@ function CodeEditorTab({
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const cursorWidgetRef = useRef<monaco.editor.IContentWidget | null>(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [hasRunSubmitted, setHasRunSubmitted] = useState(false);
   const [remoteCursor, setRemoteCursor] = useState<{
     lineNumber: number;
     column: number;
@@ -261,7 +275,7 @@ function CodeEditorTab({
   const handleRun = async () => {
     setLoading(true);
     setError(null);
-    setHasSubmitted(true);
+    setHasRunSubmitted(true);
     const toRun = testCases
       .filter((tc) => !tc.hidden)
       .map((tc) => ({
@@ -302,14 +316,17 @@ function CodeEditorTab({
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    sethasSubmitted(true);
     try {
       const res = await runCodeApi(language, code, testCases, timeout);
 
       if (res.data.success) {
         setSubmitResults(res.data.output);
+        onResultsChange?.(res.data.output);
         setActiveTab("console");
       } else {
         setError(res.data.error);
+        onErrorChange?.(res.data.error);
         setSubmitResults([]);
         setRunResults([]);
         setActiveTab("console");
@@ -428,7 +445,7 @@ function CodeEditorTab({
                           <div className="text-sm text-slate-600 mb-1">
                             Expected: <code>{JSON.stringify(tc.expected)}</code>
                           </div>
-                          {runResults && hasSubmitted && (
+                          {runResults && hasRunSubmitted && (
                             <div className="text-sm text-slate-700 mb-1">
                               Output:{" "}
                               <code>
@@ -613,6 +630,10 @@ export default function CollaborationPage() {
   const knownUsersRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
 
+  const [latestResults, setLatestResults] = useState<ExecResult[]>([]);
+  const [latestError, setLatestError] = useState<string | null>(null);
+  const [hasSubmitted, sethasSubmitted] = useState(false);
+
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
     if (storedUser) {
@@ -754,6 +775,11 @@ export default function CollaborationPage() {
       socketRef.current?.emit("leave-session", {
         sessionId,
         username: currentUsername,
+        code,
+        submitResults: latestResults,
+        error: latestError,
+        language,
+        hasSubmitted,
       });
 
       // Optionally mark session inactive locally
@@ -838,6 +864,9 @@ export default function CollaborationPage() {
                 sessionId={sessionId}
                 currentUsername={currentUsername}
                 timeout={timeout}
+                onResultsChange={setLatestResults}
+                onErrorChange={setLatestError}
+                sethasSubmitted={sethasSubmitted}
               />
             )}
             {activeTab === "chat" && (
