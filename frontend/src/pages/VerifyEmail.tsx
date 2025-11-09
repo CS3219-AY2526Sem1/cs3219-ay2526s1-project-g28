@@ -15,29 +15,34 @@ export default function VerifyEmail() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
   const hasRequested = useRef(false);
+  const lastTokenRef = useRef<string | null>(null);
+  const isMountedRef = useRef(false);
 
   useEffect(() => {
-    hasRequested.current = false;
-  }, [token]);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
+    if (lastTokenRef.current !== token) {
+      lastTokenRef.current = token;
+      hasRequested.current = false;
+    }
+
     if (hasRequested.current) {
       return;
     }
 
-    let cancelled = false;
     hasRequested.current = true;
 
     (async () => {
       if (!token) {
-        if (!cancelled) {
+        if (isMountedRef.current) {
           setStatus("error");
           setMessage("Missing verification token");
         }
-        return;
-      }
-
-      if (cancelled) {
         return;
       }
 
@@ -45,13 +50,13 @@ export default function VerifyEmail() {
 
       try {
         const res = (await api(`/users/verify-email?token=${encodeURIComponent(token)}`)) as VerificationResponse;
-        if (cancelled) {
+        if (!isMountedRef.current) {
           return;
         }
         setMessage(res?.message ?? "Email verified successfully");
         setStatus("success");
       } catch (err: unknown) {
-        if (cancelled) {
+        if (!isMountedRef.current) {
           return;
         }
         const errorMessage = err instanceof Error ? err.message : "Failed to verify email";
@@ -59,10 +64,6 @@ export default function VerifyEmail() {
         setStatus("error");
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [token]);
 
   return (
