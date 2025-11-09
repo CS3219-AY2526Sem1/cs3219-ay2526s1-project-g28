@@ -418,6 +418,18 @@ export function formatQuestionResponse(question) {
  * It's triggered by the consumer in kafka.js instead of an HTTP route.
  */
 export async function handleMatchingRequest(message) {
+<<<<<<< Updated upstream
+=======
+  // let request;
+  // try {
+  //   request = JSON.parse(message.value.toString());
+  // } catch (err) {
+  //   console.error("Failed to parse Kafka message:", err);
+  //   return; // Ignore unparseable message
+  // }
+  // console.log(request);
+  // const { correlationId, difficulty, topics } = request;
+>>>>>>> Stashed changes
   const { correlationId, meta } = message;
 
   if (!meta.difficulty || !meta.topics) {
@@ -433,6 +445,10 @@ export async function handleMatchingRequest(message) {
   );
 
   try {
+<<<<<<< Updated upstream
+=======
+    // 1. Use your existing model function to find a question
+>>>>>>> Stashed changes
     const randomQuestion = await _findRandomQuestion(meta.difficulty, meta.topics[0]);
 
     if (!randomQuestion || randomQuestion.length === 0) {

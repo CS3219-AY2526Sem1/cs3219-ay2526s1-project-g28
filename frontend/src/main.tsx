@@ -12,11 +12,15 @@ import Dashboard from "./pages/Dashboard";
 import HistoryPage from "./pages/HistoryPage";
 import Signup from "./pages/Signup";
 import HomePage from "./pages/HomePage";
+<<<<<<< Updated upstream
 import LoginSuccess from "./pages/LoginSuccess";
 import QuestionsPage from "./pages/QuestionsPage";
 import UsersPage from "./pages/UsersPage"
 import Chat from "./pages/Chat";
 import CollaborationPage from "./pages/CollaborationPage";
+=======
+// import CollaborationPage from "./pages/CollaborationPage";
+>>>>>>> Stashed changes
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
 import { Toaster } from "react-hot-toast";
@@ -43,6 +47,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            {/* <Route path="/collaborationpage" element={<CollaborationPage />} /> */}
             <Route
               path="*"
               element={<div className="p-10">404 Not found</div>}
