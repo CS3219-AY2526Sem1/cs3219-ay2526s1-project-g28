@@ -11,12 +11,7 @@ app.use("/ai/", rateLimit({ windowMs: 60_000, max: 60 }));
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 // --- OpenRouter client ---
 const openai = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.SITE_URL || "http://localhost",
-    "X-Title": process.env.SITE_NAME || "PeerPrep",
-  },
+  apiKey: process.env.OPENAI_API_KEY, 
 });
 
 app.get("/health", (_, res) => res.json({ ok: true }));
@@ -60,7 +55,7 @@ app.post("/ai/explain", async (req, res) => {
 
   try {
     const stream = await openai.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL || "minimax/minimax-m2:free",
+      model: process.env.OPENAI_MODEL || "gpt-4",
       stream: true,
       messages: [
         { role: "system", content: sys },
@@ -91,7 +86,7 @@ app.post("/ai/explain", async (req, res) => {
 
 // POST /api/ai/chat  — { messages: [{role:"user"|"assistant"|"system", content:string}] }
 app.post("/ai/chat", async (req, res) => {
-  const { messages = [] } = req.body || {};
+  const { messages = [], context } = req.body || {};
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: "Missing 'messages'[]" });
   }
@@ -100,12 +95,32 @@ app.post("/ai/chat", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  const baseSys =
+    "You are a concise coding interview tutor. Use the provided CURRENT_QUESTION_CONTEXT_JSON if present. " +
+    "If hasCode=false or user asks to explain code without code, explain the question, outline an approach, give high-level pseudocode, and pitfalls. " +
+    "If hasCode=true and user asks about code, review that code.";
+    // Build final message list
+  const final = [...messages];
 
+  // Only add if caller didn't already set a system message
+  const alreadyHasSystem = final.some((m) => m.role === "system");
+  if (!alreadyHasSystem) {
+    final.unshift({ role: "system", content: baseSys });
+  }
+
+  // If caller provided a compact context object, inject as a second system message
+  if (context) {
+    const safeJson = JSON.stringify(context);
+    final.unshift({
+      role: "system",
+      content: `CURRENT_QUESTION_CONTEXT_JSON=${safeJson}`,
+    });
+  }
   try {
     const stream = await openai.chat.completions.create({
-      model: process.env.OPENROUTER_MODEL || "minimax/minimax-m2:free",
+      model: process.env.OPENAI_MODEL  || "gpt-4",
       stream: true,
-      messages, // already in the correct shape
+      messages: final,
     });
 
     for await (const part of stream) {

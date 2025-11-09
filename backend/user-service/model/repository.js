@@ -36,7 +36,15 @@ async function hashPassword(plain) {
 
 /* ---------- Local (email/password) ---------- */
 
-export async function createLocalUser({ username, fullname, email, password, avatarUrl = "" }) {
+export async function createLocalUser({
+  username,
+  fullname,
+  email,
+  password,
+  avatarUrl = "",
+  emailVerificationTokenHash,
+  emailVerificationExpiresAt,
+}) {
   if (!email) throw new Error("Email is required for local signup");
   if (!password) throw new Error("Password is required for local signup");
   const uname = await ensureUniqueUsername(username || email.split("@")[0]);
@@ -49,6 +57,9 @@ export async function createLocalUser({ username, fullname, email, password, ava
     email: email.toLowerCase().trim(),
     password: hashed,
     avatarUrl,
+    isEmailVerified: false,
+    emailVerificationTokenHash,
+    emailVerificationExpiresAt,
     providers: [{ provider: "password", providerId: `local:${email.toLowerCase()}` }],
   });
 
@@ -116,6 +127,29 @@ export async function deleteUserById(userId) {
   return UserModel.findByIdAndDelete(userId);
 }
 
+export async function findUserByEmailVerificationTokenHash(tokenHash) {
+  if (!tokenHash) return null;
+  return UserModel.findOne({ emailVerificationTokenHash: tokenHash });
+}
+
+export async function markUserEmailVerified(userId) {
+  if (!userId) return null;
+  return UserModel.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        isEmailVerified: true,
+        emailVerifiedAt: new Date(),
+      },
+      $unset: {
+        emailVerificationTokenHash: "",
+        emailVerificationExpiresAt: "",
+      },
+    },
+    { new: true }
+  );
+}
+
 /* ---------- OAuth (find-or-create) ---------- */
 
 export async function findUserByProviderId(provider, providerId) {
@@ -135,6 +169,7 @@ export async function createOAuthUser({ provider, providerId, username, fullname
     fullname: fullname || uname,
     email: email ? email.toLowerCase().trim() : undefined,
     avatarUrl: avatarUrl || "",
+    isEmailVerified: true,
     providers: [{ provider, providerId }],
   });
 

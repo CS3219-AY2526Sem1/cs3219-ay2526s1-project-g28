@@ -38,6 +38,10 @@ export async function handleLogin(req, res) {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ message: "Wrong email and/or password" });
 
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ message: "Email address has not been verified" });
+    }
+
     const accessToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "1d" });
 
     return res.status(200).json({

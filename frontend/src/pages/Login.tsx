@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
+import { API_BASE } from "@/lib/config";
 import Header from "@/components/Header";
 export default function Login() {
   const [email,setEmail]=useState(""); 
@@ -12,6 +13,13 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   
+  function oauth(provider: "google" | "github") {
+    // If API_BASE is absolute, use it. If it's blank or relative, fall back to same-origin.
+    const path = `/auth/${provider}`;
+    const href = API_BASE ? `${API_BASE}${path}` : path;
+    window.location.href = href;
+  }
+
   async function onSubmit(e:React.FormEvent){ 
     e.preventDefault(); 
     setLoading(true);
@@ -64,14 +72,14 @@ export default function Login() {
         <div className="pt-2 space-y-2">
   <button
     type="button"
-    onClick={() => (window.location.href = "http://localhost:3001/auth/google")}
+    onClick={() => oauth("google")}
     className="w-full rounded-md border-2 border-black py-2.5 dark:text-black"
   >
     Continue with Google
   </button>
   <button
     type="button"
-    onClick={() => (window.location.href = "http://localhost:3001/auth/github")}
+    onClick={() => oauth("github")}
     className="w-full rounded-md border-2 border-black py-2.5 dark:text-black"
   >
     Continue with GitHub
