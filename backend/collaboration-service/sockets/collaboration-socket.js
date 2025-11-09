@@ -21,6 +21,34 @@ export function initCollaborationSocket(io, redis) {
       console.log("Current users in session", sessionId, ":", users);
 
       socket.to(sessionId).emit("user-joined", { username });
+
+      const activeCallInitiator = await redis.get(`session:${sessionId}:call`);
+      if (activeCallInitiator) {
+        socket.emit("start-call", { initiator: activeCallInitiator });
+      }
+    });
+
+    socket.on("start-call", async ({ sessionId, username }) => {
+      const targetSessionId = sessionId || socket.data.sessionId;
+      if (!targetSessionId) return;
+
+      const initiator = username || socket.data.username || "";
+      socket.data.inCall = true;
+
+      await redis.set(`session:${targetSessionId}:call`, initiator);
+
+      socket.to(targetSessionId).emit("start-call", { initiator });
+    });
+
+    socket.on("end-call", async ({ sessionId }) => {
+      const targetSessionId = sessionId || socket.data.sessionId;
+      if (!targetSessionId) return;
+
+      socket.data.inCall = false;
+
+      await redis.del(`session:${targetSessionId}:call`);
+
+      socket.to(targetSessionId).emit("end-call");
     });
 
     socket.on("code-change", ({ sessionId, code }) => {
@@ -52,11 +80,14 @@ export function initCollaborationSocket(io, redis) {
         hasSubmitted,
       }) => {
         socket.data.voluntaryLeave = true;
+        socket.data.inCall = false;
         console.log(`User ${username} left session ${sessionId}`);
 
         // Remove user completely (they can join another session)
         await redis.srem(`session:${sessionId}:users`, username);
         await redis.srem(`session:${sessionId}:disconnected`, username);
+
+        await redis.del(`session:${sessionId}:call`);
 
         socket.to(sessionId).emit("user-left", { username });
 
@@ -97,6 +128,12 @@ export function initCollaborationSocket(io, redis) {
       // Notify other user(s)
       socket.to(sessionId).emit("user-disconnected", { username });
 
+      const activeCallInitiator = await redis.get(`session:${sessionId}:call`);
+      if (activeCallInitiator) {
+        await redis.del(`session:${sessionId}:call`);
+        socket.to(sessionId).emit("end-call");
+      }
+
       // Cleanup check
       await checkAndCleanup(sessionId, redis);
     });
@@ -118,7 +155,8 @@ async function checkAndCleanup(sessionId, redis) {
     await redis.del(
       `session:${sessionId}:users`,
       `session:${sessionId}:disconnected`,
-      `session:${sessionId}:code`
+      `session:${sessionId}:code`,
+      `session:${sessionId}:call`
     );
 
     await Session.findOneAndUpdate(

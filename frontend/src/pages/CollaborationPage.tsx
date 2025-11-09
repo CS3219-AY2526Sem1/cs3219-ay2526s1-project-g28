@@ -872,6 +872,20 @@ export default function CollaborationPage() {
       }
     });
 
+    const handleRemoteStartCall = () => {
+      setIsCallActive(true);
+      setShowCallPopup(true);
+      setActiveTab((prev) => (prev === "call" ? prev : "call"));
+    };
+
+    const handleRemoteEndCall = () => {
+      setIsCallActive(false);
+      setShowCallPopup(false);
+    };
+
+    socket.on("start-call", handleRemoteStartCall);
+    socket.on("end-call", handleRemoteEndCall);
+
     // Existing code-change / language-change handlers
     socket.on("code-change", ({ code: newCode }: { code: string }) => {
       setCode(newCode);
@@ -887,6 +901,8 @@ export default function CollaborationPage() {
     );
 
     return () => {
+      socket.off("start-call", handleRemoteStartCall);
+      socket.off("end-call", handleRemoteEndCall);
       socket.disconnect();
       socketRef.current = null;
     };
@@ -906,12 +922,29 @@ export default function CollaborationPage() {
     });
   };
 
+  const handleStartCall = () => {
+    if (!sessionId || !currentUsername || isCallActive) return;
+
+    setActiveTab("call");
+    setIsCallActive(true);
+    setShowCallPopup(true);
+
+    socketRef.current?.emit("start-call", {
+      sessionId,
+      username: currentUsername,
+    });
+  };
+
   const handleLeaveSession = async () => {
     if (!sessionId || !currentUsername) return;
 
     if (!window.confirm("Are you sure you want to leave this session?")) return;
 
     try {
+      if (isCallActive) {
+        socketRef.current?.emit("end-call", { sessionId });
+      }
+
       // Notify backend (voluntary leave)
       socketRef.current?.emit("leave-session", {
         sessionId,
@@ -1034,10 +1067,7 @@ export default function CollaborationPage() {
                   <div className="flex flex-1 items-center justify-center">
                     <button
                       disabled={isCallActive}
-                      onClick={() => {
-                        setIsCallActive(true);
-                        setShowCallPopup(true);
-                      }}
+                      onClick={handleStartCall}
                       className={`px-4 py-2 rounded text-white font-medium transition ${
                         isCallActive
                           ? "bg-gray-400 cursor-not-allowed"
