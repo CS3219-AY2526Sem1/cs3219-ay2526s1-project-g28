@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 
 interface FloatingCallPopupProps {
@@ -18,25 +18,36 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
+  const onCallEndRef = useRef(onCallEnd);
   const [inCall, setInCall] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-    let callCreated = false;
+    onCallEndRef.current = onCallEnd;
+  }, [onCallEnd]);
 
-    const roomName = sessionId?.includes(":")
-      ? sessionId.split(":").pop()
-      : sessionId;
+  const roomName = useMemo(() => {
+    if (!sessionId) return undefined;
+    return sessionId.includes(":") ? sessionId.split(":").pop() : sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    let mounted = true;
+    let cleanupHandlers: {
+      left?: () => void;
+      error?: (event: unknown) => void;
+    } = {};
 
     if (!roomName) {
       console.error("No session id available for Daily call");
-      onCallEnd();
+      onCallEndRef.current?.();
       return;
     }
 
     const startCall = async () => {
-      if (!mounted || callCreated) return;
-      callCreated = true;
+      if (!mounted) return;
+      if (callFrameRef.current) {
+        return;
+      }
 
       try {
         const res = await fetch(
@@ -56,13 +67,6 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
         const container = containerRef.current;
         if (!container) throw new Error("Daily container not found");
 
-        if (container.querySelector("iframe")) {
-          console.warn(
-            "Daily iframe already exists — skipping duplicate creation."
-          );
-          return;
-        }
-
         const newCall = DailyIframe.createFrame(container, {
           showLeaveButton: true,
           iframeStyle: {
@@ -75,15 +79,6 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
             borderRadius: "0.75rem",
           },
         });
-
-        await newCall.join({ url: (data as { url: string }).url });
-        if (!mounted) {
-          newCall.destroy();
-          return;
-        }
-
-        callFrameRef.current = newCall;
-        setInCall(true);
 
         const handleLeftMeeting = async () => {
           try {
@@ -102,17 +97,42 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
           callFrameRef.current?.destroy();
           callFrameRef.current = null;
           setInCall(false);
-          onCallEnd();
+          onCallEndRef.current?.();
         };
 
-        newCall.on("left-meeting", handleLeftMeeting);
-        newCall.on("error", (event) => {
+        const handleError = (event: unknown) => {
           console.error("Daily call error", event);
-        });
+        };
+
+        cleanupHandlers.left = handleLeftMeeting;
+        cleanupHandlers.error = handleError;
+
+        newCall.on("left-meeting", handleLeftMeeting);
+        newCall.on("error", handleError);
+
+        try {
+          await newCall.join({ url: (data as { url: string }).url });
+        } catch (joinErr) {
+          newCall.off("left-meeting", handleLeftMeeting);
+          newCall.off("error", handleError);
+          newCall.destroy();
+          throw joinErr;
+        }
+
+        if (!mounted) {
+          newCall.off("left-meeting", handleLeftMeeting);
+          newCall.off("error", handleError);
+          newCall.destroy();
+          return;
+        }
+
+        callFrameRef.current = newCall;
+        setInCall(true);
+
       } catch (err) {
         console.error("Daily error:", err);
         alert("Could not start video call.");
-        onCallEnd();
+        onCallEndRef.current?.();
       }
     };
 
@@ -120,14 +140,20 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 
     return () => {
       mounted = false;
-      callCreated = true;
-      if (callFrameRef.current) {
-        callFrameRef.current.destroy();
+      const existingCall = callFrameRef.current;
+      if (existingCall) {
+        if (cleanupHandlers.left) {
+          existingCall.off("left-meeting", cleanupHandlers.left);
+        }
+        if (cleanupHandlers.error) {
+          existingCall.off("error", cleanupHandlers.error);
+        }
+        existingCall.destroy();
         callFrameRef.current = null;
       }
       setInCall(false);
     };
-  }, [sessionId, collabServiceUrl, onCallEnd, socketRef]);
+  }, [roomName, collabServiceUrl, socketRef]);
 
   return (
     <div
