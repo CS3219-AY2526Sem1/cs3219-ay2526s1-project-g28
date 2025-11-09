@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import Header from "@/components/Header";
 import { api } from "../lib/api";
@@ -14,28 +14,55 @@ export default function VerifyEmail() {
   const token = useMemo(() => searchParams.get("token"), [searchParams]);
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string>("");
+  const hasRequested = useRef(false);
 
   useEffect(() => {
-    async function verify() {
+    hasRequested.current = false;
+  }, [token]);
+
+  useEffect(() => {
+    if (hasRequested.current) {
+      return;
+    }
+
+    let cancelled = false;
+    hasRequested.current = true;
+
+    (async () => {
       if (!token) {
-        setStatus("error");
-        setMessage("Missing verification token");
+        if (!cancelled) {
+          setStatus("error");
+          setMessage("Missing verification token");
+        }
+        return;
+      }
+
+      if (cancelled) {
         return;
       }
 
       setStatus("loading");
+
       try {
         const res = (await api(`/users/verify-email?token=${encodeURIComponent(token)}`)) as VerificationResponse;
+        if (cancelled) {
+          return;
+        }
         setMessage(res?.message ?? "Email verified successfully");
         setStatus("success");
       } catch (err: unknown) {
+        if (cancelled) {
+          return;
+        }
         const errorMessage = err instanceof Error ? err.message : "Failed to verify email";
         setMessage(errorMessage);
         setStatus("error");
       }
-    }
+    })();
 
-    verify();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   return (
