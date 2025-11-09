@@ -6,6 +6,19 @@ const EMAIL_FROM = process.env.EMAIL_FROM;
 const EMAIL_VERIFICATION_WEBHOOK = process.env.EMAIL_VERIFICATION_WEBHOOK;
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
 
+const EXPIRY_TIMEZONE = "Asia/Singapore";
+const EXPIRY_FORMATTER = new Intl.DateTimeFormat("en-SG", {
+  dateStyle: "medium",
+  timeStyle: "short",
+  timeZone: EXPIRY_TIMEZONE,
+});
+
+function formatExpiry(date) {
+  if (!(date instanceof Date)) return null;
+  if (Number.isNaN(date.getTime())) return null;
+  return `${EXPIRY_FORMATTER.format(date)} (GMT+8)`;
+}
+
 function getFetch() {
   if (typeof fetch !== "function") {
     throw new Error("Global fetch API is not available in this runtime");
@@ -35,8 +48,9 @@ export function buildVerificationUrl(token) {
 
 function buildEmailContent({ name, verificationUrl, expiresAt }) {
   const safeName = name || "there";
-  const expirationText = expiresAt
-    ? `This link will expire on ${expiresAt.toUTCString()}.`
+  const formattedExpiry = expiresAt ? formatExpiry(expiresAt) : null;
+  const expirationText = formattedExpiry
+    ? `This link will expire on ${formattedExpiry}.`
     : "";
 
   const plainText = [

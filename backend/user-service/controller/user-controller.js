@@ -16,7 +16,7 @@ import {
 } from "../model/repository.js";
 import { sendVerificationEmail, buildVerificationUrl } from "../services/email-service.js";
 
-const EMAIL_VERIFICATION_TTL_HOURS = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS || 24);
+const EMAIL_VERIFICATION_TTL_HOURS = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS || 48);
 
 /**
  * POST /users

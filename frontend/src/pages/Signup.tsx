@@ -56,10 +56,12 @@ export default function Signup() {
     if (!success?.expiresAt) return null;
     const expires = new Date(success.expiresAt);
     if (Number.isNaN(expires.getTime())) return null;
-    return new Intl.DateTimeFormat(undefined, {
+    const formatted = new Intl.DateTimeFormat("en-SG", {
       dateStyle: "medium",
       timeStyle: "short",
+      timeZone: "Asia/Singapore",
     }).format(expires);
+    return `${formatted} GMT+8`;
   }, [success?.expiresAt]);
 
   if (success) {
