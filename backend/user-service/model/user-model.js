@@ -37,6 +37,21 @@ const UserModelSchema = new Schema({
   },
   avatarUrl: { type: String, default: "" },
 
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  emailVerificationTokenHash: {
+    type: String,
+    index: true,
+  },
+  emailVerificationExpiresAt: {
+    type: Date,
+  },
+  emailVerifiedAt: {
+    type: Date,
+  },
+
   providers: {
     type: [ProviderSubSchema],
     default: [],         // e.g., [{ provider:"password", providerId:"local:user@example.com" }]

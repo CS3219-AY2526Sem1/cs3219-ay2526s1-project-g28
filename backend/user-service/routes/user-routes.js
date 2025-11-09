@@ -7,6 +7,7 @@ import {
   getUser,
   updateUser,
   updateUserPrivilege,
+  verifyEmail,
 } from "../controller/user-controller.js";
 import { verifyAccessToken, verifyIsAdmin, verifyIsOwnerOrAdmin } from "../middleware/basic-access-control.js";
 import { requireOwner } from "../middleware/requireOwner.js";
@@ -17,6 +18,8 @@ router.get("/", verifyAccessToken, verifyIsAdmin, getAllUsers);
 router.patch("/:id/privilege", verifyAccessToken, verifyIsAdmin, updateUserPrivilege);
 
 router.post("/", createUser);
+
+router.get("/verify-email", verifyEmail);
 
 router.get("/:id", verifyAccessToken, verifyIsOwnerOrAdmin, getUser);
 
