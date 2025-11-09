@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { motion, useDragControls } from "framer-motion";
-import DailyIframe from "@daily-co/daily-js";
+import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 
-// You can pass these in from the parent so no hard-coding needed
 interface FloatingCallPopupProps {
   sessionId: string | undefined;
   socketRef: React.MutableRefObject<any>;
@@ -18,94 +17,117 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 }) => {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [callFrame, setCallFrame] = useState<any>(null);
+  const callFrameRef = useRef<DailyCall | null>(null);
   const [inCall, setInCall] = useState(false);
 
   useEffect(() => {
-  let mounted = true;
-  let callCreated = false;
+    let mounted = true;
+    let callCreated = false;
 
-  const startCall = async () => {
-    if (!mounted || callCreated) return;
-    callCreated = true;
+    const roomName = sessionId?.includes(":")
+      ? sessionId.split(":").pop()
+      : sessionId;
 
-    try {
-      const res = await fetch(
-        `${collabServiceUrl}/collaboration/create-daily-room/${sessionId?.split(":")[1]}`,
-        { method: "POST" }
-      );
-      const data = await res.json();
-      if (!data.url) throw new Error("No room URL returned from server");
+    if (!roomName) {
+      console.error("No session id available for Daily call");
+      onCallEnd();
+      return;
+    }
 
-      const container = containerRef.current;
-      if (!container) throw new Error("Daily container not found");
+    const startCall = async () => {
+      if (!mounted || callCreated) return;
+      callCreated = true;
 
-      // Prevent creating multiple frames
-      if (container.querySelector("iframe")) {
-        console.warn("Daily iframe already exists — skipping duplicate creation.");
-        return;
-      }
+      try {
+        const res = await fetch(
+          `${collabServiceUrl}/collaboration/create-daily-room/${roomName}`,
+          { method: "POST" }
+        );
 
-      const newCall = DailyIframe.createFrame(container, {
-        showLeaveButton: true,
-        iframeStyle: {
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          top: "0",
-          left: "0",
-          border: "0",
-          borderRadius: "0.75rem",
-        },
-      });
-
-      await newCall.join({ url: data.url });
-      if (!mounted) return;
-
-      setCallFrame(newCall);
-      setInCall(true);
-
-      newCall.on("left-meeting", async () => {
-        newCall.destroy();
-        setInCall(false);
-        onCallEnd();
-      });
-
-
-      newCall.on("left-meeting", async () => {
-        try {
-          await fetch(
-            `${collabServiceUrl}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,
-            { method: "DELETE" }
-          );
-        } catch (err) {
-          console.error("Failed to close room:", err);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error((data as { error?: string }).error || "Failed to create room");
         }
 
-        socketRef.current?.emit("end-call", {
-          sessionId: sessionId?.split(":")[1],
+        if (!data || !("url" in data)) {
+          throw new Error("No room URL returned from server");
+        }
+
+        const container = containerRef.current;
+        if (!container) throw new Error("Daily container not found");
+
+        if (container.querySelector("iframe")) {
+          console.warn(
+            "Daily iframe already exists — skipping duplicate creation."
+          );
+          return;
+        }
+
+        const newCall = DailyIframe.createFrame(container, {
+          showLeaveButton: true,
+          iframeStyle: {
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            top: "0",
+            left: "0",
+            border: "0",
+            borderRadius: "0.75rem",
+          },
         });
 
-        newCall.destroy();
-        setInCall(false);
+        await newCall.join({ url: (data as { url: string }).url });
+        if (!mounted) {
+          newCall.destroy();
+          return;
+        }
+
+        callFrameRef.current = newCall;
+        setInCall(true);
+
+        const handleLeftMeeting = async () => {
+          try {
+            await fetch(
+              `${collabServiceUrl}/collaboration/close-daily-room/${roomName}`,
+              { method: "DELETE" }
+            );
+          } catch (err) {
+            console.error("Failed to close room:", err);
+          }
+
+          socketRef.current?.emit("end-call", {
+            sessionId: roomName,
+          });
+
+          callFrameRef.current?.destroy();
+          callFrameRef.current = null;
+          setInCall(false);
+          onCallEnd();
+        };
+
+        newCall.on("left-meeting", handleLeftMeeting);
+        newCall.on("error", (event) => {
+          console.error("Daily call error", event);
+        });
+      } catch (err) {
+        console.error("Daily error:", err);
+        alert("Could not start video call.");
         onCallEnd();
-      });
-    } catch (err) {
-      console.error("Daily error:", err);
-      alert("Could not start video call.");
-      onCallEnd();
-    }
-  };
+      }
+    };
 
-  startCall();
+    startCall();
 
-  return () => {
-    mounted = false;
-    callCreated = true;
-    if (callFrame) callFrame.destroy();
-  };
-}, []);
-
+    return () => {
+      mounted = false;
+      callCreated = true;
+      if (callFrameRef.current) {
+        callFrameRef.current.destroy();
+        callFrameRef.current = null;
+      }
+      setInCall(false);
+    };
+  }, [sessionId, collabServiceUrl, onCallEnd, socketRef]);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
