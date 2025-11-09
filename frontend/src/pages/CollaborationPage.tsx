@@ -553,36 +553,36 @@ function CodeEditorTab({
                         : "bg-red-50 border border-red-400";
                     }
                     return (
-                        <div
-                          key={${idx}-${subIdx}}
-                          className={min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}}
-                        >
-                          <div className="font-semibold text-slate-800 mb-1">
-                            Case {idx + 1}
-                          </div>
-                          <div className="text-sm text-slate-600 mb-1">
-                            Input:{" "}
+                      <div
+                        key={`${idx}-${subIdx}`}
+                        className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
+                      >
+                        <div className="font-semibold text-slate-800 mb-1">
+                          Case {idx + 1}
+                        </div>
+                        <div className="text-sm text-slate-600 mb-1">
+                          Input:{" "}
+                          <code>
+                            {Array.isArray(tc.args)
+                              ? JSON.stringify(tc.args)
+                              : tc.args}
+                          </code>
+                        </div>
+                        <div className="text-sm text-slate-600 mb-1">
+                          Expected: <code>{JSON.stringify(tc.expected)}</code>
+                        </div>
+                        {runResults && hasRunSubmitted && (
+                          <div className="text-sm text-slate-700 mb-1">
+                            Output:{" "}
                             <code>
-                              {Array.isArray(tc.args)
-                                ? JSON.stringify(tc.args)
-                                : tc.args}
+                              {runResults[idx]?.output
+                                ? JSON.stringify(runResults[idx].output)
+                                : "No output"}
                             </code>
                           </div>
-                          <div className="text-sm text-slate-600 mb-1">
-                            Expected: <code>{JSON.stringify(tc.expected)}</code>
-                          </div>
-                          {runResults && hasRunSubmitted && (
-                            <div className="text-sm text-slate-700 mb-1">
-                              Output:{" "}
-                              <code>
-                                {runResults[idx]?.output
-                                  ? JSON.stringify(runResults[idx].output)
-                                  : "No output"}
-                              </code>
-                            </div>
-                          )}
-                        </div>
-                      );
+                        )}
+                      </div>
+                    );
                     });
                   })}
               </div>
