@@ -8,6 +8,7 @@ import {
   findUserByProviderId,         // OAuth lookup
   createOAuthUser,              // create user for OAuth
   ensureUniqueUsername,         // repo helper we added
+  updateUserById,          // keep existing users in sync with provider data
 } from "../model/repository.js";
 
 import { formatUserResponse } from "./user-controller.js";
@@ -99,6 +100,8 @@ export const googleCallback = async (req, res) => {
         email,                // may be null, schema allows it
         avatarUrl: profilePic,
       });
+       } else if (profilePic && user.avatarUrl !== profilePic) {
+      user = await updateUserById(user.id, { avatarUrl: profilePic });
     }
 
     // 4) Sign JWT with your app’s user payload
@@ -167,6 +170,8 @@ export const githubCallback = async (req, res) => {
         email, // may be null; schema allows it
         avatarUrl: profilePic,
       });
+      } else if (profilePic && user.avatarUrl !== profilePic) {
+      user = await updateUserById(user.id, { avatarUrl: profilePic });
     }
 
     const payload = {
