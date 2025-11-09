@@ -157,14 +157,5 @@ async function updateHistory(
         },
       }
     );
-  } else {
-    await Session.updateOne(
-      { correlationId: sessionId },
-      {
-        $set: {
-          hasSubmitted: false,
-        },
-      }
-    );
   }
 }

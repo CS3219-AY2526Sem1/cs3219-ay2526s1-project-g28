@@ -55,7 +55,6 @@ const HomePage: React.FC = () => {
           return;
         }
         const data = await res.json();
-        console.log(data);
 
         if (
           !data.isActive ||

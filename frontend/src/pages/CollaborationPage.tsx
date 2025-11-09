@@ -723,6 +723,7 @@ function CodeEditorTab({
   );
 }
 
+
 function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
   const [elapsed, setElapsed] = useState(0); // seconds
 
