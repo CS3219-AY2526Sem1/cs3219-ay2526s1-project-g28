@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import Header from "@/components/Header";
 import OAuthButtons from "@/components/OAuthButtons";
+import { getPasswordRequirementStatus, isPasswordStrong } from "@/lib/password";
 export default function Signup() {
   const [username, setUsername] = useState("");
   const [fullname, setFullname] = useState("");
@@ -22,9 +23,14 @@ export default function Signup() {
       }
   >(null);
 
-  const pwOk = password.length >= 8;
+  const passwordStatus = useMemo(
+    () => getPasswordRequirementStatus(password),
+    [password]
+  );
+
+  const pwOk = isPasswordStrong(password);
   const match = password === confirm;
-  const canSubmit = username && email && pwOk && match && !loading;
+  const canSubmit = Boolean(username && email && pwOk && match && !loading);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -158,9 +164,10 @@ export default function Signup() {
           />
           <Input
             type="password"
-            placeholder="password (min 8 chars)"
+            placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            aria-describedby="password-requirements"
           />
           <Input
             type="password"
@@ -169,9 +176,38 @@ export default function Signup() {
             onChange={(e) => setConfirm(e.target.value)}
           />
 
-          {!pwOk && password.length > 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-300">Password must be at least 8 characters.</p>
-          )}
+          <div
+            id="password-requirements"
+            className="rounded-md border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-700
+                       dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300"
+          >
+            <p className="font-medium text-neutral-800 dark:text-neutral-200">Password must include:</p>
+            <ul className="mt-2 space-y-1">
+              {passwordStatus.map((requirement) => (
+                <li key={requirement.id} className="flex items-center gap-2">
+                  <span
+                    className={
+                      requirement.met
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-neutral-400 dark:text-neutral-600"
+                    }
+                  >
+                    {requirement.met ? "✓" : "•"}
+                  </span>
+                  <span
+                    className={
+                      requirement.met
+                        ? "text-neutral-800 dark:text-neutral-100"
+                        : "text-neutral-600 dark:text-neutral-400"
+                    }
+                  >
+                    {requirement.label}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
           {password && confirm && !match && (
             <p className="text-xs text-red-700 dark:text-red-300">Passwords do not match.</p>
           )}
