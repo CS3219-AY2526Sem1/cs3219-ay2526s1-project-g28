@@ -21,6 +21,7 @@ export interface HistoryEntry {
   status: Status;
   roomId?: string;
   questionTitle?: string;
+  submittedResults?: [];
 }
 
 const ITEMS_PER_PAGE = 25;
@@ -28,10 +29,10 @@ const ITEMS_PER_PAGE = 25;
 function toStatus(
   error: String,
   isActive?: boolean,
-  hasSubmitted?: boolean
+  hasSubmitted?: boolean,
+  hasAnyFail?: boolean
 ): Status {
-  console.log(error);
-  if (!error && hasSubmitted) return "Completed";
+  if (hasSubmitted && !isActive && !hasAnyFail) return "Completed";
   if (!isActive) return "Failed";
   return "In Progress";
 }
@@ -80,7 +81,9 @@ const HistoryPage: React.FC = () => {
           const difficulty = (s?.meta?.difficulty ?? "Easy") as Difficulty;
           const topics = Array.isArray(s?.meta?.topics) ? s.meta.topics : [];
           const hasSubmitted = s?.hasSubmitted || false;
-          const status = toStatus(s?.error, s?.isActive, hasSubmitted);
+          const submittedResults = s?.submitResults ?? [];
+          const hasAnyFail = submittedResults.some((r: { result: boolean; }) => r.result === false);
+          const status = toStatus(s?.error, s?.isActive, hasSubmitted, hasAnyFail);
 
           return {
             id,
