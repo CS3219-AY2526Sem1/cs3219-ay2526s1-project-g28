@@ -1,21 +1,22 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
-import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
-import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import pythonLang from "react-syntax-highlighter/dist/esm/languages/prism/python";
+import javascriptLang from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import javaLang from "react-syntax-highlighter/dist/esm/languages/prism/java";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
-import java from "react-syntax-highlighter/dist/esm/languages/prism/java";
-
 import oneLight from "react-syntax-highlighter/dist/esm/styles/prism/one-light";
 
-SyntaxHighlighter.registerLanguage("python", python);
-SyntaxHighlighter.registerLanguage("javascript", javascript);
-SyntaxHighlighter.registerLanguage("java", java);
+// Register languages exactly once
+SyntaxHighlighter.registerLanguage("python", pythonLang);
+SyntaxHighlighter.registerLanguage("javascript", javascriptLang);
+SyntaxHighlighter.registerLanguage("java", javaLang);
 
 const STICKY_THRESHOLD = 120;
 
-type Msg = { role: "user" | "assistant"; content: string };
-type Example = { id: number; input: string; output: string; explanation?: string };
-type ChatQuestion = {
+// Types
+export type Msg = { role: "user" | "assistant"; content: string };
+export type Example = { id: number; input: string; output: string; explanation?: string };
+export type ChatQuestion = {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
   problemStatement: string;
@@ -33,9 +34,7 @@ function useIsDark() {
   );
   useEffect(() => {
     const el = document.documentElement;
-    const obs = new MutationObserver(() =>
-      setIsDark(el.classList.contains("dark"))
-    );
+    const obs = new MutationObserver(() => setIsDark(el.classList.contains("dark")));
     obs.observe(el, { attributes: true, attributeFilter: ["class"] });
     return () => obs.disconnect();
   }, []);
@@ -56,7 +55,6 @@ function renderMarkdown(text: string, isDark: boolean) {
           <code
             key={`code-${i}`}
             className="font-mono rounded-md px-1.5 border"
-            /* light / dark tokens */
             style={{
               background: isDark ? "rgba(255,255,255,0.06)" : "#f3f4f6",
             }}
@@ -101,7 +99,6 @@ function renderMarkdown(text: string, isDark: boolean) {
           borderRadius: 10,
           margin: 0,
           fontSize: 13,
-          /* no hard-coded border/background; theme handles it */
         }}
         showLineNumbers={false}
         wrapLongLines
@@ -132,7 +129,7 @@ export default function Chat({
   sessionId,
 }: {
   question: ChatQuestion;
-  language?: "python" | "javascript";
+  language?: "python" | "javascript" | "java";
   code?: string;
   sessionId: string;
 }) {
@@ -159,14 +156,16 @@ export default function Chat({
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = React.useCallback((smooth = false) => {
+  const scrollToBottom = useCallback((smooth = false) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   }, []);
+
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages, STORAGE_KEY]);
+
   useEffect(() => {
     sessionStorage.setItem(`${STORAGE_KEY}:input`, input);
   }, [input, STORAGE_KEY]);
@@ -176,6 +175,7 @@ export default function Chat({
     if (!el) return;
     const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
     const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
+    // smooth when user just sent; instant while streaming to avoid jitter
     scrollToBottom(!loading && isNearBottom);
   }, [messages, loading, scrollToBottom]);
 
@@ -204,7 +204,11 @@ export default function Chat({
     setErr(null);
     if (!forcedContent) setInput("");
 
-    setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", content },
+      { role: "assistant", content: "" },
+    ]);
     setLoading(true);
 
     const contextJson = buildContext();
@@ -275,7 +279,10 @@ export default function Chat({
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
+                  copy[copy.length - 1] = {
+                    ...last,
+                    content: (last.content || "") + delta,
+                  };
                   return copy;
                 });
               }
@@ -312,7 +319,10 @@ export default function Chat({
     );
   }
   function quickHint() {
-    return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
+    return send(
+      undefined,
+      "Give me a gentle hint for this question. Don't reveal the full solution yet."
+    );
   }
 
   return (
@@ -340,10 +350,7 @@ export default function Chat({
       </div>
 
       {/* Messages */}
-      <div
-        ref={scrollerRef}
-        className="flex-1 overflow-auto p-3 bg-slate-50 dark:bg-zinc-900"
-      >
+      <div ref={scrollerRef} className="flex-1 overflow-auto p-3 bg-slate-50 dark:bg-zinc-900">
         <div className="min-h-full flex flex-col justify-end gap-3">
           {messages.map((m, i) => {
             const isUser = m.role === "user";
@@ -354,7 +361,7 @@ export default function Chat({
                   "max-w-[75%] rounded-2xl px-3 py-2 leading-relaxed",
                   isUser
                     ? "self-end bg-blue-600 text-white text-right"
-                    : "self-start bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 shadow-sm"
+                    : "self-start bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 shadow-sm",
                 ].join(" ")}
               >
                 {isUser ? m.content : renderMarkdown(m.content, isDark)}
@@ -392,6 +399,13 @@ export default function Chat({
           Cancel
         </button>
       </form>
+
+      {/* Error banner */}
+      {err && (
+        <div className="px-3 py-2 text-sm bg-red-50 text-red-700 border-t border-red-200">
+          {err}
+        </div>
+      )}
     </div>
   );
 }
