@@ -108,7 +108,6 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
   const statuses = Object.values(matchData);
   const acceptor = users.find((u) => matchData[u] === "accepted");
   const rejector = users.find((u) => matchData[u] === "rejected");
-<<<<<<< Updated upstream
   const waitingUser = users.find((u) => u !== clickedUserId);
 
   if (acceptor && !rejector) {
@@ -116,36 +115,6 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
     const matchEvent = {
       correlationId,
       matchKey,
-=======
-
-  const waitingUser = users.find((u) => u !== clickedUserId);
-
-  if (acceptor && !rejector) {
-    // Publish match_found event to Kafka 
-    const users = Object.keys(matchData); 
-    // const matchEvent = { 
-    //   matchKey, 
-    //   userA: { id: users[0], username: acceptor }, // replace with actual username if stored 
-    //   userB: { id: users[1], username: rejector }, 
-    //   // questionId: parsedMeta.questionId, 
-    //   timestamp: new Date().toISOString(), 
-    // }; 
-    // await producer.send({ 
-    //   topic: "match_found", 
-    //   messages: [ 
-    //     { value: JSON.stringify(matchEvent) }, 
-    //   ], 
-    // }); 
-    // console.log(`[Matching] Published match_found event for match ${matchKey}`); 
-
-    // Generate a unique key for this match
-    const correlationId = `match-${matchKey}-${Date.now()}`;
-
-    // Include this key in both messages: match_found and question request
-    const matchEvent = {
-      correlationId,      // <-- key for combining in collaboration service
-      matchKey, 
->>>>>>> Stashed changes
       userA: { id: users[0], username: acceptor },
       userB: { id: users[1], username: rejector },
       meta: meta,
@@ -159,7 +128,6 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
 
     console.log(`[Matching] Published match_found event for match ${matchKey}`);
 
-<<<<<<< Updated upstream
     const confirmedData = { matchId: matchKey, users, ...meta };
     const socketPayload = {
       type: "match_confirmed",
@@ -171,68 +139,32 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(socketPayload));
 
     return { status: "confirmed", message: "Match Confirmed! Moving to room...", data: confirmedData };
-=======
-
-    const confirmedData = { matchId: matchKey, users, ...meta };
-    const socketPayload = {
-      type: "match_confirmed",
-      users: [waitingUser],
-      message: "Match Confirmed! Moving to room...",
-    };
-    await publisher.publish(MATCH_CHANNEL, JSON.stringify(socketPayload));
-    return {
-      status: "confirmed",
-      message: "Match Confirmed! Moving to room...",
-      data: confirmedData,
-    };
->>>>>>> Stashed changes
   }
 
   if (acceptor && rejector) {
     const pipeline = redis.pipeline();
-<<<<<<< Updated upstream
     pipeline.hmset(getUserKey(acceptor), { difficulty: meta.difficulty, topics: JSON.stringify(meta.topics) });
-=======
-    pipeline.hmset(getUserKey(acceptor), {
-      difficulty: meta.difficulty,
-      topics: JSON.stringify(meta.topics),
-    });
->>>>>>> Stashed changes
     for (const topic of meta.topics) {
       pipeline.sadd(getTopicKey(meta.difficulty, topic), acceptor);
     }
     await pipeline.exec();
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
     const requeuePayload = {
       type: "match_requeued",
       userId: acceptor,
       message: "Your match has rejected. You will be requeued.",
     };
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(requeuePayload));
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
     const rejectPayload = {
       type: "match_rejected",
       userId: rejector,
       message: "You have rejected the match.",
     };
     await publisher.publish(MATCH_CHANNEL, JSON.stringify(rejectPayload));
-<<<<<<< Updated upstream
 
     if (clickedUserId === acceptor) {
       return { status: "requeued", message: "Your match has rejected. You will be requeued." };
-=======
-    if (clickedUserId === acceptor) {
-      return {
-        status: "requeued",
-        message: "Your match has rejected. You will be requeued.",
-      };
->>>>>>> Stashed changes
     } else {
       return { status: "rejected", message: "You have rejected the match." };
     }
@@ -240,25 +172,15 @@ async function resolveMatch(matchKey, matchData, meta, clickedUserId) {
 
   await removeUserFromAllQueues(users[0], meta.difficulty, meta.topics);
   await removeUserFromAllQueues(users[1], meta.difficulty, meta.topics);
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
   const rejectPayload = {
     type: "match_rejected",
     users: [waitingUser],
     message: "You have rejected the match.",
   };
   await publisher.publish(MATCH_CHANNEL, JSON.stringify(rejectPayload));
-<<<<<<< Updated upstream
 
   return { status: "rejected", message: "You have rejected the match." };
-=======
-  return {
-    status: "rejected",
-    message: "You have rejected the match.",
-  };
->>>>>>> Stashed changes
 }
 
 export async function acceptMatch(userId, matchId) {
@@ -279,10 +201,7 @@ export async function acceptMatch(userId, matchId) {
 
   const metaStr = await redis.get(`${matchKey}:meta`);
   const meta = metaStr ? JSON.parse(metaStr) : null;
-<<<<<<< Updated upstream
 
-=======
->>>>>>> Stashed changes
   if (!meta) {
     return { status: "error", message: "Match metadata missing or expired." };
   }
