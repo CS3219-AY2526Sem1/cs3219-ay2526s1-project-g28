@@ -7,8 +7,14 @@ import { useNavigate } from "react-router-dom";
 import { runCodeApi } from "../lib/services/executionService";
 import Chat from "./Chat";
 import FloatingCallPopup from "../components/FloatingCallPopup";
+import * as Y from "yjs";
+import { WebsocketProvider } from "y-websocket";
+import { MonacoBinding } from "y-monaco";
+import { api } from "../lib/api";
+import toast from "react-hot-toast";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
+const GATEWAY_URL = import.meta.env.VITE_API_URL;
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
@@ -184,12 +190,35 @@ function CodeEditorTab({
   } | null>(null);
   const [decorationIds, setDecorationIds] = useState<string[]>([]);
 
-  const handleCodeChange: OnChange = (val) => setCode(val || "");
+  // Yjs refs so we create them once and clean up on unmount
+  const ydocRef = useRef<Y.Doc | null>(null);
+  const providerRef = useRef<WebsocketProvider | null>(null);
+  const bindingRef = useRef<MonacoBinding | null>(null);
+  const yTextRef = useRef<Y.Text | null>(null);
 
-  // Mount editor and listen for local cursor movement
+  // --- Cleanup Yjs when component unmounts ---
+  useEffect(() => {
+    return () => {
+      if (bindingRef.current) {
+        bindingRef.current.destroy();
+        bindingRef.current = null;
+      }
+      if (providerRef.current) {
+        providerRef.current.destroy();
+        providerRef.current = null;
+      }
+      if (ydocRef.current) {
+        ydocRef.current.destroy();
+        ydocRef.current = null;
+      }
+    };
+  }, []);
+
+  // Mount editor, init Yjs once, and listen for local cursor movement
   const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
+    // --- socket.io cursor tracking (unchanged) ---
     editor.onDidChangeCursorPosition((e) => {
       const pos = e.position;
       socketRef.current?.emit("cursor-change", {
@@ -198,9 +227,57 @@ function CodeEditorTab({
         username: currentUsername,
       });
     });
+
+    // --- Yjs init: only once per session ---
+    if (!sessionId) return;
+    if (ydocRef.current) return; // already initialized
+
+    const ydoc = new Y.Doc();
+    ydocRef.current = ydoc;
+
+    const provider = new WebsocketProvider("ws://localhost:1234", sessionId, ydoc);
+    providerRef.current = provider;
+
+    const yText = ydoc.getText("monaco");
+    yTextRef.current = yText;
+
+    // Seed default snippet only if document is empty (first user in room)
+    if (yText.toString().trim().length === 0 && editorRef.current) {
+      // Prevent double insertion by deferring one microtask
+      setTimeout(() => {
+        if (yText.toString().trim().length === 0) {
+          console.log("Seeding default snippet once for", language);
+          yText.insert(0, defaultSnippets[language]);
+        }
+      }, 50);
+    }
+
+    const model = editor.getModel();
+    if (model) {
+      const binding = new MonacoBinding(
+        yText,
+        model,
+        new Set([editor]),
+        provider.awareness
+      );
+      bindingRef.current = binding;
+    }
+
+    // Keep React state in sync so Run/Submit see latest code
+    yText.observe(() => {
+      setCode(yText.toString());
+    });
+
+    provider.awareness.setLocalStateField("user", {
+      name: currentUsername,
+    });
+
+    provider.on("status", (event: { status: string }) => {
+      console.log("Yjs connection:", event.status);
+    });
   };
 
-  // Listen for remote cursor updates
+  // Listen for remote cursor updates via socket.io
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
@@ -292,7 +369,6 @@ function CodeEditorTab({
       .filter((tc) => !tc.hidden)
       .map((tc) => ({
         ...tc,
-        // Replace tc.input with just its first element if it's an array
         input: Array.isArray(tc.input) ? tc.input[0] : tc.input,
       }));
     try {
@@ -352,6 +428,19 @@ function CodeEditorTab({
     }
   };
 
+  // Reset button should reset the shared Yjs document, not just local state
+  const handleResetCode = () => {
+    const yText = yTextRef.current;
+    if (yText) {
+      yText.delete(0, yText.length);
+      yText.insert(0, defaultSnippets[language]);
+      // setCode will be triggered by yText.observe
+    } else {
+      // fallback (e.g. if Yjs not ready yet)
+      setCode(defaultSnippets[language]);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
       {/* Tabs */}
@@ -372,152 +461,175 @@ function CodeEditorTab({
       </div>
 
       {/* Editor Tab */}
+      {/* Toolbar — shown only when Editor tab is active */}
       {activeTab === "editor" && (
-        <>
-          {/* Toolbar */}
-          <div className="flex justify-between mb-2 items-center gap-2">
-            <select
-              value={language}
-              onChange={(e) => {
-                const lang = e.target.value as Language;
-                setLanguage(lang);
-                // setCode(defaultSnippets[lang]);
-              }}
-              className="border rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            >
-              <option value="python">Python</option>
-              <option value="javascript">JavaScript</option>
-              <option value="c++">C++</option>
-              <option value="java">Java</option>
-            </select>
-            <button
-              onClick={() => setCode(defaultSnippets[language])}
-              className="border rounded px-3 py-1 shadow-sm hover:bg-slate-50 transition"
-            >
-              Reset Code
-            </button>
+        <div className="flex justify-between mb-2 items-center gap-2">
+          <select
+            value={language}
+            onChange={(e) => {
+              const newLang = e.target.value as Language;
+              setLanguage(newLang);
+
+              // 1️⃣ Update syntax highlighting
+              const editor = editorRef.current;
+              if (editor) {
+                const model = editor.getModel();
+                if (model) {
+                  monaco.editor.setModelLanguage(model, newLang);
+                }
+              }
+
+              // 2️⃣ Replace the shared text content
+              const yText = yTextRef.current;
+              if (yText) {
+                yText.delete(0, yText.length);
+                yText.insert(0, defaultSnippets[newLang]);
+              }
+            }}
+            className="border rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            <option value="python">Python</option>
+            <option value="javascript">JavaScript</option>
+            <option value="c++">C++</option>
+            <option value="java">Java</option>
+          </select>
+          <button
+            onClick={handleResetCode}
+            className="border rounded px-3 py-1 shadow-sm hover:bg-slate-50 transition"
+          >
+            Reset Code
+          </button>
+        </div>
+      )}
+
+      {/* Always keep Monaco mounted — just hide it when not on Editor tab */}
+      <div
+        className={`flex-1 rounded-xl border overflow-hidden min-h-0 ${
+          activeTab === "editor"
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none absolute inset-0"
+        }`}
+      >
+        <MonacoEditor
+          language={language}
+          value={""}
+          onChange={() => {}}
+          onMount={handleEditorMount}
+        />
+      </div>
+
+      {/* Test Cases — visible only when Editor tab is active */}
+      {activeTab === "editor" && (
+        <div className="mt-3 rounded-xl border bg-white overflow-hidden transition-all duration-300">
+          <div
+            className="flex justify-between items-center px-4 py-2 cursor-pointer"
+            onClick={() => setShowTests(!showTests)}
+          >
+            <h3 className="text-sm font-medium text-slate-800">Test Cases</h3>
+            <span className="text-indigo-600 text-sm hover:underline">
+              {showTests ? "Hide" : "Show"}
+            </span>
           </div>
 
-          {/* Editor */}
-          <div className="flex-1 rounded-xl border overflow-hidden min-h-0">
-            <MonacoEditor
-              language={language}
-              value={code}
-              onChange={handleCodeChange}
-              onMount={handleEditorMount}
-            />
-          </div>
-
-          {/* Test Cases */}
-          <div className="mt-3 rounded-xl border bg-white overflow-hidden transition-all duration-300">
-            <div
-              className="flex justify-between items-center px-4 py-2 cursor-pointer"
-              onClick={() => setShowTests(!showTests)}
-            >
-              <h3 className="text-sm font-medium text-slate-800">Test Cases</h3>
-              <span className="text-indigo-600 text-sm hover:underline">
-                {showTests ? "Hide" : "Show"}
-              </span>
-            </div>
-
-            <div
-              className={`overflow-x-auto transition-all duration-300 ${
-                showTests ? "max-h-64 opacity-100 p-3" : "max-h-0 opacity-0 p-0"
-              }`}
-            >
-              <div className="flex gap-4">
-                {testCases
-                  .filter((tcItem) => !tcItem.hidden)
-                  .map((tcItem, idx) => {
-                    const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
-                    return tcs.map((tc, subIdx) => {
-                      const result = runResults[idx]?.result;
-                      let bgColor = "bg-white";
-                      if (result !== undefined) {
-                        bgColor = result
-                          ? "bg-green-50 border border-green-400"
-                          : "bg-red-50 border border-red-400";
-                      }
-                      return (
-                        <div
-                          key={`${idx}-${subIdx}`}
-                          className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
-                        >
-                          <div className="font-semibold text-slate-800 mb-1">
-                            Case {idx + 1}
-                          </div>
-                          <div className="text-sm text-slate-600 mb-1">
-                            Input:{" "}
+          <div
+            className={`overflow-x-auto transition-all duration-300 ${
+              showTests ? "max-h-64 opacity-100 p-3" : "max-h-0 opacity-0 p-0"
+            }`}
+          >
+            <div className="flex gap-4">
+              {testCases
+                .filter((tcItem) => !tcItem.hidden)
+                .map((tcItem, idx) => {
+                  const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
+                  return tcs.map((tc, subIdx) => {
+                    const result = runResults[idx]?.result;
+                    let bgColor = "bg-white";
+                    if (result !== undefined) {
+                      bgColor = result
+                        ? "bg-green-50 border border-green-400"
+                        : "bg-red-50 border border-red-400";
+                    }
+                    return (
+                      <div
+                        key={`${idx}-${subIdx}`}
+                        className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
+                      >
+                        <div className="font-semibold text-slate-800 mb-1">
+                          Case {idx + 1}
+                        </div>
+                        <div className="text-sm text-slate-600 mb-1">
+                          Input:{" "}
+                          <code>
+                            {Array.isArray(tc.args[0])
+                              ? JSON.stringify(tc.args[0])
+                              : tc.args[0]}
+                          </code>
+                        </div>
+                        <div className="text-sm text-slate-600 mb-1">
+                          Expected: <code>{JSON.stringify(tc.expected)}</code>
+                        </div>
+                        {runResults && hasSubmitted && (
+                          <div className="text-sm text-slate-700 mb-1">
+                            Output:{" "}
                             <code>
-                              {Array.isArray(tc.args)
-                                ? JSON.stringify(tc.args)
-                                : tc.args}
+                              {runResults[idx]?.output
+                                ? JSON.stringify(runResults[idx].output)
+                                : "No output"}
                             </code>
                           </div>
-                          <div className="text-sm text-slate-600 mb-1">
-                            Expected: <code>{JSON.stringify(tc.expected)}</code>
-                          </div>
-                          {runResults && hasRunSubmitted && (
-                            <div className="text-sm text-slate-700 mb-1">
-                              Output:{" "}
-                              <code>
-                                {runResults[idx]?.output
-                                  ? JSON.stringify(runResults[idx].output)
-                                  : "No output"}
-                              </code>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    });
-                  })}
-              </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })}
             </div>
           </div>
+        </div>
+      )}
 
-          {/* Footer */}
-          <div className="sticky bottom-0 mt-3 flex items-center gap-3 rounded-xl border bg-white px-3 py-2 shadow-sm">
-            <button
-              onClick={handleRun}
-              disabled={loading}
-              className="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-indigo-700 disabled:opacity-70 transition"
-            >
-              Run
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={loading}
-              className="bg-green-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-green-700 disabled:opacity-70 transition"
-            >
-              Submit
-            </button>
-            {loading && (
-              <span className="flex items-center gap-2 text-sm text-slate-700">
-                <svg
-                  className="animate-spin h-4 w-4"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  />
-                </svg>
-                Running...
-              </span>
-            )}
-          </div>
-        </>
+      {/* Footer — shown only when Editor tab is active */}
+      {activeTab === "editor" && (
+        <div className="sticky bottom-0 mt-3 flex items-center gap-3 rounded-xl border bg-white px-3 py-2 shadow-sm">
+          <button
+            onClick={handleRun}
+            disabled={loading}
+            className="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-indigo-700 disabled:opacity-70 transition"
+          >
+            Run
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="bg-green-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-green-700 disabled:opacity-70 transition"
+          >
+            Submit
+          </button>
+          {loading && (
+            <span className="flex items-center gap-2 text-sm text-slate-700">
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                />
+              </svg>
+              Running...
+            </span>
+          )}
+        </div>
       )}
 
       {/* Console Tab */}
@@ -529,14 +641,12 @@ function CodeEditorTab({
             </div>
           )}
 
-          {/* If there’s no error but also no results → show message */}
           {!error && (!submitResults || submitResults.length === 0) && (
             <div className="text-center text-slate-600 italic py-4">
               You must submit your code first
             </div>
           )}
 
-          {/* If there are results, render success/failure */}
           {!error &&
             submitResults.length > 0 &&
             (() => {
@@ -593,6 +703,7 @@ function CodeEditorTab({
     </div>
   );
 }
+
 
 function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
   const [elapsed, setElapsed] = useState(0); // seconds
@@ -661,10 +772,7 @@ export default function CollaborationPage() {
 
     const fetchSession = async () => {
       try {
-        const res = await fetch(
-          `${COLLAB_SERVICE_URL}/collaboration/${sessionId}`
-        );
-        const data = await res.json();
+        const data = await api(`/collaboration/${sessionId}`);
         if (data.question) {
           setQuestion(data.question);
           setStartedAt(data.startedAt);
@@ -694,7 +802,8 @@ export default function CollaborationPage() {
   useEffect(() => {
     if (!sessionId || socketRef.current || !currentUsername) return;
 
-    const socket = io(COLLAB_SERVICE_URL, {
+    const socket = io(GATEWAY_URL, {
+      path: "/socket.io",
       transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -720,16 +829,17 @@ export default function CollaborationPage() {
       if (username === currentUsername) return;
 
       if (knownUsersRef.current.has(username)) {
-        alert(`${username} has rejoined the session.`);
+        toast.success(`${username} has rejoined the session.`);
       } else {
         knownUsersRef.current.add(username);
+        toast(`${username} joined the session 👋`);
         console.log(`${username} joined the session`);
       }
     });
 
     socket.on("user-left", ({ username }) => {
       if (username !== currentUsername) {
-        alert(`${username} has left the session`);
+        toast(`${username} left the session 👋`);
       }
     });
 
@@ -739,7 +849,7 @@ export default function CollaborationPage() {
 
     socket.on("user-disconnected", ({ username }) => {
       if (username !== currentUsername) {
-        alert(`${username} has been disconnected from the session.`);
+        toast.error(`${username} was disconnected`);
       }
     });
 
@@ -765,7 +875,7 @@ export default function CollaborationPage() {
 
   const handleCodeChange = (newCode: string) => {
     setCode(newCode);
-    socketRef.current?.emit("code-change", { sessionId, code: newCode });
+    // socketRef.current?.emit("code-change", { sessionId, code: newCode });
   };
 
   const handleLanguageChange = (newLang: Language) => {
