@@ -165,28 +165,53 @@ function toJavaExpr(v) {
     if (v.length === 0) return "new Object[]{}";
     const first = v[0];
 
-    if (
-      Array.isArray(first) &&
-      first.every((x) => typeof x === "number") &&
-      v.every((row) => Array.isArray(row) && row.every((n) => typeof n === "number"))
-    ) {
-      const rows = v.map((row) => `new int[]{${row.map((n) => Math.trunc(n)).join(",")}}`);
-      return `new int[][]{${rows.join(",")}}`;
-    }
-
-    if (v.every((x) => typeof x === "number")) {
-      return `new int[]{${v.map((n) => Math.trunc(n)).join(",")}}`;
-    }
-
-    if (v.every((x) => typeof x === "string")) {
-      if (v.every((s) => s.length === 1)) {
-        return `new char[]{${v.map((s) => `'${escapeJavaChar(s)}'`).join(",")}}`;
+    if (Array.isArray(first)) {
+      // 2D numbers -> int[][]
+      if (
+        v.every(row => Array.isArray(row) && row.every(n => typeof n === "number"))
+      ) {
+        const rows = v.map(row => `new int[]{${row.map(n => Math.trunc(n)).join(",")}}`);
+        return `new int[][]{${rows.join(",")}}`;
       }
-      return `new String[]{${v.map((s) => `"${escapeJavaString(s)}"`).join(",")}}`;
+
+      if (
+        v.every(row => Array.isArray(row) && row.every(s => typeof s === "string" && s.length === 1))
+      ) {
+        const rows = v.map(row => `new char[]{${row.map(s => `'${escapeJavaChar(s)}'`).join(",")}}`);
+        return `new char[][]{${rows.join(",")}}`;
+      }
+
+      if (
+        v.every(row => Array.isArray(row) && row.every(s => typeof s === "string"))
+      ) {
+        const rows = v.map(row => `new String[]{${row.map(s => `"${escapeJavaString(s)}"`).join(",")}}`);
+        return `new String[][]{${rows.join(",")}}`;
+      }
+
+      if (
+        v.every(row => Array.isArray(row) && row.every(b => typeof b === "boolean"))
+      ) {
+        const rows = v.map(row => `new boolean[]{${row.map(b => (b ? "true" : "false")).join(",")}}`);
+        return `new boolean[][]{${rows.join(",")}}`;
+      }
+
+      const rows = v.map(row => `new Object[]{${row.map(toJavaExpr).join(",")}}`);
+      return `new Object[][]{${rows.join(",")}}`;
     }
 
-    if (v.every((x) => typeof x === "boolean")) {
-      return `new boolean[]{${v.map((b) => (b ? "true" : "false")).join(",")}}`;
+    if (v.every(x => typeof x === "number")) {
+      return `new int[]{${v.map(n => Math.trunc(n)).join(",")}}`;
+    }
+
+    if (v.every(x => typeof x === "string")) {
+      if (v.every(s => s.length === 1)) {
+        return `new char[]{${v.map(s => `'${escapeJavaChar(s)}'`).join(",")}}`;
+      }
+      return `new String[]{${v.map(s => `"${escapeJavaString(s)}"`).join(",")}}`;
+    }
+
+    if (v.every(x => typeof x === "boolean")) {
+      return `new boolean[]{${v.map(b => (b ? "true" : "false")).join(",")}}`;
     }
 
     return `new Object[]{${v.map(toJavaExpr).join(",")}}`;
