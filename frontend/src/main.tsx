@@ -20,6 +20,7 @@ import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
 import { Toaster } from "react-hot-toast";
 import VerifyEmail from "./pages/VerifyEmail";
+import ResetPassword from "./pages/ResetPassword";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route
               path="*"
               element={<div className="p-10">404 Not found</div>}

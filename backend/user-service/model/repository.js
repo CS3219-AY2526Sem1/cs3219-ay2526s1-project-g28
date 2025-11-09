@@ -109,6 +109,8 @@ export async function updateUserById(
     emailVerificationTokenHash,
     emailVerificationExpiresAt,
     emailVerifiedAt,
+    passwordResetTokenHash,
+    passwordResetExpiresAt,
   }
 ) {
   const update = {};
@@ -139,6 +141,18 @@ export async function updateUserById(
     unset.emailVerifiedAt = "";
   } else if (emailVerifiedAt !== undefined) {
     update.emailVerifiedAt = emailVerifiedAt;
+  }
+
+  if (passwordResetTokenHash === null) {
+    unset.passwordResetTokenHash = "";
+  } else if (passwordResetTokenHash !== undefined) {
+    update.passwordResetTokenHash = passwordResetTokenHash;
+  }
+
+  if (passwordResetExpiresAt === null) {
+    unset.passwordResetExpiresAt = "";
+  } else if (passwordResetExpiresAt !== undefined) {
+    update.passwordResetExpiresAt = passwordResetExpiresAt;
   }
 
   const updateDoc = { $set: update };
@@ -182,6 +196,11 @@ export async function markUserEmailVerified(userId) {
     },
     { new: true }
   );
+}
+
+export async function findUserByPasswordResetTokenHash(tokenHash) {
+  if (!tokenHash) return null;
+  return UserModel.findOne({ passwordResetTokenHash: tokenHash });
 }
 
 /* ---------- OAuth (find-or-create) ---------- */
