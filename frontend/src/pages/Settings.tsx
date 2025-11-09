@@ -178,8 +178,8 @@ async function removeAvatar() {
             Signed in as <strong>{user.username || user.email || "user"}</strong>
             {isOAuth ? ` (via ${provider})` : " (local account)"}
           </p>
-          {msg && <p style={{ color: "#16a34a", marginTop: 8 }}>{msg}</p>}
-          {err && <p style={{ color: "#ef4444", marginTop: 8 }}>{err}</p>}
+          {msg && <p style={{ color: theme.success, marginTop: 8 }}>{msg}</p>}
+          {err && <p style={{ color: theme.danger, marginTop: 8 }}>{err}</p>}
         </section>
 
         {/* Avatar */}
@@ -198,17 +198,17 @@ async function removeAvatar() {
               <input type="file" accept="image/*" onChange={onPickFile} disabled={uploading} style={{ display: "none" }} />
               <span>{uploading ? "Uploading…" : "Upload image"}</span>
             </label>
-          <button
-    onClick={removeAvatar}
-    disabled={busy || !avatarUrl}
-    style={{
-      ...styles.secondaryBtn,
-      opacity: avatarUrl ? 1 : 0.6,
-    }}
-    title={avatarUrl ? "Remove current image" : "No image to remove"}
-  >
-    Remove image
-  </button>
+            <button
+              onClick={removeAvatar}
+              disabled={busy || !avatarUrl}
+              style={{
+                ...styles.secondaryBtn,
+                opacity: avatarUrl ? 1 : 0.6,
+              }}
+              title={avatarUrl ? "Remove current image" : "No image to remove"}
+            >
+              Remove image
+            </button>
           </div>
           <p style={styles.mutedSmall}>limit 2MB.</p>
         </section>
@@ -296,13 +296,14 @@ const styles: { [k: string]: Style } = {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
     padding: "1.25rem 1.25rem 1.5rem",
+    boxShadow: "0 10px 25px rgba(15, 23, 42, 0.05)",
   },
   h1: { fontSize: 24, fontWeight: 600, margin: 0, marginBottom: 6 },
   h2: { fontSize: 18, fontWeight: 600, margin: 0, marginBottom: 6 },
   muted: { color: theme.textSecondary, margin: 0 },
   mutedSmall: { color: theme.textSecondary, marginTop: 8, fontSize: 12 },
   input: {
-    background: theme.backgroundDark,
+    background: theme.backgroundMedium,
     color: theme.textPrimary,
     border: `1px solid ${theme.border}`,
     borderRadius: 8,
@@ -315,9 +316,9 @@ const styles: { [k: string]: Style } = {
     cursor: "not-allowed",
   },
   primaryBtn: {
-    background: "#111",
-    color: "#fff",
-    border: "1px solid #111",
+    background: theme.accent,
+    color: theme.accentForeground,
+    border: `1px solid ${theme.accent}`,
     borderRadius: 8,
     padding: "10px 16px",
     cursor: "pointer",
@@ -325,8 +326,8 @@ const styles: { [k: string]: Style } = {
   },
   dangerBtn: {
     background: "transparent",
-    color: "#ef4444",
-    border: "1px solid #ef4444",
+    color: theme.danger,
+    border: `1px solid ${theme.danger}`,
     borderRadius: 8,
     padding: "10px 16px",
     cursor: "pointer",
