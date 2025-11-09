@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "nodemon server.js",
+    "dev": "concurrently \"nodemon server.js\" \"npx y-websocket --port 1234 --host 0.0.0.0\"",
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "nodemon": "^3.1.4"
   },
   "dependencies": {
@@ -24,6 +25,8 @@
     "mongoose": "^8.19.2",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "y-redis": "^1.0.3",
+    "y-websocket": "^1.5.4"
   }
 }

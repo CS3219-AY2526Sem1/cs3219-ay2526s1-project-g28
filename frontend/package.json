@@ -26,12 +26,16 @@
     "lucide-react": "^0.545.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.9.3",
     "shadcn": "^3.4.0",
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.14",
-    "vue": "^3.5.18"
+    "vue": "^3.5.18",
+    "y-monaco": "^0.1.6",
+    "y-websocket": "^1.5.4",
+    "yjs": "^13.6.27"
   },
   "devDependencies": {
     "@types/node": "^24.9.2",
