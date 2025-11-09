@@ -1,37 +1,210 @@
 import React, { useEffect, useRef, useState } from "react";
+import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
+import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
+import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+
+SyntaxHighlighter.registerLanguage("python", python);
+SyntaxHighlighter.registerLanguage("javascript", javascript);
+const STICKY_THRESHOLD = 120;
+
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-// Only Vite env; fallback to same-origin (use a dev proxy)
+type Example = { id: number; input: string; output: string; explanation?: string };
+type ChatQuestion = {
+  title: string;
+  difficulty: "Easy" | "Medium" | "Hard";
+  problemStatement: string;
+  examples?: Example[];
+  testCases?: any[];
+  codeSnippets?: { language: "python" | "javascript"; code: string }[];
+};
+
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-export default function Chat() {
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: "assistant", content: "Hi! I’m your test bot. Ask me anything." },
-  ]);
-  const [input, setInput] = useState("");
+function renderMarkdown(text: string) {
+  const out: React.ReactNode[] = [];
+  const fence = /```([a-zA-Z0-9+\-_]*)?\n([\s\S]*?)```/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+
+  const renderInline = (t: string) => {
+    // first split out inline code spans so we don't format inside them
+    const codeSplit = t.split(/(`[^`]+`)/g);
+    return codeSplit.map((chunk, i) => {
+      if (chunk.startsWith("`") && chunk.endsWith("`")) {
+        return (
+          <code
+            key={`code-${i}`}
+            style={{
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              background: "#f3f4f6",
+              border: "1px solid #e5e7eb",
+              padding: "0 4px",
+              borderRadius: 6,
+            }}
+          >
+            {chunk.slice(1, -1)}
+          </code>
+        );
+      }
+      // handle **bold** and *italic* in the non-code parts
+      const parts = chunk.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+      return parts.map((p, j) => {
+        if (/^\*\*[^*]+\*\*$/.test(p)) {
+          return <strong key={`b-${i}-${j}`}>{p.slice(2, -2)}</strong>;
+        }
+        if (/^\*[^*]+\*$/.test(p)) {
+          return <em key={`i-${i}-${j}`}>{p.slice(1, -1)}</em>;
+        }
+        return <span key={`t-${i}-${j}`}>{p}</span>;
+      });
+    });
+  };
+
+  while ((m = fence.exec(text)) !== null) {
+    const before = text.slice(last, m.index);
+    if (before.trim().length) {
+      before.split(/\n{2,}/).forEach((para, i) => {
+        out.push(
+          <p key={`p-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+            {renderInline(para)}
+          </p>
+        );
+      });
+    }
+
+    const lang = m[1] || "";
+    const code = m[2].replace(/\n+$/, "");
+    out.push(
+      <SyntaxHighlighter
+    key={`code-${m.index}`}
+    language={(lang as any) || undefined}
+    style={oneDark}
+    customStyle={{
+      borderRadius: 10,
+      margin: 0,
+      border: "1px solid #111827",
+      fontSize: 13,
+    }}
+    showLineNumbers={false}
+    wrapLongLines
+  >
+    {code}
+  </SyntaxHighlighter>
+    );
+
+    last = fence.lastIndex;
+  }
+
+  const tail = text.slice(last);
+  if (tail.trim().length) {
+    tail.split(/\n{2,}/).forEach((para, i) => {
+      out.push(
+        <p key={`tail-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+          {renderInline(para)}
+        </p>
+      );
+    });
+  }
+  return out;
+}
+
+export default function Chat({
+  question,
+  language,
+  code,
+  sessionId,
+}: {
+  question: ChatQuestion;
+  language?: "python" | "javascript";
+  code?: string;
+  sessionId: string;
+}) {
+  const STORAGE_KEY = `peerprep:${sessionId}:chat`;
+
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw
+      ? JSON.parse(raw)
+      : [
+          {
+            role: "assistant",
+            content:
+              "Hi! I know your current PeerPrep problem. Ask me to explain it, discuss approaches, or request hints.",
+          },
+        ];
+  });
+  const [input, setInput] = useState(
+    () => sessionStorage.getItem(`${STORAGE_KEY}:input`) || ""
+  );
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
+  const scrollToBottom = React.useCallback((smooth = false) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, []);
   useEffect(() => {
-    scrollerRef.current?.scrollTo({ top: 9e9, behavior: "smooth" });
-  }, [messages, loading]);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  }, [messages, STORAGE_KEY]);
+  useEffect(() => {
+    sessionStorage.setItem(`${STORAGE_KEY}:input`, input);
+  }, [input, STORAGE_KEY]);
 
-  async function send(e?: React.FormEvent) {
+  useEffect(() => {
+  const el = scrollerRef.current;
+  if (!el) return;
+  const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+  const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
+  // smooth when user just sent; instant while streaming to avoid jitter
+  scrollToBottom(!loading && isNearBottom);
+}, [messages, loading]);
+
+  function buildContext() {
+    const ctx = {
+      title: question?.title,
+      difficulty: question?.difficulty,
+      statement: question?.problemStatement,
+      examples: (question?.examples || []).map((e) => ({
+        input: e.input,
+        output: e.output,
+        explanation: e.explanation,
+      })),
+      languagePreference: language,
+      currentCode: code || "",
+      hasCode: Boolean(code && code.trim()),
+    };
+    return JSON.stringify(ctx);
+  }
+
+  async function send(e?: React.FormEvent, forcedContent?: string) {
     e?.preventDefault();
-    const content = input.trim();
+    const content = (forcedContent ?? input).trim();
     if (!content || loading) return;
 
     setErr(null);
-    setInput("");
+    if (!forcedContent) setInput("");
+
     setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
     setLoading(true);
 
+    const contextJson = buildContext();
+
     const payload = {
       messages: [
-        { role: "system", content: "You are a concise, helpful assistant." },
+        {
+          role: "system",
+          content:
+            "You are a concise coding interview tutor. You receive CURRENT_QUESTION_CONTEXT_JSON. " +
+            "If hasCode=false or the user asks to explain code without code present, explain the question, outline an approach, pseudocode, and pitfalls. " +
+            "If hasCode=true and the user asks about code, review the provided currentCode.",
+        },
+        { role: "system", content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}` },
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -90,10 +263,7 @@ export default function Chat() {
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = {
-                    ...last,
-                    content: (last.content || "") + delta,
-                  };
+                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
                   return copy;
                 });
               }
@@ -112,8 +282,7 @@ export default function Chat() {
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError")
-        setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
@@ -124,65 +293,94 @@ export default function Chat() {
     setLoading(false);
   }
 
+  function quickExplain() {
+    return send(
+      undefined,
+      "Explain the current question in simple terms, then outline a plan, pseudocode, and common pitfalls."
+    );
+  }
+  function quickHint() {
+    return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
+  }
+
   return (
-    <div
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
+      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>Chat</header>
+
+      {/* Quick actions */}
+      <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
+        <button
+          type="button"
+          onClick={quickExplain}
+          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+        >
+          Explain this question
+        </button>
+        <button
+          type="button"
+          onClick={quickHint}
+          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+        >
+          Give me a hint
+        </button>
+      </div>
+
+{/* Messages */}
+<div
+  ref={scrollerRef}
+  style={{
+    flex: 1,
+    overflow: "auto",
+    padding: 12,
+    background: "#f9fafb",
+  }}
+>
+  <div
       style={{
+        minHeight: "100%",
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
-        maxHeight: "100vh",
+        justifyContent: "flex-end", // anchor to bottom
+        gap: 12,
       }}
     >
-      <header
-        style={{
-          padding: 12,
-          borderBottom: "1px solid #e5e7eb",
-          fontWeight: 600,
-        }}
-      >
-        Chat
-      </header>
-
-      <div
-        ref={scrollerRef}
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: 12,
-          gap: 12,
-          display: "flex",
-          flexDirection: "column",
-          background: "#f9fafb",
-        }}
-      >
-        {messages.map((m, i) => (
+      {messages.map((m, i) => {
+        const isUser = m.role === "user";
+        return (
           <div
             key={i}
             style={{
               maxWidth: "75%",
+              alignSelf: isUser ? "flex-end" : "flex-start",
               borderRadius: 16,
-              padding: "8px 12px",
-              whiteSpace: "pre-wrap",
-              marginLeft: m.role === "user" ? "auto" : undefined,
-              marginRight: m.role === "assistant" ? "auto" : undefined,
-              background: m.role === "user" ? "#3b82f6" : "#fff",
-              color: m.role === "user" ? "#fff" : "#111",
-              border: m.role === "assistant" ? "1px solid #e5e7eb" : "none",
+              padding: "10px 14px",
+              lineHeight: 1.5,
+              background: isUser ? "#3b82f6" : "#fff",
+              color: isUser ? "#fff" : "#111",
+              border: !isUser ? "1px solid #e5e7eb" : "none",
+              boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+              textAlign: isUser ? "right" : "left",
             }}
           >
-            {m.content}
+            {isUser ? m.content : renderMarkdown(m.content)}
           </div>
-        ))}
-        {err && <div style={{ color: "#ef4444", fontSize: 12 }}>{err}</div>}
-      </div>
+        );
+      })}
+      <div style={{ height: 8 }} /> {/* spacer above composer */}
+    </div>
+</div>
 
+      {/* Composer (separate bar so it never overlaps the last message) */}
       <form
         onSubmit={send}
         style={{
-          padding: 12,
+          position: "sticky",
+          bottom: 0,
+          background: "#fff",
           borderTop: "1px solid #e5e7eb",
           display: "flex",
           gap: 8,
+          padding: 12,
         }}
       >
         <input
@@ -192,15 +390,16 @@ export default function Chat() {
           style={{
             flex: 1,
             border: "1px solid #e5e7eb",
-            borderRadius: 8,
-            padding: "10px 12px",
+            borderRadius: 10,
+            padding: "12px 14px",
+            background: "#fff",
           }}
         />
         <button
           type="submit"
           disabled={loading}
           style={{
-            padding: "10px 16px",
+            padding: "12px 16px",
             borderRadius: 10,
             background: "#111827",
             color: "#fff",
@@ -209,12 +408,7 @@ export default function Chat() {
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button
-          type="button"
-          onClick={cancel}
-          disabled={!loading}
-          style={{ padding: "10px 12px", borderRadius: 10 }}
-        >
+        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "12px 12px", borderRadius: 10 }}>
           Cancel
         </button>
       </form>
