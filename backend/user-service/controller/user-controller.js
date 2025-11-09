@@ -1,4 +1,5 @@
 // controller/user-controller.js
+import crypto from "crypto";
 import { isValidObjectId } from "mongoose";
 import {
   createLocalUser as _createLocalUser,
@@ -8,9 +9,14 @@ import {
   findUserById as _findUserById,
   findUserByUsername as _findUserByUsername,
   findUserByUsernameOrEmail as _findUserByUsernameOrEmail,
+  findUserByEmailVerificationTokenHash as _findUserByEmailVerificationTokenHash,
   updateUserById as _updateUserById,
   updateUserPrivilegeById as _updateUserPrivilegeById,
+  markUserEmailVerified as _markUserEmailVerified,
 } from "../model/repository.js";
+import { sendVerificationEmail, buildVerificationUrl } from "../services/email-service.js";
+
+const EMAIL_VERIFICATION_TTL_HOURS = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS || 24);
 
 /**
  * POST /users
@@ -32,16 +38,91 @@ export async function createUser(req, res) {
       return res.status(409).json({ message: "username or email already exists" });
     }
 
+    const verificationToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+    const expiration = new Date(Date.now() + EMAIL_VERIFICATION_TTL_HOURS * 60 * 60 * 1000);
+
     // repo hashes the password internally
-    const createdUser = await _createLocalUser({ username, fullname, email, password });
+    const createdUser = await _createLocalUser({
+      username,
+      fullname,
+      email,
+      password,
+      emailVerificationTokenHash: tokenHash,
+      emailVerificationExpiresAt: expiration,
+    });
+
+    const verificationUrl = buildVerificationUrl(verificationToken);
+
+    let emailDispatched = false;
+    try {
+      await sendVerificationEmail({
+        to: email,
+        name: fullname || username,
+        verificationUrl,
+        expiresAt: expiration,
+      });
+      emailDispatched = true;
+    } catch (emailErr) {
+      console.error("Failed to send verification email", emailErr);
+    }
 
     return res.status(201).json({
-      message: `Created new user ${createdUser.username} successfully`,
-      data: formatUserResponse(createdUser),
+      message: `Created new user ${createdUser.username} successfully` +
+        (emailDispatched
+          ? ". Verification email sent."
+          : ". Verification email could not be sent automatically."),
+      data: {
+        ...formatUserResponse(createdUser),
+        emailVerification: {
+          dispatched: emailDispatched,
+          expiresAt: expiration,
+        },
+      },
     });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Unknown error when creating new user!" });
+  }
+}
+
+/**
+ * GET /users/verify-email?token=...
+ */
+export async function verifyEmail(req, res) {
+  try {
+    const { token } = req.query;
+    if (!token || typeof token !== "string") {
+      return res.status(400).json({ message: "Verification token is required" });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await _findUserByEmailVerificationTokenHash(tokenHash);
+
+    if (!user || !user.emailVerificationExpiresAt) {
+      return res.status(400).json({ message: "Invalid or expired verification token" });
+    }
+
+    if (user.emailVerificationExpiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Verification token has expired" });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(200).json({
+        message: "Email already verified",
+        data: formatUserResponse(user),
+      });
+    }
+
+    const updatedUser = await _markUserEmailVerified(user.id);
+
+    return res.status(200).json({
+      message: "Email verified successfully",
+      data: formatUserResponse(updatedUser),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when verifying email!" });
   }
 }
 
@@ -194,7 +275,7 @@ export async function deleteUser(req, res) {
 /* ---------- response shape ---------- */
 export function formatUserResponse(user) {
   const provider = user.providers?.[0]?.provider ?? "password";
-  
+
   return {
     id: user.id,
     username: user.username,
@@ -202,7 +283,8 @@ export function formatUserResponse(user) {
     email: user.email ?? null,
     avatarUrl: user.avatarUrl ?? "",
     isAdmin: !!user.isAdmin,
+    isEmailVerified: !!user.isEmailVerified,
     createdAt: user.createdAt,
-    provider
+    provider,
   };
 }
