@@ -2,23 +2,29 @@ import React, { useEffect, useRef, useState } from "react";
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
 import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
 import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import java from "react-syntax-highlighter/dist/esm/languages/prism/java";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
 
 SyntaxHighlighter.registerLanguage("python", python);
+SyntaxHighlighter.registerLanguage("java", java);
 SyntaxHighlighter.registerLanguage("javascript", javascript);
 const STICKY_THRESHOLD = 120;
 
-
 type Msg = { role: "user" | "assistant"; content: string };
 
-type Example = { id: number; input: string; output: string; explanation?: string };
+type Example = {
+  id: number;
+  input: string;
+  output: string;
+  explanation?: string;
+};
 type ChatQuestion = {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
   problemStatement: string;
   examples?: Example[];
   testCases?: any[];
-  codeSnippets?: { language: "python" | "javascript"; code: string }[];
+  codeSnippets?: { language: "python" | "javascript" | "java"; code: string }[];
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -38,7 +44,8 @@ function renderMarkdown(text: string) {
           <code
             key={`code-${i}`}
             style={{
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontFamily:
+                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               background: "#f3f4f6",
               border: "1px solid #e5e7eb",
               padding: "0 4px",
@@ -68,7 +75,10 @@ function renderMarkdown(text: string) {
     if (before.trim().length) {
       before.split(/\n{2,}/).forEach((para, i) => {
         out.push(
-          <p key={`p-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+          <p
+            key={`p-${last}-${i}`}
+            style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}
+          >
             {renderInline(para)}
           </p>
         );
@@ -79,20 +89,20 @@ function renderMarkdown(text: string) {
     const code = m[2].replace(/\n+$/, "");
     out.push(
       <SyntaxHighlighter
-    key={`code-${m.index}`}
-    language={(lang as any) || undefined}
-    style={oneDark}
-    customStyle={{
-      borderRadius: 10,
-      margin: 0,
-      border: "1px solid #111827",
-      fontSize: 13,
-    }}
-    showLineNumbers={false}
-    wrapLongLines
-  >
-    {code}
-  </SyntaxHighlighter>
+        key={`code-${m.index}`}
+        language={(lang as any) || undefined}
+        style={oneDark}
+        customStyle={{
+          borderRadius: 10,
+          margin: 0,
+          border: "1px solid #111827",
+          fontSize: 13,
+        }}
+        showLineNumbers={false}
+        wrapLongLines
+      >
+        {code}
+      </SyntaxHighlighter>
     );
 
     last = fence.lastIndex;
@@ -102,7 +112,10 @@ function renderMarkdown(text: string) {
   if (tail.trim().length) {
     tail.split(/\n{2,}/).forEach((para, i) => {
       out.push(
-        <p key={`tail-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+        <p
+          key={`tail-${last}-${i}`}
+          style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}
+        >
           {renderInline(para)}
         </p>
       );
@@ -118,7 +131,7 @@ export default function Chat({
   sessionId,
 }: {
   question: ChatQuestion;
-  language?: "python" | "javascript";
+  language?: "python" | "javascript" | "java";
   code?: string;
   sessionId: string;
 }) {
@@ -157,13 +170,14 @@ export default function Chat({
   }, [input, STORAGE_KEY]);
 
   useEffect(() => {
-  const el = scrollerRef.current;
-  if (!el) return;
-  const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-  const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
-  // smooth when user just sent; instant while streaming to avoid jitter
-  scrollToBottom(!loading && isNearBottom);
-}, [messages, loading]);
+    const el = scrollerRef.current;
+    if (!el) return;
+    const distanceFromBottom =
+      el.scrollHeight - (el.scrollTop + el.clientHeight);
+    const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
+    // smooth when user just sent; instant while streaming to avoid jitter
+    scrollToBottom(!loading && isNearBottom);
+  }, [messages, loading]);
 
   function buildContext() {
     const ctx = {
@@ -190,7 +204,11 @@ export default function Chat({
     setErr(null);
     if (!forcedContent) setInput("");
 
-    setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", content },
+      { role: "assistant", content: "" },
+    ]);
     setLoading(true);
 
     const contextJson = buildContext();
@@ -204,7 +222,10 @@ export default function Chat({
             "If hasCode=false or the user asks to explain code without code present, explain the question, outline an approach, pseudocode, and pitfalls. " +
             "If hasCode=true and the user asks about code, review the provided currentCode.",
         },
-        { role: "system", content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}` },
+        {
+          role: "system",
+          content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}`,
+        },
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -224,7 +245,9 @@ export default function Chat({
 
       if (!resp.ok) {
         const txt = await resp.text().catch(() => "");
-        throw new Error(`API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`);
+        throw new Error(
+          `API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`
+        );
       }
 
       const reader = resp.body?.getReader?.();
@@ -263,7 +286,10 @@ export default function Chat({
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
+                  copy[copy.length - 1] = {
+                    ...last,
+                    content: (last.content || "") + delta,
+                  };
                   return copy;
                 });
               }
@@ -282,7 +308,8 @@ export default function Chat({
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError")
+        setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
@@ -300,75 +327,110 @@ export default function Chat({
     );
   }
   function quickHint() {
-    return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
+    return send(
+      undefined,
+      "Give me a gentle hint for this question. Don't reveal the full solution yet."
+    );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
-      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>Chat</header>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        maxHeight: "100%",
+      }}
+    >
+      <header
+        style={{
+          padding: 12,
+          borderBottom: "1px solid #e5e7eb",
+          fontWeight: 600,
+        }}
+      >
+        Chat
+      </header>
 
       {/* Quick actions */}
-      <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
+      <div
+        style={{
+          padding: 12,
+          display: "flex",
+          gap: 8,
+          borderBottom: "1px solid #f1f5f9",
+        }}
+      >
         <button
           type="button"
           onClick={quickExplain}
-          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+          style={{
+            padding: "6px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            background: "#fff",
+          }}
         >
           Explain this question
         </button>
         <button
           type="button"
           onClick={quickHint}
-          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+          style={{
+            padding: "6px 10px",
+            border: "1px solid #e5e7eb",
+            borderRadius: 8,
+            background: "#fff",
+          }}
         >
           Give me a hint
         </button>
       </div>
 
-{/* Messages */}
-<div
-  ref={scrollerRef}
-  style={{
-    flex: 1,
-    overflow: "auto",
-    padding: 12,
-    background: "#f9fafb",
-  }}
->
-  <div
-      style={{
-        minHeight: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end", // anchor to bottom
-        gap: 12,
-      }}
-    >
-      {messages.map((m, i) => {
-        const isUser = m.role === "user";
-        return (
-          <div
-            key={i}
-            style={{
-              maxWidth: "75%",
-              alignSelf: isUser ? "flex-end" : "flex-start",
-              borderRadius: 16,
-              padding: "10px 14px",
-              lineHeight: 1.5,
-              background: isUser ? "#3b82f6" : "#fff",
-              color: isUser ? "#fff" : "#111",
-              border: !isUser ? "1px solid #e5e7eb" : "none",
-              boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-              textAlign: isUser ? "right" : "left",
-            }}
-          >
-            {isUser ? m.content : renderMarkdown(m.content)}
-          </div>
-        );
-      })}
-      <div style={{ height: 8 }} /> {/* spacer above composer */}
-    </div>
-</div>
+      {/* Messages */}
+      <div
+        ref={scrollerRef}
+        style={{
+          flex: 1,
+          overflow: "auto",
+          padding: 12,
+          background: "#f9fafb",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100%",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "flex-end", // anchor to bottom
+            gap: 12,
+          }}
+        >
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            return (
+              <div
+                key={i}
+                style={{
+                  maxWidth: "75%",
+                  alignSelf: isUser ? "flex-end" : "flex-start",
+                  borderRadius: 16,
+                  padding: "10px 14px",
+                  lineHeight: 1.5,
+                  background: isUser ? "#3b82f6" : "#fff",
+                  color: isUser ? "#fff" : "#111",
+                  border: !isUser ? "1px solid #e5e7eb" : "none",
+                  boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
+                  textAlign: isUser ? "right" : "left",
+                }}
+              >
+                {isUser ? m.content : renderMarkdown(m.content)}
+              </div>
+            );
+          })}
+          <div style={{ height: 8 }} /> {/* spacer above composer */}
+        </div>
+      </div>
 
       {/* Composer (separate bar so it never overlaps the last message) */}
       <form
@@ -408,7 +470,12 @@ export default function Chat({
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "12px 12px", borderRadius: 10 }}>
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={!loading}
+          style={{ padding: "12px 12px", borderRadius: 10 }}
+        >
           Cancel
         </button>
       </form>
