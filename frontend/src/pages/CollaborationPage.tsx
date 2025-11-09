@@ -913,7 +913,7 @@ export default function CollaborationPage() {
             setIsCallActive(false);
             setShowCallPopup(false);
           }}
-          collabServiceUrl={COLLAB_SERVICE_URL} // 👈 pass it from parent
+          collabServiceUrl={COLLAB_SERVICE_URL}
         />
       )}
     </div>
