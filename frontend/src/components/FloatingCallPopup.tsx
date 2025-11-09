@@ -19,6 +19,8 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
   const onCallEndRef = useRef(onCallEnd);
+  const activeRoomNameRef = useRef<string | undefined>();
+  const creationInFlight = useRef(false);
   const [inCall, setInCall] = useState(false);
 
   useEffect(() => {
@@ -45,11 +47,12 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 
     const startCall = async () => {
       if (!mounted) return;
-      if (callFrameRef.current) {
+      if (callFrameRef.current || creationInFlight.current) {
         return;
       }
 
       try {
+        creationInFlight.current = true;
         const res = await fetch(
           `${collabServiceUrl}/collaboration/create-daily-room/${roomSlug}`,
           { method: "POST" }
@@ -63,6 +66,10 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
         if (!data || !("url" in data)) {
           throw new Error("No room URL returned from server");
         }
+
+        const resolvedRoomName =
+          (data as { roomName?: string }).roomName ?? roomSlug;
+        activeRoomNameRef.current = resolvedRoomName;
 
         const container = containerRef.current;
         if (!container) throw new Error("Daily container not found");
@@ -82,8 +89,9 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 
         const handleLeftMeeting = async () => {
           try {
+            const targetRoomName = activeRoomNameRef.current ?? roomSlug;
             await fetch(
-              `${collabServiceUrl}/collaboration/close-daily-room/${roomSlug}`,
+              `${collabServiceUrl}/collaboration/close-daily-room/${targetRoomName}`,
               { method: "DELETE" }
             );
           } catch (err) {
@@ -133,11 +141,14 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
 
       } catch (err) {
         console.error("Daily error:", err);
+        activeRoomNameRef.current = undefined;
         if (sessionId) {
           socketRef.current?.emit("end-call", { sessionId });
         }
         alert("Could not start video call.");
         onCallEndRef.current?.();
+      } finally {
+        creationInFlight.current = false;
       }
     };
 
@@ -156,6 +167,8 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
         existingCall.destroy();
         callFrameRef.current = null;
       }
+      activeRoomNameRef.current = undefined;
+      creationInFlight.current = false;
       setInCall(false);
     };
   }, [roomSlug, collabServiceUrl, socketRef, sessionId]);
