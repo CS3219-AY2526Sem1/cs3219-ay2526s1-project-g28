@@ -21,6 +21,14 @@ type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
 type Language = "python" | "javascript" | "java";
 
+export interface ExecResult {
+  args: any[];
+  expected: any;
+  output: any;
+  result: boolean;
+  error?: string;
+}
+
 const defaultSnippets: Record<Language, string> = {
   python: "def solution():\n  # Write your code here\n  pass",
   javascript: "function solution() {\n  // Write your code here\n}",
@@ -74,21 +82,33 @@ function ProblemViewer({
       {examples.length > 0 && (
         <div className="mt-4">
           <h3 className="font-semibold">Examples</h3>
-          {examples.map((ex, idx) => (
-            <div key={idx} className="border rounded p-2 my-1 bg-gray-50">
-              <div>
-                <strong>Input:</strong> {ex.input}
-              </div>
-              <div>
-                <strong>Output:</strong> {ex.output}
-              </div>
-              {ex.explanation && (
-                <div>
-                  <strong>Explanation:</strong> {ex.explanation}
+          {examples.map((ex, idx) => {
+            return (
+              <div key={idx} className="border rounded p-2 my-1 bg-gray-50">
+                <div className="flex items-center">
+                  {ex.image?.url && (
+                    <img
+                      src={ex.image.url}
+                      alt={`example ${idx}`}
+                      width={ex.image.width / 1.2}
+                      height={ex.image.height / 1.2}
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                <div>
+                  <strong>Input:</strong> {ex.input}
+                </div>
+                <div>
+                  <strong>Output:</strong> {ex.output}
+                </div>
+                {ex.explanation && (
+                  <div>
+                    <strong>Explanation:</strong> {ex.explanation}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </aside>
@@ -134,6 +154,9 @@ function CodeEditorTab({
   sessionId,
   currentUsername,
   timeout,
+  onResultsChange,
+  onErrorChange,
+  sethasSubmitted,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -148,6 +171,9 @@ function CodeEditorTab({
   sessionId: string | undefined;
   currentUsername: string;
   timeout: number;
+  onResultsChange?: (results: ExecResult[]) => void;
+  onErrorChange?: (err: string | null) => void;
+  sethasSubmitted: (v: boolean) => void;
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -157,7 +183,7 @@ function CodeEditorTab({
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
   const cursorWidgetRef = useRef<monaco.editor.IContentWidget | null>(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [hasRunSubmitted, setHasRunSubmitted] = useState(false);
   const [remoteCursor, setRemoteCursor] = useState<{
     lineNumber: number;
     column: number;
@@ -339,7 +365,7 @@ function CodeEditorTab({
   const handleRun = async () => {
     setLoading(true);
     setError(null);
-    setHasSubmitted(true);
+    setHasRunSubmitted(true);
     const toRun = testCases
       .filter((tc) => !tc.hidden)
       .map((tc) => ({
@@ -379,14 +405,17 @@ function CodeEditorTab({
   const handleSubmit = async () => {
     setLoading(true);
     setError(null);
+    sethasSubmitted(true);
     try {
       const res = await runCodeApi(language, code, testCases, timeout);
 
       if (res.data.success) {
         setSubmitResults(res.data.output);
+        onResultsChange?.(res.data.output);
         setActiveTab("console");
       } else {
         setError(res.data.error);
+        onErrorChange?.(res.data.error);
         setSubmitResults([]);
         setRunResults([]);
         setActiveTab("console");
@@ -522,42 +551,41 @@ function CodeEditorTab({
                         : "bg-red-50 border border-red-400";
                     }
                     return (
-                      <div
-                        key={`${idx}-${subIdx}`}
-                        className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
-                      >
-                        <div className="font-semibold text-slate-800 mb-1">
-                          Case {idx + 1}
-                        </div>
-                        <div className="text-sm text-slate-600 mb-1">
-                          Input:{" "}
-                          <code>
-                            {Array.isArray(tc.args[0])
-                              ? JSON.stringify(tc.args[0])
-                              : tc.args[0]}
-                          </code>
-                        </div>
-                        <div className="text-sm text-slate-600 mb-1">
-                          Expected: <code>{JSON.stringify(tc.expected)}</code>
-                        </div>
-                        {runResults && hasSubmitted && (
-                          <div className="text-sm text-slate-700 mb-1">
-                            Output:{" "}
+                        <div
+                          key={${idx}-${subIdx}}
+                          className={min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}}
+                        >
+                          <div className="font-semibold text-slate-800 mb-1">
+                            Case {idx + 1}
+                          </div>
+                          <div className="text-sm text-slate-600 mb-1">
+                            Input:{" "}
                             <code>
-                              {runResults[idx]?.output
-                                ? JSON.stringify(runResults[idx].output)
-                                : "No output"}
+                              {Array.isArray(tc.args)
+                                ? JSON.stringify(tc.args)
+                                : tc.args}
                             </code>
                           </div>
-                        )}
-                      </div>
-                    );
-                  });
-                })}
+                          <div className="text-sm text-slate-600 mb-1">
+                            Expected: <code>{JSON.stringify(tc.expected)}</code>
+                          </div>
+                          {runResults && hasRunSubmitted && (
+                            <div className="text-sm text-slate-700 mb-1">
+                              Output:{" "}
+                              <code>
+                                {runResults[idx]?.output
+                                  ? JSON.stringify(runResults[idx].output)
+                                  : "No output"}
+                              </code>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    });
+                  })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
       {/* Footer — shown only when Editor tab is active */}
       {activeTab === "editor" && (
@@ -646,9 +674,9 @@ function CodeEditorTab({
                     <div className="text-sm text-slate-600">
                       <strong>Input:</strong>{" "}
                       <code>
-                        {Array.isArray(tc.args?.[0])
-                          ? JSON.stringify(tc.args[0])
-                          : JSON.stringify(tc.args)}
+                        {Array.isArray(tc.args)
+                          ? JSON.stringify(tc.args)
+                          : tc.args}
                       </code>
                     </div>
                     <div className="text-sm text-slate-600">
@@ -724,6 +752,10 @@ export default function CollaborationPage() {
   const socketRef = useRef<any>(null);
   const knownUsersRef = useRef<Set<string>>(new Set());
   const navigate = useNavigate();
+
+  const [latestResults, setLatestResults] = useState<ExecResult[]>([]);
+  const [latestError, setLatestError] = useState<string | null>(null);
+  const [hasSubmitted, sethasSubmitted] = useState(false);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -865,6 +897,11 @@ export default function CollaborationPage() {
       socketRef.current?.emit("leave-session", {
         sessionId,
         username: currentUsername,
+        code,
+        submitResults: latestResults,
+        error: latestError,
+        language,
+        hasSubmitted,
       });
 
       // Optionally mark session inactive locally
@@ -925,7 +962,7 @@ export default function CollaborationPage() {
               }`}
               onClick={() => setActiveTab("chat")}
             >
-              Chat
+              AI Chat
             </button>
             <button
               className={`px-3 py-1 border rounded ${
@@ -949,12 +986,18 @@ export default function CollaborationPage() {
                 sessionId={sessionId}
                 currentUsername={currentUsername}
                 timeout={timeout}
+                onResultsChange={setLatestResults}
+                onErrorChange={setLatestError}
+                sethasSubmitted={sethasSubmitted}
               />
             )}
             {activeTab === "chat" && (
-              <div className="text-center text-gray-500">
-                <Chat />
-              </div>
+              <Chat
+                question={question}
+                language={language}
+                code={code}
+                sessionId={sessionId as string}
+              />
             )}
             {activeTab === "call" && (
               <div className="flex flex-col h-full w-full items-center justify-center gap-4">
