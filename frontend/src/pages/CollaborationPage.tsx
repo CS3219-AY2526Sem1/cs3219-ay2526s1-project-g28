@@ -75,21 +75,33 @@ function ProblemViewer({
       {examples.length > 0 && (
         <div className="mt-4">
           <h3 className="font-semibold">Examples</h3>
-          {examples.map((ex, idx) => (
-            <div key={idx} className="border rounded p-2 my-1 bg-gray-50">
-              <div>
-                <strong>Input:</strong> {ex.input}
-              </div>
-              <div>
-                <strong>Output:</strong> {ex.output}
-              </div>
-              {ex.explanation && (
-                <div>
-                  <strong>Explanation:</strong> {ex.explanation}
+          {examples.map((ex, idx) => {
+            return (
+              <div key={idx} className="border rounded p-2 my-1 bg-gray-50">
+                <div className="flex items-center">
+                  {ex.image?.url && (
+                    <img
+                      src={ex.image.url}
+                      alt={`example ${idx}`}
+                      width={ex.image.width / 1.2}
+                      height={ex.image.height / 1.2}
+                    />
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+                <div>
+                  <strong>Input:</strong> {ex.input}
+                </div>
+                <div>
+                  <strong>Output:</strong> {ex.output}
+                </div>
+                {ex.explanation && (
+                  <div>
+                    <strong>Explanation:</strong> {ex.explanation}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </aside>
@@ -437,9 +449,9 @@ function CodeEditorTab({
                           <div className="text-sm text-slate-600 mb-1">
                             Input:{" "}
                             <code>
-                              {Array.isArray(tc.args[0])
-                                ? JSON.stringify(tc.args[0])
-                                : tc.args[0]}
+                              {Array.isArray(tc.args)
+                                ? JSON.stringify(tc.args)
+                                : tc.args}
                             </code>
                           </div>
                           <div className="text-sm text-slate-600 mb-1">
@@ -552,9 +564,9 @@ function CodeEditorTab({
                     <div className="text-sm text-slate-600">
                       <strong>Input:</strong>{" "}
                       <code>
-                        {Array.isArray(tc.args?.[0])
-                          ? JSON.stringify(tc.args[0])
-                          : JSON.stringify(tc.args)}
+                        {Array.isArray(tc.args)
+                          ? JSON.stringify(tc.args)
+                          : tc.args}
                       </code>
                     </div>
                     <div className="text-sm text-slate-600">
