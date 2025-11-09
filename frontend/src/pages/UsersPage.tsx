@@ -142,40 +142,40 @@ const UsersPage: React.FC = () => {
           isSidebarOpen ? "ml-60" : "ml-[72px]"
         }`}
       >
-        <section className="rounded-xl p-5 shadow-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-lg">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-6">
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-slate-100">Users</h1>
+            <h1 className="text-2xl font-semibold text-gray-800">Users</h1>
             <div className="relative w-full md:w-96">
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by username, full name, or email..."
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-900 dark:text-slate-100"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-2.5 text-gray-500 dark:text-slate-400" />
+              <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-2.5 text-gray-500" />
             </div>
           </div>
 
-          {isLoading && <p className="text-gray-500 dark:text-slate-400 text-center py-4">Loading users...</p>}
-          {error && <p className="text-red-500 dark:text-red-400 text-center py-4">Error: {error}</p>}
+          {isLoading && <p className="text-gray-500 text-center py-4">Loading users...</p>}
+          {error && <p className="text-red-500 text-center py-4">Error: {error}</p>}
 
           {!isLoading && !error && (
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto text-left">
-                  <thead className="border-b border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60">
+                  <thead className="border-b border-gray-300 bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">User</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Email</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Role</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Provider</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider text-right">Actions</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">User</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Email</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Role</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Provider</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                  <tbody className="divide-y divide-gray-200">
                     {currentUsers.map((u) => (
-                      <tr key={u.id} className="transition hover:bg-gray-50 dark:hover:bg-slate-800/80">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-100">
+                      <tr key={u.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800">
                           <div className="flex items-center gap-3">
                             {u.avatarUrl ? (
                               <img
@@ -185,38 +185,36 @@ const UsersPage: React.FC = () => {
                                 referrerPolicy="no-referrer"
                               />
                             ) : (
-                              <div className="h-8 w-8 rounded-full bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-gray-600 dark:text-slate-300 text-xs">
+                              <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs">
                                 {u.username?.charAt(0)?.toUpperCase() || "U"}
                               </div>
                             )}
                             <div className="flex flex-col">
                               <span>{u.username}</span>
-                               <span className="text-gray-500 dark:text-slate-400 text-xs">{u.fullname}</span>
+                              <span className="text-gray-500 text-xs">{u.fullname}</span>
                             </div>
                           </div>
                         </td>
-                         <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">{u.email ?? "—"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{u.email ?? "—"}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                             u.isAdmin
-                              ? "bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-200"
-                              : "bg-gray-100 text-gray-800 dark:bg-slate-800/60 dark:text-slate-200"
+                            u.isAdmin ? "bg-purple-100 text-purple-800" : "bg-gray-100 text-gray-800"
                           }`}>
                             {u.isAdmin ? "Admin" : "User"}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">{u.provider || "local"}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{u.provider || "local"}</td>
                         <td className="px-4 py-3 text-sm text-right space-x-3">
                           <button
                             onClick={() => handleEdit(u.id)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                            className="text-blue-600 hover:text-blue-800 font-medium"
                             title="Edit"
                           >
                             <PencilIcon className="h-5 w-5 inline-block" />
                           </button>
                           <button
                             onClick={() => handleDelete(u.id)}
-                            className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium"
+                            className="text-red-600 hover:text-red-800 font-medium"
                             title="Delete"
                           >
                             <TrashIcon className="h-5 w-5 inline-block" />
@@ -226,7 +224,7 @@ const UsersPage: React.FC = () => {
                     ))}
                     {currentUsers.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-slate-400">
+                        <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500">
                           No users found.
                         </td>
                       </tr>
@@ -236,21 +234,21 @@ const UsersPage: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center mt-6">
-                <span className="text-sm text-gray-500 dark:text-slate-400">
+                <span className="text-sm text-gray-500">
                   Showing {filtered.length === 0 ? 0 : startIndex + 1} to {endIndex} of {filtered.length} users
                 </span>
                 <div className="space-x-2">
                   <button
                     onClick={goToPreviousPage}
                     disabled={currentPage === 1}
-                     className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={goToNextPage}
                     disabled={currentPage === totalPages}
-                     className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
@@ -264,18 +262,18 @@ const UsersPage: React.FC = () => {
       {/* Delete Confirm Modal */}
       {showDeleteConfirm && (
         <div style={styles.modalOverlay}>
-          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3 text-center">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-slate-100">Delete User</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Delete User</h3>
               <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500 dark:text-slate-400">
+                <p className="text-sm text-gray-500">
                   Are you sure you want to delete this user? This action cannot be undone.
                 </p>
               </div>
               <div className="items-center px-4 py-3 space-x-4">
                 <button
                   onClick={cancelDelete}
-                  className="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded hover:bg-gray-300 dark:hover:bg-slate-700 text-base font-medium"
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-base font-medium"
                 >
                   Cancel
                 </button>

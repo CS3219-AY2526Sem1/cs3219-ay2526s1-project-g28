@@ -140,26 +140,26 @@ const HistoryPage: React.FC = () => {
   function badgeClasses(status: Status) {
     switch (status) {
       case "Completed":
-        return "bg-green-100 text-green-800 dark:bg-emerald-900/50 dark:text-emerald-300";
+        return "bg-green-100 text-green-800";
       case "In Progress":
-        return "bg-yellow-100 text-yellow-800 dark:bg-amber-900/50 dark:text-amber-200";
+        return "bg-yellow-100 text-yellow-800";
       case "Cancelled":
-        return "bg-gray-100 text-gray-800 dark:bg-slate-800/60 dark:text-slate-200";
+        return "bg-gray-100 text-gray-800";
       case "Failed":
       default:
-        return "bg-red-100 text-red-800 dark:bg-rose-900/50 dark:text-rose-200";
+        return "bg-red-100 text-red-800";
     }
   }
 
   function diffClasses(diff: Difficulty) {
     switch (diff) {
       case "Easy":
-        return "bg-green-100 text-green-800 dark:bg-emerald-900/50 dark:text-emerald-300";
+        return "bg-green-100 text-green-800";
       case "Medium":
-        return "bg-yellow-100 text-yellow-800 dark:bg-amber-900/50 dark:text-amber-200";
+        return "bg-yellow-100 text-yellow-800";
       case "Hard":
       default:
-        return "bg-red-100 text-red-800 dark:bg-rose-900/50 dark:text-rose-200";
+        return "bg-red-100 text-red-800";
     }
   }
 
@@ -194,61 +194,61 @@ const HistoryPage: React.FC = () => {
           isSidebarOpen ? "ml-60" : "ml-[72px]"
         }`}
       >
-        <section className="rounded-xl p-5 shadow-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-800 dark:text-slate-100">
+              <h1 className="text-2xl font-semibold text-gray-800">
                 Match History
               </h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400">
+              <p className="text-sm text-gray-500">
                 Review your past sessions, details, and outcomes.
               </p>
             </div>
           </div>
 
           {isLoading && (
-            <p className="text-gray-500 dark:text-slate-400 text-center py-4">Loading history…</p>
+            <p className="text-gray-500 text-center py-4">Loading history…</p>
           )}
           {error && (
-            <p className="text-red-500 dark:text-red-400 text-center py-4">Error: {error}</p>
+            <p className="text-red-500 text-center py-4">Error: {error}</p>
           )}
 
           {!isLoading && !error && (
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto text-left">
-                  <thead className="border-b border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60">
+                  <thead className="border-b border-gray-300 bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Date
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Partner
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Difficulty
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Topics
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Status
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">
                         Duration
                       </th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider text-right">
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider text-right">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                  <tbody className="divide-y divide-gray-200">
                     {currentRows.map((item) => (
-                      <tr key={item.id} className="transition hover:bg-gray-50 dark:hover:bg-slate-800/80">
-                        <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-100 whitespace-nowrap">
+                      <tr key={item.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm text-gray-800 whitespace-nowrap">
                           {fmtDate(item.startedAt)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-800 dark:text-slate-200">
+                        <td className="px-4 py-3 text-sm text-gray-800">
                           {item.partner}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -260,7 +260,7 @@ const HistoryPage: React.FC = () => {
                             {item.difficulty}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">
+                        <td className="px-4 py-3 text-sm text-gray-600">
                           {item.topics.join(", ")}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -272,13 +272,13 @@ const HistoryPage: React.FC = () => {
                             {item.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-700 dark:text-slate-300">
+                        <td className="px-4 py-3 text-sm text-gray-700">
                           {formatDuration(item.startedAt, item.endedAt)}
                         </td>
                         <td className="px-4 py-3 text-sm text-right space-x-3 whitespace-nowrap">
                           <button
                             onClick={() => handleView(item)}
-                            className="text-gray-700 dark:text-slate-300 hover:text-gray-900 dark:hover:text-slate-100 font-medium"
+                            className="text-gray-700 hover:text-gray-900 font-medium"
                             title="View details"
                           >
                             <EyeIcon className="h-5 w-5 inline-block" />
@@ -291,7 +291,7 @@ const HistoryPage: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center mt-6">
-                <span className="text-sm text-gray-500 dark:text-slate-400">
+                <span className="text-sm text-gray-500">
                   Showing {history.length === 0 ? 0 : startIndex + 1} to{" "}
                   {Math.min(endIndex, history.length)} of {history.length}{" "}
                   sessions
@@ -300,14 +300,14 @@ const HistoryPage: React.FC = () => {
                   <button
                     onClick={goToPreviousPage}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={goToNextPage}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>

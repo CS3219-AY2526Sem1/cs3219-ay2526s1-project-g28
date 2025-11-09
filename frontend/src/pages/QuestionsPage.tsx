@@ -117,10 +117,10 @@ const QuestionsPage: React.FC = () => {
           isSidebarOpen ? "ml-60" : "ml-[72px]"
         }`}
       >
-        <section className="rounded-xl p-5 shadow-lg border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <section className="bg-white border border-gray-200 rounded-xl p-5 shadow-lg">
           <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-800 dark:text-slate-100">Questions</h1>
+              <h1 className="text-2xl font-semibold text-gray-800">Questions</h1>
             </div>
             <button
               onClick={handleAddNew}
@@ -130,42 +130,40 @@ const QuestionsPage: React.FC = () => {
             </button>
           </div>
 
-          {isLoading && <p className="text-gray-500 dark:text-slate-400 text-center py-4">Loading questions...</p>}
-          {error && <p className="text-red-500 dark:text-red-400 text-center py-4">Error: {error}</p>}
+          {isLoading && <p className="text-gray-500 text-center py-4">Loading questions...</p>}
+          {error && <p className="text-red-500 text-center py-4">Error: {error}</p>}
 
           {!isLoading && !error && (
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full table-auto text-left">
-                  <thead className="border-b border-gray-300 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/60">
+                  <thead className="border-b border-gray-300 bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Title</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Difficulty</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider">Topics</th>
-                      <th className="px-4 py-3 text-sm font-medium text-gray-600 dark:text-slate-300 uppercase tracking-wider text-right">Actions</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Title</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Difficulty</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider">Topics</th>
+                      <th className="px-4 py-3 text-sm font-medium text-gray-600 uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-slate-700">
+                  <tbody className="divide-y divide-gray-200">
                     {currentQuestions.map((q) => (
-                      <tr key={q.id} className="transition hover:bg-gray-50 dark:hover:bg-slate-800/80">
-                        <td className="px-4 py-3 text-sm font-medium text-gray-800 dark:text-slate-100">{q.title}</td>
+                      <tr key={q.id} className="hover:bg-gray-50 transition">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800">{q.title}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            q.difficulty === 'Easy'
-                              ? 'bg-green-100 text-green-800 dark:bg-emerald-900/50 dark:text-emerald-300'
-                              : q.difficulty === 'Medium'
-                                ? 'bg-yellow-100 text-yellow-800 dark:bg-amber-900/50 dark:text-amber-200'
-                                : 'bg-red-100 text-red-800 dark:bg-rose-900/50 dark:text-rose-200'
+                            q.difficulty === 'Easy' ? 'bg-green-100 text-green-800' :
+                            q.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
                           }`}>
                             {q.difficulty}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-slate-300">{q.topics.join(', ')}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{q.topics.join(', ')}</td>
                         <td className="px-4 py-3 text-sm text-right space-x-3">
-                          <button onClick={() => handleEdit(q.id)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium" title="Edit">
+                          <button onClick={() => handleEdit(q.id)} className="text-blue-600 hover:text-blue-800 font-medium" title="Edit">
                             <PencilIcon className="h-5 w-5 inline-block"/>
                           </button>
-                           <button onClick={() => handleDelete(q.id)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 font-medium" title="Delete">
+                          <button onClick={() => handleDelete(q.id)} className="text-red-600 hover:text-red-800 font-medium" title="Delete">
                             <TrashIcon className="h-5 w-5 inline-block"/>
                           </button>
                         </td>
@@ -176,21 +174,21 @@ const QuestionsPage: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center mt-6">
-                 <span className="text-sm text-gray-500 dark:text-slate-400">
+                <span className="text-sm text-gray-500">
                   Showing {startIndex + 1} to {Math.min(endIndex, questions.length)} of {questions.length} questions
                 </span>
                 <div className="space-x-2">
                   <button
                     onClick={goToPreviousPage}
                     disabled={currentPage === 1}
-                    className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Previous
                   </button>
                   <button
                     onClick={goToNextPage}
                     disabled={currentPage === totalPages}
-                     className="px-3 py-1 text-sm font-medium text-gray-600 dark:text-slate-200 bg-white dark:bg-slate-900 border border-gray-300 dark:border-slate-700 rounded-md hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
                   </button>
@@ -203,16 +201,16 @@ const QuestionsPage: React.FC = () => {
 
       {showDeleteConfirm && (
         <div style={styles.modalOverlay}>
-          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-700">
+          <div className="relative p-5 border w-96 shadow-lg rounded-md bg-white">
             <div className="mt-3 text-center">
-              <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-slate-100">Delete Question</h3>
+              <h3 className="text-lg leading-6 font-medium text-gray-900">Delete Question</h3>
               <div className="mt-2 px-7 py-3">
-                <p className="text-sm text-gray-500 dark:text-slate-400">Are you sure you want to delete this question? This action cannot be undone.</p>
+                <p className="text-sm text-gray-500">Are you sure you want to delete this question? This action cannot be undone.</p>
               </div>
               <div className="items-center px-4 py-3 space-x-4">
                 <button
                   onClick={cancelDelete}
-                   className="px-4 py-2 bg-gray-200 dark:bg-slate-800 text-gray-800 dark:text-slate-200 rounded hover:bg-gray-300 dark:hover:bg-slate-700 text-base font-medium"
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 text-base font-medium"
                 >
                   Cancel
                 </button>
