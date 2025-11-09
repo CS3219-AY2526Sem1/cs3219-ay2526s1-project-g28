@@ -31,7 +31,7 @@ export interface ExecResult {
 const defaultSnippets: Record<Language, string> = {
   python: "def solution():\n  # Write your code here\n  pass",
   javascript: "function solution() {\n  // Write your code here\n}",
-  java: "public static void main()",
+  java: "public class solution {\n public static Object function(Object o) {\n } \n}",
 };
 
 const difficultyStyles: Record<Difficulty, string> = {
@@ -992,8 +992,13 @@ export default function CollaborationPage() {
               />
             )}
             {activeTab === "chat" && (
-  <Chat question={question} language={language} code={code} sessionId={sessionId as string}/>
-)}
+              <Chat
+                question={question}
+                language={language}
+                code={code}
+                sessionId={sessionId as string}
+              />
+            )}
             {activeTab === "call" && (
               <div className="flex flex-col h-full w-full items-center justify-center gap-4">
                 <button
