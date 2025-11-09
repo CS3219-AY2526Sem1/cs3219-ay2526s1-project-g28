@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion, useDragControls } from "framer-motion";
 import DailyIframe, { DailyCall } from "@daily-co/daily-js";
 
 interface FloatingCallPopupProps {
@@ -7,6 +6,7 @@ interface FloatingCallPopupProps {
   socketRef: React.MutableRefObject<any>;
   onCallEnd: () => void;
   collabServiceUrl: string;
+  className?: string;
 }
 
 const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
@@ -14,8 +14,8 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   socketRef,
   onCallEnd,
   collabServiceUrl,
+  className = "",
 }) => {
-  const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
   const callFrameRef = useRef<DailyCall | null>(null);
   const [inCall, setInCall] = useState(false);
@@ -130,36 +130,23 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   }, [sessionId, collabServiceUrl, onCallEnd, socketRef]);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-50">
-      <motion.div
-        drag
-        dragControls={dragControls}
-        dragListener={false}
-        dragMomentum={false}
-        initial={{ x: 100, y: 100 }}
-        className="absolute bg-white rounded-xl shadow-xl border w-[600px] h-[400px] resize both overflow-hidden pointer-events-auto flex flex-col"
+    <div
+      className={`flex flex-col h-full w-full overflow-hidden rounded-xl border shadow-sm bg-white dark:bg-zinc-900 dark:border-zinc-800 ${className}`}
+    >
+      <div className="bg-gray-800 text-white text-sm font-medium px-4 py-2 flex items-center justify-between">
+        <span>📹 Live Video Call</span>
+      </div>
+      <div
+        ref={containerRef}
+        id="daily-modal-container"
+        className="flex-1 relative overflow-hidden bg-gray-100 dark:bg-zinc-950"
       >
-        {/* Draggable Header */}
-        <div
-          className="cursor-move bg-gray-800 text-white text-sm font-medium px-4 py-2 rounded-t-xl select-none flex items-center justify-between"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <span>📹 Live Video Call</span>
-        </div>
-
-        {/* Daily Call Container */}
-        <div
-          ref={containerRef}
-          id="daily-modal-container"
-          className="flex-1 relative rounded-b-xl overflow-hidden bg-gray-100"
-        >
-          {!inCall && (
-            <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-              Connecting...
-            </div>
-          )}
-        </div>
-      </motion.div>
+        {!inCall && (
+          <div className="flex items-center justify-center h-full text-gray-500 text-sm">
+            Connecting...
+          </div>
+        )}
+      </div>
     </div>
   );
 };

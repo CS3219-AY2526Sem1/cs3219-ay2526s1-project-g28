@@ -1018,37 +1018,41 @@ export default function CollaborationPage() {
               />
             )}
             {activeTab === "call" && (
-              <div className="flex flex-col h-full w-full items-center justify-center gap-4">
-                <button
-                  disabled={isCallActive}
-                  onClick={() => {
-                    setIsCallActive(true);
-                    setShowCallPopup(true);
-                  }}
-                  className={`px-4 py-2 rounded text-white font-medium transition ${
-                    isCallActive
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-indigo-600 hover:bg-indigo-700"
-                  }`}
-                >
-                  {isCallActive ? "Call Started" : "Start Video Call"}
-                </button>
+              <div className="flex flex-1 flex-col h-full w-full">
+                {showCallPopup ? (
+                  <FloatingCallPopup
+                    sessionId={sessionId}
+                    socketRef={socketRef}
+                    onCallEnd={() => {
+                      setIsCallActive(false);
+                      setShowCallPopup(false);
+                    }}
+                    collabServiceUrl={COLLAB_SERVICE_URL}
+                    className="flex-1"
+                  />
+                ) : (
+                  <div className="flex flex-1 items-center justify-center">
+                    <button
+                      disabled={isCallActive}
+                      onClick={() => {
+                        setIsCallActive(true);
+                        setShowCallPopup(true);
+                      }}
+                      className={`px-4 py-2 rounded text-white font-medium transition ${
+                        isCallActive
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-indigo-600 hover:bg-indigo-700"
+                      }`}
+                    >
+                      {isCallActive ? "Call Started" : "Start Video Call"}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       </div>
-      {showCallPopup && (
-        <FloatingCallPopup
-          sessionId={sessionId}
-          socketRef={socketRef}
-          onCallEnd={() => {
-            setIsCallActive(false);
-            setShowCallPopup(false);
-          }}
-          collabServiceUrl={COLLAB_SERVICE_URL}
-        />
-      )}
     </div>
   );
 }
