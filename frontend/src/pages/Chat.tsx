@@ -221,7 +221,10 @@ export default function Chat({
             "If hasCode=false or the user asks to explain code without code present, explain the question, outline an approach, pseudocode, and pitfalls. " +
             "If hasCode=true and the user asks about code, review the provided currentCode.",
         },
-        { role: "system", content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}` },
+        {
+          role: "system",
+          content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}`,
+        },
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -241,7 +244,9 @@ export default function Chat({
 
       if (!resp.ok) {
         const txt = await resp.text().catch(() => "");
-        throw new Error(`API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`);
+        throw new Error(
+          `API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`
+        );
       }
 
       const reader = resp.body?.getReader?.();
@@ -301,7 +306,8 @@ export default function Chat({
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError")
+        setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
