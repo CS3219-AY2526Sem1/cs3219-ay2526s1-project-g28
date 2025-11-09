@@ -67,13 +67,24 @@ function buildEmailContent({ name, verificationUrl, expiresAt }) {
     .join("\n");
 
   const html = `
-    <p>Hello ${safeName},</p>
-    <p>Thanks for signing up. Please verify your email address by clicking the button below:</p>
-    <p><a href="${verificationUrl}" style="display:inline-block;padding:10px 16px;background-color:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:6px;">Verify email</a></p>
-    <p>Or copy and paste this link into your browser:<br/><a href="${verificationUrl}">${verificationUrl}</a></p>
-    ${expirationText ? `<p>${expirationText}</p>` : ""}
-    <p>If you did not sign up, you can safely ignore this email.</p>
-  `;
+  <p>Hello ${safeName},</p>
+  <p>Thanks for signing up. Please verify your email address by clicking the button below:</p>
+  <p>
+    <a href="${verificationUrl}"
+       target="_blank"
+       rel="noopener noreferrer"
+       style="display:inline-block;padding:10px 16px;background-color:#1d4ed8;color:#ffffff;text-decoration:none;border-radius:6px;">
+      Verify email
+    </a>
+  </p>
+  <p>
+    Or copy and paste this link into your browser:<br/>
+    <a href="${verificationUrl}" target="_blank" rel="noopener noreferrer">${verificationUrl}</a>
+  </p>
+  ${expirationText ? `<p>${expirationText}</p>` : ""}
+  <p>If you did not sign up, you can safely ignore this email.</p>
+`;
+
 
   return { plainText, html };
 }
