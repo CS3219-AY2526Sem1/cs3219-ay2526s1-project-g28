@@ -11,6 +11,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { api } from "../lib/api";
+import toast from "react-hot-toast";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
@@ -795,16 +796,17 @@ export default function CollaborationPage() {
       if (username === currentUsername) return;
 
       if (knownUsersRef.current.has(username)) {
-        alert(`${username} has rejoined the session.`);
+        toast.success(`${username} has rejoined the session.`);
       } else {
         knownUsersRef.current.add(username);
+        toast(`${username} joined the session 👋`);
         console.log(`${username} joined the session`);
       }
     });
 
     socket.on("user-left", ({ username }) => {
       if (username !== currentUsername) {
-        alert(`${username} has left the session`);
+        toast(`${username} left the session 👋`);
       }
     });
 
@@ -814,7 +816,7 @@ export default function CollaborationPage() {
 
     socket.on("user-disconnected", ({ username }) => {
       if (username !== currentUsername) {
-        alert(`${username} has been disconnected from the session.`);
+        toast.error(`${username} was disconnected`);
       }
     });
 
