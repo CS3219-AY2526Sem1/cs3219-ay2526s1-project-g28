@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { runCodeApi } from "../lib/services/executionService";
 import Chat from "./Chat";
 import FloatingCallPopup from "../components/FloatingCallPopup";
+import { useTheme } from "../theme/ThemeProvider";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
 
@@ -21,6 +22,34 @@ export interface ExecResult {
   result: boolean;
   error?: string;
 }
+
+function ThemeButton() {
+    const { theme, resolved, setTheme } = useTheme();
+    function cycle() {
+      if (theme === "light") setTheme("dark");
+      else if (theme === "dark") setTheme("system");
+      else setTheme("light");
+    }
+    const label =
+      theme === "system"
+        ? `System (${resolved})`
+        : resolved === "dark"
+        ? "Dark"
+        : "Light";
+    const icon = theme === "system" ? "🖥️" : resolved === "dark" ? "🌙" : "☀️";
+    return (
+      <button
+        onClick={cycle}
+        title={`Theme: ${label} (click to change)`}
+        className="px-2 py-1 rounded-md border border-neutral-300 bg-white text-black
+                   hover:bg-neutral-100 transition
+                   dark:border-neutral-600 dark:bg-neutral-800 dark:text-white dark:hover:bg-neutral-700"
+      >
+        <span className="mr-1">{icon}</span>
+        <span className="text-sm">{label}</span>
+      </button>
+    );
+  }
 
 const defaultSnippets: Record<Language, string> = {
   python: "def solution():\n  # Write your code here\n  pass",
@@ -343,20 +372,28 @@ function CodeEditorTab({
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
       {/* Tabs */}
-      <div className="flex gap-2 mb-3">
-        {["editor", "console"].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab as "editor" | "console")}
-            className={`px-4 py-2 rounded-t-lg font-semibold transition-colors ${
-              activeTab === tab
-                ? "bg-white shadow text-slate-900"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
+      <div role="tablist" aria-label="Editor console tabs" className="flex gap-2 mb-3">
+  {(["editor", "console"] as const).map((tab) => {
+    const active = activeTab === tab;
+    return (
+      <button
+        key={tab}
+        role="tab"
+        aria-selected={active}
+        onClick={() => setActiveTab(tab)}
+        className={[
+          "px-4 py-2 rounded-md text-sm font-semibold transition-colors outline-none",
+          active
+            ? // active = strong, inverted chip
+              "bg-slate-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
+            : // inactive = no pill, just text; subtle hover
+              "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+        ].join(" ")}
+      >
+        {tab.charAt(0).toUpperCase() + tab.slice(1)}
+      </button>
+    );
+  })}
       </div>
 
       {/* Editor Tab */}
@@ -397,13 +434,13 @@ function CodeEditorTab({
           </div>
 
           {/* Test Cases */}
-          <div className="mt-3 rounded-xl border bg-white overflow-hidden transition-all duration-300">
+          <div className="mt-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden transition-all duration-300">
             <div
               className="flex justify-between items-center px-4 py-2 cursor-pointer"
               onClick={() => setShowTests(!showTests)}
             >
-              <h3 className="text-sm font-medium text-slate-800">Test Cases</h3>
-              <span className="text-indigo-600 text-sm hover:underline">
+              <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">Test Cases</h3>
+              <span className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline">
                 {showTests ? "Hide" : "Show"}
               </span>
             </div>
@@ -420,21 +457,19 @@ function CodeEditorTab({
                     const tcs = Array.isArray(tcItem) ? tcItem : [tcItem];
                     return tcs.map((tc, subIdx) => {
                       const result = runResults[idx]?.result;
-                      let bgColor = "bg-white";
+                      let bgColor = "bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700";
                       if (result !== undefined) {
                         bgColor = result
-                          ? "bg-green-50 border border-green-400"
-                          : "bg-red-50 border border-red-400";
+                          ? "bg-green-50 dark:bg-transparent border border-green-400 dark:border-green-500"
+                          : "bg-red-50 dark:bg-transparent border border-red-400 dark:border-red-500";
                       }
                       return (
                         <div
                           key={`${idx}-${subIdx}`}
                           className={`min-w-[220px] flex-shrink-0 rounded-xl border p-3 shadow-sm ${bgColor}`}
                         >
-                          <div className="font-semibold text-slate-800 mb-1">
-                            Case {idx + 1}
-                          </div>
-                          <div className="text-sm text-slate-600 mb-1">
+                          <div className="font-semibold text-slate-800 dark:text-zinc-100 mb-1">Case {idx + 1}</div>
+                          <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
                             Input:{" "}
                             <code>
                               {Array.isArray(tc.args[0])
@@ -442,11 +477,11 @@ function CodeEditorTab({
                                 : tc.args[0]}
                             </code>
                           </div>
-                          <div className="text-sm text-slate-600 mb-1">
+                          <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
                             Expected: <code>{JSON.stringify(tc.expected)}</code>
                           </div>
                           {runResults && hasRunSubmitted && (
-                            <div className="text-sm text-slate-700 mb-1">
+                            <div className="text-sm text-slate-700 dark:text-zinc-200 mb-1">
                               Output:{" "}
                               <code>
                                 {runResults[idx]?.output
@@ -810,6 +845,9 @@ export default function CollaborationPage() {
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-bold">PeerPrep</h1>
         <SessionTimer startedAt={startedAt} />
+        <div className="flex items-center gap-2">
+          <ThemeButton />
+        </div>
         <button
           onClick={handleLeaveSession}
           className="px-3 py-1 border rounded bg-red-500 text-white hover:bg-red-600"
