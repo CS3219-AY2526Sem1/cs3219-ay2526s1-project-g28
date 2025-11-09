@@ -33,9 +33,13 @@ export async function connectKafka() {
       try {
         const event = JSON.parse(message.value.toString());
         const { correlationId, meta } = event;
+<<<<<<< Updated upstream
 
         console.log(`[Question Service] Received MatchFound: ${correlationId}`);
 
+=======
+        console.log(`[Question Service] Received MatchFound: ${correlationId}`);
+>>>>>>> Stashed changes
         await handleMatchingRequest(event);
       } catch (error) {
         console.error("Failed to process Kafka message:", error);
