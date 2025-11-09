@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  api-gateway:
+    container_name: api-gateway
+    build: ./backend/api-gateway
+    image: local/gateway:dev
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./backend/api-gateway/.env
+    restart: unless-stopped
+
+  user-service:
+    container_name: user-service
+    build: ./backend/user-service
+    image: local/user:dev
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./backend/user-service/.env
+    restart: unless-stopped
+
+  question-service:
+    container_name: question-service
+    build: ./backend/question-service
+    image: local/question:dev
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./backend/question-service/.env
+    restart: unless-stopped
+
+  matching-service:
+    container_name: matching-service
+    build: ./backend/matching-service
+    image: local/matching:dev
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./backend/matching-service/.env
+    restart: unless-stopped
+
+  collaboration-service:
+    container_name: collaboration-service
+    build: ./backend/collaboration-service
+    image: local/collaboration:dev
+    ports:
+      - "3004:3004"
+    env_file:
+      - ./backend/collaboration-service/.env
+    restart: unless-stopped
+
+  notification-service:
+    container_name: notification-service
+    build: ./backend/notification-service
+    image: local/notification:dev
+    ports:
+      - "3005:3005"
+    env_file:
+      - ./backend/notification-service/.env
+    restart: unless-stopped
+
+  execution-service:
+    container_name: execution-service
+    build: ./backend/execution-service
+    image: local/execution:dev
+    ports:
+      - "3006:3006"
+    env_file:
+      - ./backend/execution-service/.env
+    restart: unless-stopped
+
+  ai-service:
+    container_name: ai-service
+    build: ./backend/ai-service
+    image: local/ai:dev
+    ports:
+      - "3007:3007"
+    env_file:
+      - ./backend/ai-service/.env
+    restart: unless-stopped
+
+  frontend:
+    container_name: frontend
+    build: ./frontend
+    image: local/frontend:dev
+    ports:
+      - "5173:5173" # Vite default port
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:3000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped

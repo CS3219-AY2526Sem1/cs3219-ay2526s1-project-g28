@@ -3,15 +3,39 @@ import React, { useState } from "react";
 import { theme } from "../theme";
 import { MenuIcon } from "./Icons";
 import ProfileDropdown from "./ProfileDropdown";
+import { useAuth } from "../auth/AuthContext";
+import { api } from "../lib/api";
+import { useNavigate } from "react-router-dom";
 
 type Style = React.CSSProperties;
 
 interface TopBarProps {
   onMenuClick: () => void;
+  rightExtra?: React.ReactNode;
 }
 
-const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
+const TopBar: React.FC<TopBarProps> = ({ onMenuClick, rightExtra }) => {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const displayName = user?.fullname || "User";
+  const displayEmail = user?.email || "";
+  const avatarUrl =
+    user && (user as any).avatarUrl
+      ? (user as any).avatarUrl
+      : "https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg";
+
+  async function handleLogout() {
+    try {
+      // optional: backend endpoint; safe to ignore failure in dev
+      await api("/auth/logout", { method: "POST" }).catch(() => {});
+    } finally {
+      logout(); // clear token/user from AuthContext + localStorage
+      setDropdownOpen(false);
+      navigate("/login", { replace: true });
+    }
+  }
 
   return (
     <header style={styles.topBar}>
@@ -23,19 +47,22 @@ const TopBar: React.FC<TopBarProps> = ({ onMenuClick }) => {
       </div>
 
       <div style={styles.rightSection}>
-        <div style={{ position: "relative" }}>
+        {rightExtra}
+        <div style={{ position: "relative", marginLeft: "0.75rem" }}>
           <button
             onClick={() => setDropdownOpen(!isDropdownOpen)}
             style={styles.profileButton}
           >
-            <img
-              src="https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg"
-              alt="User Avatar"
-              style={styles.avatar}
-            />
+            <img src={avatarUrl} alt="User Avatar" style={styles.avatar} />
           </button>
           {isDropdownOpen && (
-            <ProfileDropdown onClose={() => setDropdownOpen(false)} />
+            <ProfileDropdown
+              onClose={() => setDropdownOpen(false)}
+              userName={displayName}
+              userEmail={displayEmail}
+              avatarUrl={avatarUrl}
+              onLogout={handleLogout}
+            />
           )}
         </div>
       </div>

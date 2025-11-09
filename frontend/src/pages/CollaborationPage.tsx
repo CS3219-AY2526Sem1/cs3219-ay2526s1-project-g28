@@ -67,7 +67,6 @@ function ProblemViewer({
     explanation?: string;
   }[];
 }) {
-  console.log(examples);
   return (
     <aside className="w-full md:w-2/5 overflow-y-auto bg-white rounded-2xl border shadow-sm p-4">
       <h2 className="text-lg font-semibold mb-2">{title}</h2>
@@ -883,13 +882,8 @@ export default function CollaborationPage() {
               />
             )}
             {activeTab === "chat" && (
-              <Chat
-                question={question}
-                language={language}
-                code={code}
-                sessionId={sessionId as string}
-              />
-            )}
+  <Chat question={question} language={language} code={code} sessionId={sessionId as string}/>
+)}
             {activeTab === "call" && (
               <div className="flex flex-col h-full w-full items-center justify-center gap-4">
                 <button

@@ -19,7 +19,10 @@ export async function createQuestion(
   constraints,
   examples,
   codeSnippets,
-  testCases
+  entryPoint,
+  timeout,
+  signature,
+  testCases,
 ) {
   return new QuestionModel({
     title,
@@ -29,6 +32,9 @@ export async function createQuestion(
     constraints,
     examples,
     codeSnippets,
+    entryPoint,
+    timeout,
+    signature,
     testCases,
   }).save();
 }
@@ -42,7 +48,10 @@ export async function updateQuestionById(
   constraints,
   examples,
   codeSnippets,
-  testCases
+  entryPoint,
+  timeout,
+  signature,
+  testCases,
 ) {
   return QuestionModel.findByIdAndUpdate(
     questionId,
@@ -55,6 +64,9 @@ export async function updateQuestionById(
         constraints,
         examples,
         codeSnippets,
+        entryPoint,
+        timeout,
+        signature,
         testCases,
       },
     },

@@ -1,5 +1,5 @@
 // src/components/CollapsibleSidebar.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { theme } from "../theme";
 import {
   HomeIcon,
@@ -25,15 +25,23 @@ interface SidebarProps {
 
 const CollapsibleSidebar: React.FC<SidebarProps> = ({
   isOpen,
+  isAdmin,
   currentPage,
   onNavigate,
 }) => {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const userObj = JSON.parse(storedUser);
+    }
+  }, []);
+
   // Separate navigation items by role
   const userNavItems: NavItem[] = [
     { name: "Challenges", icon: <HomeIcon /> },
-    { name: "My Sessions", icon: <HistoryIcon /> },
+    { name: "My History", icon: <HistoryIcon /> },
     { name: "Leaderboard", icon: <LeaderboardIcon /> },
   ];
 
@@ -81,13 +89,15 @@ const CollapsibleSidebar: React.FC<SidebarProps> = ({
           ))}
         </ul>
 
-        <hr style={styles.divider} />
+        {isAdmin && <hr style={styles.divider} />}
 
-        <ul style={styles.navList}>
-          {adminNavItems.map((item) => (
-            <NavLink key={item.name} item={item} />
-          ))}
-        </ul>
+        {isAdmin && (
+          <ul style={styles.navList}>
+            {adminNavItems.map((item) => (
+              <NavLink key={item.name} item={item} />
+            ))}
+          </ul>
+        )}
       </nav>
     </aside>
   );

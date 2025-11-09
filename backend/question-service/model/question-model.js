@@ -2,30 +2,40 @@ import mongoose from "mongoose";
 
 const Schema = mongoose.Schema;
 
-// Sub-schema for examples
+const ParamSchema = new Schema(
+  {
+    name: { type: String, required: true },
+    type: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const SignatureSchema = new Schema(
+  {
+    params: { type: [ParamSchema], default: [] },
+    returnType: { type: String, default: "any" },
+  },
+  { _id: false }
+);
+
 const ExampleSchema = new Schema(
   {
-    input: {
-      type: String,
-      required: true,
-    },
-    output: {
-      type: String,
-      required: true,
-    },
-    explanation: {
-      type: String,
-      required: false, // Optional
-    },
+    input: String,
+    output: String,
+    explanation: String,
     image: {
-      type: String,
-      required: false, // Optional
+      url: { type: String },
+      provider: { type: String },
+      key: { type: String },
+      width: Number,
+      height: Number,
+      mime: String,
+      size: Number,
     },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
-// Sub-schema for code snippets
 const CodeSnippetSchema = new Schema(
   {
     language: {
@@ -38,22 +48,26 @@ const CodeSnippetSchema = new Schema(
     },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
-// Sub-schema for test cases
 const TestCaseSchema = new Schema(
   {
-    input: {
-      type: String,
+    args: {
+      type: [Schema.Types.Mixed],
       required: true,
+      validate: [
+        (arr) => Array.isArray(arr),
+        "Test case 'args' must be an array (of JSON-serializable values).",
+      ],
     },
     expected: {
-      type: String,
+      type: Schema.Types.Mixed,
       required: true,
     },
+    hidden: { type: Boolean, default: false },
   },
   { _id: false }
-); // Prevents Mongoose from creating an _id for subdocuments
+);
 
 const QuestionsModelSchema = new Schema({
   title: {
@@ -82,7 +96,6 @@ const QuestionsModelSchema = new Schema({
       },
     ],
     required: true,
-    // Custom validator to ensure the array has at least one item
     validate: [
       (val) => val.length > 0,
       "A question must have at least one topic.",
@@ -106,8 +119,12 @@ const QuestionsModelSchema = new Schema({
   },
   codeSnippets: {
     type: [CodeSnippetSchema],
-    required: false, // Optional field
+    required: false,
   },
+  entryPoint: { type: String, required: true },
+  timeout: { type: Number, default: 1, min: 1, },
+  signature: { type: SignatureSchema, default: undefined },
+
   testCases: {
     type: [TestCaseSchema],
     required: true,
