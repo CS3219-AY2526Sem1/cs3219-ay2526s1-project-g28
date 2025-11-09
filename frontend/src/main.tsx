@@ -18,6 +18,7 @@ import CollaborationPage from "./pages/CollaborationPage";
 import HistoryDetail from "./pages/HistoryDetail";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
+import VerifyEmail from "./pages/VerifyEmail";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
@@ -28,6 +29,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route
               path="*"
               element={<div className="p-10">404 Not found</div>}
