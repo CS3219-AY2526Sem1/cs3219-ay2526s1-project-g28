@@ -56,19 +56,19 @@ function buildEmailContent({ name, verificationUrl, expiresAt }) {
   const plainText = [
     `Hello ${safeName},`,
     "",
-    "Thanks for signing up. Please verify your email address by visiting the link below:",
+    "Please verify your email address by visiting the link below:",
     verificationUrl,
     "",
     expirationText,
     "",
-    "If you did not sign up, you can safely ignore this email.",
+    "If you did not request this, you can safely ignore this email.",
   ]
     .filter(Boolean)
     .join("\n");
 
   const html = `
   <p>Hello ${safeName},</p>
-  <p>Thanks for signing up. Please verify your email address by clicking the button below:</p>
+  <p>Please verify your email address by clicking the button below:</p>
   <p>
     <a href="${verificationUrl}"
        target="_blank"
@@ -82,7 +82,7 @@ function buildEmailContent({ name, verificationUrl, expiresAt }) {
     <a href="${verificationUrl}" target="_blank" rel="noopener noreferrer">${verificationUrl}</a>
   </p>
   ${expirationText ? `<p>${expirationText}</p>` : ""}
-  <p>If you did not sign up, you can safely ignore this email.</p>
+  <p>If you did not request this, you can safely ignore this email.</p>
 `;
 
 

@@ -16,6 +16,12 @@ type CloudinarySig = {
   apiKey: string;
 };
 
+type EmailVerificationInfo = {
+  email?: string | null;
+  dispatched: boolean;
+  expiresAt?: string | null;
+};
+
 // If your api() helper already adds auth headers, use it. Otherwise use fetch with Authorization.
 async function getCloudinarySignature(): Promise<CloudinarySig> {
   // If your backend route is different, adjust this path:
@@ -64,6 +70,7 @@ const SettingsPage: React.FC = () => {
   const [err, setErr] = useState<string | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [emailVerificationInfo, setEmailVerificationInfo] = useState<EmailVerificationInfo | null>(null);
 
   const passwordStatus = useMemo(
     () => getPasswordRequirementStatus(newPw),
@@ -74,6 +81,17 @@ const SettingsPage: React.FC = () => {
   const canSavePassword = Boolean(
     passwordStrong && passwordsMatch && newPw && confirmPw && !savingPassword
   );
+
+  const emailVerificationExpiry = useMemo(() => {
+    if (!emailVerificationInfo?.expiresAt) return null;
+    const expires = new Date(emailVerificationInfo.expiresAt);
+    if (Number.isNaN(expires.getTime())) return null;
+    return new Intl.DateTimeFormat("en-SG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Singapore",
+    }).format(expires);
+  }, [emailVerificationInfo?.expiresAt]);
 
   
   // Treat missing provider as "password" (local) to keep old accounts working
@@ -146,12 +164,22 @@ const SettingsPage: React.FC = () => {
     setSavingEmail(true);
     setMsg(null);
     setErr(null);
+    setEmailVerificationInfo(null);
     try {
       const res = await api(`/users/${user.id}`, { method: "PATCH", body: { email } });
       const updated = res?.data ?? res;
       if (token) login(token, updated);
       setEmail(updated.email || email);
-      setMsg("Email updated");
+      const verification = (res?.emailVerification ?? null) as EmailVerificationInfo | null;
+      if (verification) {
+        const dispatchedMsg = verification.dispatched
+          ? `We sent a verification link to ${verification.email || updated.email || email}. Please verify to complete the change.`
+          : `We updated your email, but couldn’t automatically send a verification link. Please contact support if you don’t receive one soon.`;
+        setMsg(dispatchedMsg);
+      } else {
+        setMsg(res?.message || "Email updated");
+      }
+      setEmailVerificationInfo(verification);
     } catch (e: any) {
       setErr(e.message || "Failed to update email");
     } finally {
@@ -322,6 +350,27 @@ const SettingsPage: React.FC = () => {
             >
               {savingEmail ? "Saving…" : "Save email"}
             </button>
+          )}
+          {!isOAuth && emailVerificationInfo && (
+            <p style={{ ...settingsStyles.mutedSmall, marginTop: 12 }}>
+              {emailVerificationInfo.dispatched ? (
+                <>
+                  Check your inbox to verify <strong>{emailVerificationInfo.email || email}</strong>.
+                  {emailVerificationExpiry && " "}
+                  {emailVerificationExpiry && (
+                    <span>
+                      The link will expire on <strong>{emailVerificationExpiry} GMT+8</strong>.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  We couldn’t automatically send a verification email to <strong>{emailVerificationInfo.email || email}</strong>.
+                  {" "}
+                  Please contact support if you don’t receive one soon.
+                </>
+              )}
+            </p>
           )}
         </section>
 
