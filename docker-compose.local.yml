@@ -81,6 +81,16 @@ services:
       - ./backend/ai-service/.env
     restart: unless-stopped
 
+  video-service:
+    container_name: video-service
+    build: ./backend/video-service
+    image: local/video:dev
+    ports:
+      - "3010:3010"
+    env_file:
+      - ./backend/video-service/.env
+    restart: unless-stopped
+
   frontend:
     container_name: frontend
     build: ./frontend
