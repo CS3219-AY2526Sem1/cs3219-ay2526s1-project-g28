@@ -1,4 +1,5 @@
 // controller/auth-controller.js
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
@@ -8,12 +9,16 @@ import {
   findUserByProviderId,         // OAuth lookup
   createOAuthUser,              // create user for OAuth
   ensureUniqueUsername,         // repo helper we added
+  updateUserById,          // keep existing users in sync with provider data
+  findUserByPasswordResetTokenHash,
 } from "../model/repository.js";
 
 import { formatUserResponse } from "./user-controller.js";
+import { buildPasswordResetUrl, sendPasswordResetEmail } from "../services/email-service.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const JWT_SECRET = process.env.JWT_SECRET;
+const PASSWORD_RESET_TTL_HOURS = Number(process.env.PASSWORD_RESET_TTL_HOURS || 1);
 
 // Small helper so we don’t depend on another utils file
 function baseUsername(displayName, email, fallback = "user") {
@@ -50,6 +55,138 @@ export async function handleLogin(req, res) {
     });
   } catch (err) {
     return res.status(500).json({ message: err.message });
+  }
+}
+
+const PASSWORD_RULES = [
+  {
+    test: (value) => typeof value === "string" && value.length >= 8,
+    message: "Password must be at least 8 characters long.",
+  },
+  {
+    test: (value) => typeof value === "string" && /[a-z]/.test(value),
+    message: "Password must include a lowercase letter.",
+  },
+  {
+    test: (value) => typeof value === "string" && /[A-Z]/.test(value),
+    message: "Password must include an uppercase letter.",
+  },
+  {
+    test: (value) => typeof value === "string" && /\d/.test(value),
+    message: "Password must include a number.",
+  },
+  {
+    test: (value) => typeof value === "string" && /[^A-Za-z0-9]/.test(value),
+    message: "Password must include a special character.",
+  },
+];
+
+function validatePasswordStrength(password) {
+  for (const rule of PASSWORD_RULES) {
+    if (!rule.test(password)) {
+      return rule.message;
+    }
+  }
+  return null;
+}
+
+export async function requestPasswordReset(req, res) {
+  const { email } = req.body;
+  if (!email || typeof email !== "string") {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  try {
+    const user = await findUserByEmail(email);
+
+    if (!user || !user.password) {
+      return res.status(200).json({
+        message: "If an account exists for this email, a reset link has been sent.",
+        data: { dispatched: false },
+      });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const expiration = new Date(Date.now() + PASSWORD_RESET_TTL_HOURS * 60 * 60 * 1000);
+
+    await updateUserById(user.id, {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: expiration,
+    });
+
+    const resetUrl = buildPasswordResetUrl(token);
+    const recipientName = user.fullname || user.username || "there";
+
+    let emailDispatched = false;
+    try {
+      await sendPasswordResetEmail({
+        to: user.email,
+        name: recipientName,
+        resetUrl,
+        expiresAt: expiration,
+      });
+      emailDispatched = true;
+    } catch (err) {
+      console.error("Failed to send password reset email", err);
+    }
+
+    return res.status(200).json({
+      message: emailDispatched
+        ? "If an account exists for this email, a reset link has been sent."
+        : "We couldn't confirm email delivery, but if an account exists it now has a fresh reset link.",
+      data: {
+        dispatched: emailDispatched,
+        expiresAt: expiration,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when requesting password reset" });
+  }
+}
+
+export async function resetPassword(req, res) {
+  const { token, password } = req.body ?? {};
+
+  if (!token || typeof token !== "string") {
+    return res.status(400).json({ message: "Reset token is required" });
+  }
+
+  if (!password || typeof password !== "string") {
+    return res.status(400).json({ message: "New password is required" });
+  }
+
+  const passwordError = validatePasswordStrength(password);
+  if (passwordError) {
+    return res.status(400).json({ message: passwordError });
+  }
+
+  try {
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await findUserByPasswordResetTokenHash(tokenHash);
+
+    if (!user || !user.passwordResetExpiresAt) {
+      return res.status(400).json({ message: "Invalid or expired reset token" });
+    }
+
+    if (user.passwordResetExpiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ message: "Reset token has expired" });
+    }
+
+    const updatedUser = await updateUserById(user.id, {
+      password,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    });
+
+    return res.status(200).json({
+      message: "Password reset successfully",
+      data: formatUserResponse(updatedUser),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when resetting password" });
   }
 }
 

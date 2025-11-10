@@ -97,8 +97,25 @@ export async function findAllUsers() {
   return UserModel.find();
 }
 
-export async function updateUserById(userId, { username, fullname, email, password, avatarUrl }) {
+export async function updateUserById(
+  userId,
+  {
+    username,
+    fullname,
+    email,
+    password,
+    avatarUrl,
+    isEmailVerified,
+    emailVerificationTokenHash,
+    emailVerificationExpiresAt,
+    emailVerifiedAt,
+    passwordResetTokenHash,
+    passwordResetExpiresAt,
+  }
+) {
   const update = {};
+  const unset = {};
+
   if (username) update.username = username.toLowerCase().trim();
   if (fullname) update.fullname = fullname;
   if (email) update.email = email.toLowerCase().trim();
@@ -108,11 +125,42 @@ export async function updateUserById(userId, { username, fullname, email, passwo
     update.password = await hashPassword(password);
   }
 
-  return UserModel.findByIdAndUpdate(
-    userId,
-    { $set: update },
-    { new: true }
-  );
+  if (isEmailVerified !== undefined) {
+    update.isEmailVerified = !!isEmailVerified;
+  }
+
+  if (emailVerificationTokenHash !== undefined) {
+    update.emailVerificationTokenHash = emailVerificationTokenHash;
+  }
+
+  if (emailVerificationExpiresAt !== undefined) {
+    update.emailVerificationExpiresAt = emailVerificationExpiresAt;
+  }
+
+  if (emailVerifiedAt === null) {
+    unset.emailVerifiedAt = "";
+  } else if (emailVerifiedAt !== undefined) {
+    update.emailVerifiedAt = emailVerifiedAt;
+  }
+
+  if (passwordResetTokenHash === null) {
+    unset.passwordResetTokenHash = "";
+  } else if (passwordResetTokenHash !== undefined) {
+    update.passwordResetTokenHash = passwordResetTokenHash;
+  }
+
+  if (passwordResetExpiresAt === null) {
+    unset.passwordResetExpiresAt = "";
+  } else if (passwordResetExpiresAt !== undefined) {
+    update.passwordResetExpiresAt = passwordResetExpiresAt;
+  }
+
+  const updateDoc = { $set: update };
+  if (Object.keys(unset).length) {
+    updateDoc.$unset = unset;
+  }
+
+  return UserModel.findByIdAndUpdate(userId, updateDoc, { new: true });
 }
 
 export async function updateUserPrivilegeById(userId, isAdmin) {
@@ -148,6 +196,11 @@ export async function markUserEmailVerified(userId) {
     },
     { new: true }
   );
+}
+
+export async function findUserByPasswordResetTokenHash(tokenHash) {
+  if (!tokenHash) return null;
+  return UserModel.findOne({ passwordResetTokenHash: tokenHash });
 }
 
 /* ---------- OAuth (find-or-create) ---------- */

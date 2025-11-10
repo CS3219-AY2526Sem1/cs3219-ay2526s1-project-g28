@@ -52,6 +52,14 @@ const UserModelSchema = new Schema({
     type: Date,
   },
 
+  passwordResetTokenHash: {
+    type: String,
+    index: true,
+  },
+  passwordResetExpiresAt: {
+    type: Date,
+  },
+
   providers: {
     type: [ProviderSubSchema],
     default: [],         // e.g., [{ provider:"password", providerId:"local:user@example.com" }]

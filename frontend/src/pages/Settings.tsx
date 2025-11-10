@@ -3,6 +3,7 @@ import { theme } from "../theme";
 import Header from "../components/Header";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../lib/api";
+import { getPasswordRequirementStatus, isPasswordStrong } from "../lib/password";
 
 type Style = React.CSSProperties;
 
@@ -13,6 +14,12 @@ type CloudinarySig = {
   signature: string;
   cloudName: string;
   apiKey: string;
+};
+
+type EmailVerificationInfo = {
+  email?: string | null;
+  dispatched: boolean;
+  expiresAt?: string | null;
 };
 
 // If your api() helper already adds auth headers, use it. Otherwise use fetch with Authorization.
@@ -57,10 +64,34 @@ const SettingsPage: React.FC = () => {
   const [email, setEmail] = useState(user?.email || "");
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [avatarBusy, setAvatarBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [emailVerificationInfo, setEmailVerificationInfo] = useState<EmailVerificationInfo | null>(null);
+
+  const passwordStatus = useMemo(
+    () => getPasswordRequirementStatus(newPw),
+    [newPw]
+  );
+  const passwordStrong = isPasswordStrong(newPw);
+  const passwordsMatch = newPw === confirmPw;
+  const canSavePassword = Boolean(
+    passwordStrong && passwordsMatch && newPw && confirmPw && !savingPassword
+  );
+
+  const emailVerificationExpiry = useMemo(() => {
+    if (!emailVerificationInfo?.expiresAt) return null;
+    const expires = new Date(emailVerificationInfo.expiresAt);
+    if (Number.isNaN(expires.getTime())) return null;
+    return new Intl.DateTimeFormat("en-SG", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Singapore",
+    }).format(expires);
+  }, [emailVerificationInfo?.expiresAt]);
 
   
   // Treat missing provider as "password" (local) to keep old accounts working
@@ -80,24 +111,13 @@ const SettingsPage: React.FC = () => {
     );
   }
 
-  async function saveAvatar() {
-  setBusy(true); setMsg(null); setErr(null);
-  try {
-    const res = await api(`/users/${user.id}`, { method: "PATCH", body: { avatarUrl } });
-    const updated = res?.data ?? res;          // depends on your api() shape
-    // persist into context + localStorage
-    if (token) login(token, updated);
-    setMsg("Avatar updated");
-  } catch (e: any) {
-    setErr(e.message || "Failed to update avatar");
-  } finally { setBusy(false); }
-}
+  async function removeAvatar() {
+    const ok = window.confirm("Remove your profile picture?");
+    if (!ok) return;
 
-async function removeAvatar() {
-  const ok = window.confirm("Remove your profile picture?");
-  if (!ok) return;
-
-  setBusy(true); setMsg(null); setErr(null);
+  setAvatarBusy(true);
+  setMsg(null);
+  setErr(null);
   try {
     const res = await api(`/users/${user.id}`, { method: "PATCH", body: { avatarUrl: "" } });
     const updated = res?.data ?? res;
@@ -107,7 +127,7 @@ async function removeAvatar() {
   } catch (e: any) {
     setErr(e.message || "Failed to remove avatar");
   } finally {
-    setBusy(false);
+    setAvatarBusy(false);
   }
 }
 
@@ -118,7 +138,10 @@ async function removeAvatar() {
   if (!file.type.startsWith("image/")) { setErr("Please select an image"); return; }
   if (file.size > 2 * 1024 * 1024) { setErr("Max file size is 2MB"); return; }
 
-  setUploading(true); setErr(null); setMsg(null);
+  setUploading(true);
+  setAvatarBusy(true);
+  setErr(null);
+  setMsg(null);
   try {
     const { url } = await uploadToCloudinary(file);
     // PATCH backend, then update context with returned user
@@ -131,31 +154,61 @@ async function removeAvatar() {
     setErr(e.message || "Upload failed");
   } finally {
     setUploading(false);
+    setAvatarBusy(false);
     e.target.value = "";
   }
 }
 
   async function saveEmail() {
-    setBusy(true); setMsg(null); setErr(null);
+    if (savingEmail) return;
+    setSavingEmail(true);
+    setMsg(null);
+    setErr(null);
+    setEmailVerificationInfo(null);
     try {
-      await api(`/users/${user.id}`, { method: "PATCH", body: { email } });
-      setMsg("Email updated");
+      const res = await api(`/users/${user.id}`, { method: "PATCH", body: { email } });
+      const updated = res?.data ?? res;
+      if (token) login(token, updated);
+      setEmail(updated.email || email);
+      const verification = (res?.emailVerification ?? null) as EmailVerificationInfo | null;
+      if (verification) {
+        const dispatchedMsg = verification.dispatched
+          ? `We sent a verification link to ${verification.email || updated.email || email}. Please verify to complete the change.`
+          : `We updated your email, but couldn’t automatically send a verification link. Please contact support if you don’t receive one soon.`;
+        setMsg(dispatchedMsg);
+      } else {
+        setMsg(res?.message || "Email updated");
+      }
+      setEmailVerificationInfo(verification);
     } catch (e: any) {
       setErr(e.message || "Failed to update email");
-    } finally { setBusy(false); }
+    } finally {
+      setSavingEmail(false);
+    }
   }
 
   async function savePassword() {
-    if (newPw.length < 8) { setErr("Password must be at least 8 characters."); return; }
-    if (newPw !== confirmPw) { setErr("Passwords do not match."); return; }
-    setBusy(true); setMsg(null); setErr(null);
+    if (savingPassword) return;
+    if (!passwordStrong) {
+      setErr("Password must meet all requirements.");
+      return;
+    }
+    if (!passwordsMatch) {
+      setErr("Passwords do not match.");
+      return;
+    }
+    setSavingPassword(true);
+    setMsg(null);
+    setErr(null);
     try {
       await api(`/users/${user.id}`, { method: "PATCH", body: { password: newPw } });
       setMsg("Password updated");
       setNewPw(""); setConfirmPw("");
     } catch (e: any) {
       setErr(e.message || "Failed to update password");
-    } finally { setBusy(false); }
+    } finally {
+      setSavingPassword(false);
+    }
   }
 
   async function deleteAccount() {
@@ -235,7 +288,13 @@ async function removeAvatar() {
     </p>
   ) : (
     <>
-      <label style={settingsStyles.fileLabel}>
+      <label
+        style={{
+          ...settingsStyles.fileLabel,
+          opacity: uploading ? 0.7 : 1,
+          cursor: uploading ? "not-allowed" : "pointer",
+        }}
+      >
         <input
           type="file"
           accept="image/*"
@@ -248,10 +307,12 @@ async function removeAvatar() {
 
       <button
               onClick={removeAvatar}
-              disabled={busy || !avatarUrl}
+              disabled={avatarBusy || uploading || !avatarUrl}
               style={{
                 ...settingsStyles.secondaryBtn,
-                opacity: avatarUrl ? 1 : 0.6,
+                opacity: avatarUrl && !(avatarBusy || uploading) ? 1 : 0.6,
+                cursor:
+                  avatarBusy || uploading || !avatarUrl ? "not-allowed" : "pointer",
               }}
               title={avatarUrl ? "Remove current image" : "No image to remove"}
             >
@@ -278,9 +339,38 @@ async function removeAvatar() {
           {isOAuth ? (
             <p style={settingsStyles.mutedSmall}>Email is managed by {provider}. Update it in your {provider} account.</p>
           ) : (
-            <button onClick={saveEmail} disabled={busy || !email} style={settingsStyles.primaryBtn}>
-              {busy ? "Saving…" : "Save email"}
+            <button
+              onClick={saveEmail}
+              disabled={savingEmail || !email}
+              style={{
+                ...settingsStyles.primaryBtn,
+                opacity: savingEmail || !email ? 0.7 : 1,
+                cursor: savingEmail || !email ? "not-allowed" : "pointer",
+              }}
+            >
+              {savingEmail ? "Saving…" : "Save email"}
             </button>
+          )}
+          {!isOAuth && emailVerificationInfo && (
+            <p style={{ ...settingsStyles.mutedSmall, marginTop: 12 }}>
+              {emailVerificationInfo.dispatched ? (
+                <>
+                  Check your inbox to verify <strong>{emailVerificationInfo.email || email}</strong>.
+                  {emailVerificationExpiry && " "}
+                  {emailVerificationExpiry && (
+                    <span>
+                      The link will expire on <strong>{emailVerificationExpiry} GMT+8</strong>.
+                    </span>
+                  )}
+                </>
+              ) : (
+                <>
+                  We couldn’t automatically send a verification email to <strong>{emailVerificationInfo.email || email}</strong>.
+                  {" "}
+                  Please contact support if you don’t receive one soon.
+                </>
+              )}
+            </p>
           )}
         </section>
 
@@ -293,10 +383,11 @@ async function removeAvatar() {
             <>
               <input
                 type="password"
-                placeholder="New password (min 8 chars)"
+                placeholder="New password"
                 style={settingsStyles.input}
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
+                aria-describedby="settings-password-requirements"
               />
               <input
                 type="password"
@@ -305,8 +396,64 @@ async function removeAvatar() {
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
               />
-              <button onClick={savePassword} disabled={busy} style={settingsStyles.primaryBtn}>
-                {busy ? "Saving…" : "Update password"}
+              <div
+                id="settings-password-requirements"
+                style={{
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 8,
+                  background: theme.backgroundMedium,
+                  padding: "12px 14px",
+                  marginTop: 12,
+                }}
+              >
+                <p
+                  style={{
+                    ...settingsStyles.mutedSmall,
+                    margin: 0,
+                    color: theme.textSecondary,
+                    fontSize: 13,
+                  }}
+                >
+                  Password must include:
+                </p>
+                <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {passwordStatus.map((requirement) => (
+                    <li key={requirement.id} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span
+                        aria-hidden
+                        style={{
+                          fontSize: 12,
+                          color: requirement.met ? theme.success : theme.textSecondary,
+                        }}
+                      >
+                        {requirement.met ? "✓" : "•"}
+                      </span>
+                      <span
+                        style={{
+                          color: requirement.met ? theme.success : theme.textSecondary,
+                          fontSize: 13,
+                        }}
+                      >
+                        {requirement.label}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {newPw && confirmPw && !passwordsMatch && (
+                <p style={{ ...settingsStyles.mutedSmall, color: theme.danger }}>Passwords do not match.</p>
+              )}
+              <button
+                onClick={savePassword}
+                disabled={!canSavePassword}
+                style={{
+                  ...settingsStyles.primaryBtn,
+                  marginTop: 12,
+                  opacity: !canSavePassword ? 0.7 : 1,
+                  cursor: !canSavePassword ? "not-allowed" : "pointer",
+                }}
+              >
+                {savingPassword ? "Saving…" : "Update password"}
               </button>
             </>
           )}
@@ -393,6 +540,14 @@ const settingsStyles: { [k: string]: Style } = {
     padding: "10px 16px",
     cursor: "pointer",
     marginTop: 6,
+  },
+  secondaryBtn: {
+    background: theme.backgroundLight,
+    color: theme.textPrimary,
+    border: `1px solid ${theme.border}`,
+    borderRadius: 8,
+    padding: "10px 16px",
+    cursor: "pointer",
   },
   fileLabel: {
     display: "inline-block",

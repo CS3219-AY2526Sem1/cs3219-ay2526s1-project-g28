@@ -199,17 +199,67 @@ export async function updateUser(req, res) {
       }
     }
 
-    const updatedUser = await _updateUserById(userId, {
+    const incomingEmail = email ? email.toLowerCase().trim() : null;
+    const currentEmail = user.email ? user.email.toLowerCase().trim() : null;
+    const emailChanged = Boolean(incomingEmail && incomingEmail !== currentEmail);
+
+    const updatePayload = {
       username,
       fullname,
       email,
-      password,   // repo will hash if provided
+      password, // repo will hash if provided
       avatarUrl,
-    });
+    };
+
+    let verificationDetails = null;
+    if (emailChanged) {
+      const verificationToken = crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(verificationToken).digest("hex");
+      const expiration = new Date(Date.now() + EMAIL_VERIFICATION_TTL_HOURS * 60 * 60 * 1000);
+
+      updatePayload.isEmailVerified = false;
+      updatePayload.emailVerificationTokenHash = tokenHash;
+      updatePayload.emailVerificationExpiresAt = expiration;
+      updatePayload.emailVerifiedAt = null;
+
+      const verificationUrl = buildVerificationUrl(verificationToken);
+      const recipientName = fullname || user.fullname || user.username || "there";
+
+      let emailDispatched = false;
+      try {
+        await sendVerificationEmail({
+          to: incomingEmail,
+          name: recipientName,
+          verificationUrl,
+          expiresAt: expiration,
+        });
+        emailDispatched = true;
+      } catch (emailErr) {
+        console.error("Failed to send email verification on email change", emailErr);
+      }
+
+      verificationDetails = {
+        dispatched: emailDispatched,
+        expiresAt: expiration,
+        email: incomingEmail,
+      };
+    }
+
+    const updatedUser = await _updateUserById(userId, updatePayload);
+
+    const baseMessage = `Updated data for user ${userId}`;
+    const message = verificationDetails
+      ? `${baseMessage}. ${
+          verificationDetails.dispatched
+            ? "Verification email sent."
+            : "Verification email could not be sent automatically."
+        }`
+      : baseMessage;
 
     return res.status(200).json({
-      message: `Updated data for user ${userId}`,
+      message,
       data: formatUserResponse(updatedUser),
+      ...(verificationDetails && { emailVerification: verificationDetails }),
     });
   } catch (err) {
     console.error(err);
