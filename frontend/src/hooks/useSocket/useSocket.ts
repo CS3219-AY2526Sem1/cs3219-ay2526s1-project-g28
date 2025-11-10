@@ -131,16 +131,15 @@ export function useSocket(user?: User) {
 
     try {
       const { response, data } = await startMatchApi(matchRequest);
-      // if (response.status === 200 && data.data) {
-      //   console.log("Match found immediately!", data);
-      //   setPendingMatch(data.data);
-      //   setModalMessage("Ready to collaborate?");
-      //   setIsQueueing(false);
-      //   setIsWaiting(false);
-      //   setShowButtons(true);
-      //   setCountdown(DEFAULT_COUNTDOWN);
-      // } else
-      if (response.status === 202) {
+      if (response.status === 200 && data.data) {
+        console.log("Match found immediately!", data);
+        setPendingMatch(data.data);
+        setModalMessage("Ready to collaborate?");
+        setIsQueueing(false);
+        setIsWaiting(false);
+        setShowButtons(true);
+        setCountdown(DEFAULT_COUNTDOWN);
+      } else if (response.status === 202) {
         console.log("In queue, waiting for a match...");
       } else {
         console.error("Failed to start match:", data);
