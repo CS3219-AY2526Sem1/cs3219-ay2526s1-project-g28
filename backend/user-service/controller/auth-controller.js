@@ -236,8 +236,6 @@ export const googleCallback = async (req, res) => {
         email,                // may be null, schema allows it
         avatarUrl: profilePic,
       });
-       } else if (profilePic && user.avatarUrl !== profilePic) {
-      user = await updateUserById(user.id, { avatarUrl: profilePic });
     }
 
     // 4) Sign JWT with your app’s user payload
@@ -306,8 +304,6 @@ export const githubCallback = async (req, res) => {
         email, // may be null; schema allows it
         avatarUrl: profilePic,
       });
-      } else if (profilePic && user.avatarUrl !== profilePic) {
-      user = await updateUserById(user.id, { avatarUrl: profilePic });
     }
 
     const payload = {
