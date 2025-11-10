@@ -20,7 +20,7 @@ const sessionSchema = new mongoose.Schema({
   submitResults: { type: Array },
   error: { type: String },
   language: { type: String },
-  hasSubmitted: { type: Boolean },
+  hasSubmitted: { type: Boolean, default: false },
 });
 
 export default mongoose.model("Session", sessionSchema);

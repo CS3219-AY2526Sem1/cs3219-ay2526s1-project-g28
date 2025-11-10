@@ -20,8 +20,9 @@ export default function LoginSuccess() {
     const id = params.get("id") || "oauth";
     const username = params.get("username") || displayName || "user";
     const email = params.get("email") || "";
+    const provider = params.get("providers") || "oauth";
 
-    console.log("OAuth login success, received params:", { token, displayName, avatarUrl, id, username, email });
+    console.log("OAuth login success, received params:", { token, displayName, avatarUrl, id, username, email,provider });
     
     if (!token) {
       navigate("/login", { replace: true });
@@ -34,7 +35,7 @@ export default function LoginSuccess() {
     window.history.replaceState({}, "", window.location.pathname);
 
     // Build a user object compatible with your AuthContext
-    const user = { id, username, fullname: displayName, email, displayName, avatarUrl };
+    const user = { id, username, fullname: displayName, email, displayName, avatarUrl,provider };
 
     // Reuse your existing localStorage-based login
     login(token, user);

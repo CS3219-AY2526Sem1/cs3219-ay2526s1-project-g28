@@ -18,16 +18,32 @@ import CollaborationPage from "./pages/CollaborationPage";
 import HistoryDetail from "./pages/HistoryDetail";
 import { ThemeProvider } from "./theme/ThemeProvider";
 import Settings from "./pages/Settings";
+import { Toaster } from "react-hot-toast";
+import VerifyEmail from "./pages/VerifyEmail";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <ThemeProvider>
     <React.StrictMode>
       <BrowserRouter>
         <AuthProvider>
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000, 
+              style: {
+                background: "#333",
+                color: "#fff",
+              },
+              success: {
+                iconTheme: { primary: "#4ade80", secondary: "#333" },
+              },
+            }}
+          />
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route
               path="*"
               element={<div className="p-10">404 Not found</div>}

@@ -48,7 +48,9 @@ async function uploadToCloudinary(file: File) {
   );
   return { url: transformed, publicId: json.public_id as string };
 }
-
+const HEADER_H = 64;          
+const SIDEBAR_W_OPEN = 260;
+const SIDEBAR_W_CLOSED = 80;
 const SettingsPage: React.FC = () => {
   const { user, token, login, logout } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
@@ -72,7 +74,7 @@ const SettingsPage: React.FC = () => {
 
   if (!user) {
     return (
-      <div style={styles.full}>
+      <div style={settingsStyles.full}>
         <p>Please log in first.</p>
       </div>
     );
@@ -167,14 +169,47 @@ async function removeAvatar() {
       setErr(e.message || "Failed to delete account");
     }
   }
-
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [currentPage, setCurrentPage] = useState<
+      "Challenges" | "History" | "Custom Lobby" | "Admin"
+    >("Challenges");
   return (
-    <div style={styles.appContainer}>
-      <Header variant="settings" showBack backTo="/home" title="Settings" />
-      <main style={{ ...styles.main, paddingTop: "calc(60px + 2rem)" }}>
-        <section style={styles.card}>
-          <h1 style={styles.h1}>Settings</h1>
-          <p style={styles.muted}>
+    <div
+          style={{
+            backgroundColor: theme.backgroundDark,
+            color: theme.textPrimary,
+            fontFamily: "'Inter','Segoe UI', Roboto, sans-serif",
+            minHeight: "100vh",
+          }}
+        >
+          <Header
+            variant="beta"
+            isSidebarOpen={isSidebarOpen}
+            currentPage={currentPage}
+            onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+            onNavigate={(p) => setCurrentPage(p)}
+          />
+          <main
+            style={{
+    position: "fixed",
+    top: HEADER_H,
+    left: isSidebarOpen ? SIDEBAR_W_OPEN : SIDEBAR_W_CLOSED,
+    right: 0,
+    bottom: 0,
+    overflowY: "auto",
+    /* no maxWidth */
+    boxSizing: "border-box",
+    padding: 24,
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  }}
+          >
+            
+      
+        <section style={settingsStyles.card}>
+          <h1 style={settingsStyles.h1}>Settings</h1>
+          <p style={settingsStyles.muted}>
             Signed in as <strong>{user.username || user.email || "user"}</strong>
             {isOAuth ? ` (via ${provider})` : " (local account)"}
           </p>
@@ -183,8 +218,8 @@ async function removeAvatar() {
         </section>
 
         {/* Avatar */}
-        <section style={styles.card}>
-          <h2 style={{ ...styles.h2, marginBottom: 10 }}>Profile</h2>
+        <section style={settingsStyles.card}>
+          <h2 style={{ ...settingsStyles.h2, marginBottom: 10 }}>Profile</h2>
           <div style={{ display: "flex", gap: 16, alignItems: "center", marginTop: 12 }}>
             <img
               src={avatarUrl || "https://t3.ftcdn.net/jpg/02/95/26/46/360_F_295264675_clwKZxogAhxLS9sD163Tgkz1WMHsq1RJ.jpg"}
@@ -194,66 +229,80 @@ async function removeAvatar() {
            
           </div>
           <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 12 }}>
-            <label style={styles.fileLabel}>
-              <input type="file" accept="image/*" onChange={onPickFile} disabled={uploading} style={{ display: "none" }} />
-              <span>{uploading ? "Uploading…" : "Upload image"}</span>
-            </label>
-            <button
-              onClick={removeAvatar}
-              disabled={busy || !avatarUrl}
-              style={{
-                ...styles.secondaryBtn,
-                opacity: avatarUrl ? 1 : 0.6,
-              }}
-              title={avatarUrl ? "Remove current image" : "No image to remove"}
-            >
-              Remove image
-            </button>
-          </div>
-          <p style={styles.mutedSmall}>limit 2MB.</p>
+  {isOAuth ? (
+    <p style={settingsStyles.mutedSmall}>
+      Profile picture is managed by {provider}. Use your provider to change it.
+    </p>
+  ) : (
+    <>
+      <label style={settingsStyles.fileLabel}>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={onPickFile}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+        <span>{uploading ? "Uploading…" : "Upload image"}</span>
+      </label>
+
+      <button
+        onClick={removeAvatar}
+        disabled={busy || !avatarUrl}
+        style={{ ...settingsStyles.secondaryBtn, opacity: avatarUrl ? 1 : 0.6 }}
+        title={avatarUrl ? "Remove current image" : "No image to remove"}
+      >
+        Remove image
+      </button>
+
+      {/* Limit note lives INSIDE the non-OAuth branch */}
+      <p style={{ ...settingsStyles.mutedSmall, margin: 0 }}>limit 2MB.</p>
+    </>
+  )}
+</div>
         </section>
 
         {/* Email */}
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Email</h2>
+        <section style={settingsStyles.card}>
+          <h2 style={settingsStyles.h2}>Email</h2>
           <input
             type="email"
-            style={{ ...styles.input, ...(isOAuth ? styles.inputDisabled : {}) }}
+            style={{ ...settingsStyles.input, ...(isOAuth ? settingsStyles.inputDisabled : {}) }}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isOAuth}
           />
           {isOAuth ? (
-            <p style={styles.mutedSmall}>Email is managed by {provider}. Update it in your {provider} account.</p>
+            <p style={settingsStyles.mutedSmall}>Email is managed by {provider}. Update it in your {provider} account.</p>
           ) : (
-            <button onClick={saveEmail} disabled={busy || !email} style={styles.primaryBtn}>
+            <button onClick={saveEmail} disabled={busy || !email} style={settingsStyles.primaryBtn}>
               {busy ? "Saving…" : "Save email"}
             </button>
           )}
         </section>
 
         {/* Password */}
-        <section style={styles.card}>
-          <h2 style={styles.h2}>Password</h2>
+        <section style={settingsStyles.card}>
+          <h2 style={settingsStyles.h2}>Password</h2>
           {isOAuth ? (
-            <p style={styles.mutedSmall}>Password is managed by {provider}. Use your provider to change it.</p>
+            <p style={settingsStyles.mutedSmall}>Password is managed by {provider}. Use your provider to change it.</p>
           ) : (
             <>
               <input
                 type="password"
                 placeholder="New password (min 8 chars)"
-                style={styles.input}
+                style={settingsStyles.input}
                 value={newPw}
                 onChange={(e) => setNewPw(e.target.value)}
               />
               <input
                 type="password"
                 placeholder="Confirm new password"
-                style={styles.input}
+                style={settingsStyles.input}
                 value={confirmPw}
                 onChange={(e) => setConfirmPw(e.target.value)}
               />
-              <button onClick={savePassword} disabled={busy} style={styles.primaryBtn}>
+              <button onClick={savePassword} disabled={busy} style={settingsStyles.primaryBtn}>
                 {busy ? "Saving…" : "Update password"}
               </button>
             </>
@@ -261,16 +310,25 @@ async function removeAvatar() {
         </section>
 
         {/* Danger zone */}
-        <section style={styles.card}>
-          <h2 style={{ ...styles.h2, color: "#ef4444" }}>Danger zone</h2>
-          <button onClick={deleteAccount} style={styles.dangerBtn}>Delete my account</button>
+        <section style={settingsStyles.card}>
+          <h2 style={{ ...settingsStyles.h2, color: "#ef4444" }}>Danger zone</h2>
+          <button onClick={deleteAccount} style={settingsStyles.dangerBtn}>Delete my account</button>
         </section>
       </main>
     </div>
   );
 };
 
-const styles: { [k: string]: Style } = {
+const settingsStyles: { [k: string]: Style } = {
+    mainContent: {
+    height: "100dvh",
+    overflowY: "auto",
+    padding: "24px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "16px",
+    maxWidth: 960,
+  },
   appContainer: {
     backgroundColor: theme.backgroundDark,
     color: theme.textPrimary,
