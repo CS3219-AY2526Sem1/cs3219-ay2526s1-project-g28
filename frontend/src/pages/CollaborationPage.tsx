@@ -15,7 +15,7 @@ import toast from "react-hot-toast";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
 const VIDEO_SERVICE_URL =
-  import.meta.env.VITE_VIDEO_SERVICE_URL || "http://localhost:3010";
+  import.meta.env.VITE_VIDEO_TOKEN_SERVICE_URL || "http://localhost:3010";
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
 // test
 

@@ -1,8 +1,7 @@
 import express from "express";
-import http from "http";
 import cors from "cors";
-import { Server } from "socket.io";
 import "dotenv/config";
+import { AccessToken } from "livekit-server-sdk";
 
 const app = express();
 const port = process.env.VIDEO_SERVICE_PORT || 3010;
@@ -12,85 +11,63 @@ const allowedOrigins = (process.env.VIDEO_SERVICE_ALLOWED_ORIGINS || "http://loc
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+const livekitUrl = process.env.LIVEKIT_URL;
+const livekitApiKey = process.env.LIVEKIT_API_KEY;
+const livekitApiSecret = process.env.LIVEKIT_API_SECRET;
+
+if (!livekitUrl || !livekitApiKey || !livekitApiSecret) {
+  console.warn(
+    "LiveKit configuration is incomplete. Please set LIVEKIT_URL, LIVEKIT_API_KEY, and LIVEKIT_API_SECRET."
+  );
+}
+
 app.use(cors({ origin: allowedOrigins, credentials: true }));
+
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-const server = http.createServer(app);
-
-const io = new Server(server, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-  },
-});
-
-const roomParticipants = new Map(); // roomId -> Map<socketId, username>
-const socketRoomMap = new Map();
-
-function handleDisconnection(socket) {
-  const roomId = socketRoomMap.get(socket.id);
-  if (!roomId) return;
-
-  const participants = roomParticipants.get(roomId);
-  if (participants) {
-    const username = participants.get(socket.id);
-    participants.delete(socket.id);
-    if (participants.size === 0) {
-      roomParticipants.delete(roomId);
-    }
-    socket.to(roomId).emit("user-left", { socketId: socket.id, username });
+app.get("/token", (req, res) => {
+  if (!livekitUrl || !livekitApiKey || !livekitApiSecret) {
+    return res.status(500).json({
+      error: "LiveKit environment variables are not configured on the video service.",
+    });
   }
 
-  socket.leave(roomId);
-  socketRoomMap.delete(socket.id);
-}
+  const roomParam = String(req.query.room || "").trim();
+  const identityParam = String(req.query.identity || "").trim();
 
-io.on("connection", (socket) => {
-  socket.on("join-room", ({ sessionId, username }) => {
-    if (!sessionId) {
-      socket.emit("error", { message: "Missing session identifier" });
-      return;
-    }
+  if (!roomParam) {
+    return res.status(400).json({ error: "Missing room parameter" });
+  }
 
-    socket.join(sessionId);
-    socketRoomMap.set(socket.id, sessionId);
+  if (!identityParam) {
+    return res.status(400).json({ error: "Missing identity parameter" });
+  }
 
-    const participants = roomParticipants.get(sessionId) || new Map();
-    participants.set(socket.id, username);
-    roomParticipants.set(sessionId, participants);
+  const sanitizedIdentity = identityParam.replace(/[^a-zA-Z0-9-_]/g, "").slice(0, 40);
+  const identity = sanitizedIdentity.length > 0 ? sanitizedIdentity : "guest";
 
-    const peerIds = Array.from(participants.keys()).filter((id) => id !== socket.id);
-    socket.emit("participants", { peers: peerIds });
-
-    socket.to(sessionId).emit("user-joined", { socketId: socket.id, username });
+  const token = new AccessToken(livekitApiKey, livekitApiSecret, {
+    identity,
+    ttl: 60 * 60, // 1 hour
   });
 
-  socket.on("offer", ({ target, description }) => {
-    if (!target || !description) return;
-    socket.to(target).emit("offer", { from: socket.id, description });
+  token.addGrant({
+    roomJoin: true,
+    room: roomParam,
+    canPublish: true,
+    canSubscribe: true,
   });
 
-  socket.on("answer", ({ target, description }) => {
-    if (!target || !description) return;
-    socket.to(target).emit("answer", { from: socket.id, description });
-  });
-
-  socket.on("ice-candidate", ({ target, candidate }) => {
-    if (!target || !candidate) return;
-    socket.to(target).emit("ice-candidate", { from: socket.id, candidate });
-  });
-
-  socket.on("leave-room", () => {
-    handleDisconnection(socket);
-  });
-
-  socket.on("disconnect", () => {
-    handleDisconnection(socket);
-  });
+  return res.json({ token: token.toJwt(), url: livekitUrl });
 });
 
-server.listen(port, () => {
-  console.log(`Video service listening on port ${port}`);
+app.use((err, _req, res, _next) => {
+  console.error("Unexpected error in video service", err);
+  res.status(500).json({ error: "Unexpected error" });
+});
+
+app.listen(port, () => {
+  console.log(`Video token service listening on port ${port}`);
 });
