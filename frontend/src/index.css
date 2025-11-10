@@ -107,18 +107,30 @@ input:-webkit-autofill:focus {
   --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
   --sidebar-border: oklch(0.929 0.013 255.508);
   --sidebar-ring: oklch(0.704 0.04 256.788);
+   --surface-background: #f8fafc;
+  --surface-medium: #e2e8f0;
+  --surface-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --border-strong: rgba(148, 163, 184, 0.4);
+  --accent-strong: #0f172a;
+  --accent-primary: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
 }
 
 .dark {
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
+  --card: oklch(0% 0 0);
   --card-foreground: oklch(0.984 0.003 247.858);
   --popover: oklch(0.208 0.042 265.755);
   --popover-foreground: oklch(0.984 0.003 247.858);
   --primary: oklch(0.929 0.013 255.508);
   --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
+  --secondary: oklch(12.166% 0.00617 261.612);
   --secondary-foreground: oklch(0.984 0.003 247.858);
   --muted: oklch(0.279 0.041 260.031);
   --muted-foreground: oklch(0.704 0.04 256.788);
@@ -141,6 +153,18 @@ input:-webkit-autofill:focus {
   --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.551 0.027 264.364);
+  --surface-background: #000101;
+  --surface-medium: #030507;
+  --surface-card: #000000;
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --border-strong: rgba(148, 163, 184, 0.25);
+  --accent-strong: #000000;
+  --accent-primary: #38bdf8;
+  --accent-hover: #0ea5e9;
+  --success: #22c55e;
+  --warning: #fbbf24;
+  --danger: #f87171;
 }
 
 @layer base {
@@ -150,6 +174,57 @@ input:-webkit-autofill:focus {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Dark mode overrides for legacy utility classes */
+.dark .bg-white,
+.dark .bg-gray-50 {
+  background-color: var(--surface-card) !important;
+}
+
+.dark .bg-gray-100,
+.dark .bg-gray-200,
+.dark .bg-gray-300,
+.dark .bg-neutral-100,
+.dark .bg-neutral-200 {
+  background-color: var(--surface-medium) !important;
+}
+
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-neutral-900 {
+  color: var(--text-primary) !important;
+}
+
+.dark .text-gray-700,
+.dark .text-gray-600,
+.dark .text-gray-500,
+.dark .text-gray-400,
+.dark .text-neutral-800,
+.dark .text-neutral-700,
+.dark .text-neutral-600 {
+  color: var(--text-secondary) !important;
+}
+
+.dark .border-gray-100,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border-neutral-200,
+.dark .border-neutral-300 {
+  border-color: var(--border-strong) !important;
+}
+
+.dark .hover\:bg-gray-50:hover {
+  background-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+.dark .hover\:bg-white:hover {
+  background-color: var(--surface-medium) !important;
+  color: var(--text-primary) !important;
+}
+
+.dark .bg-gray-100\/70 {
+  background-color: rgba(30, 41, 59, 0.7) !important;
 }
 
 @keyframes blink {
