@@ -588,6 +588,7 @@ function CodeEditorTab({
               </div>
             </div>
           </div>
+      )}
 
       {/* Footer — shown only when Editor tab is active */}
       {activeTab === "editor" && (
