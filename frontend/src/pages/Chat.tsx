@@ -1,55 +1,68 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { PrismLight as SyntaxHighlighter } from "react-syntax-highlighter";
-import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
-import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import pythonLang from "react-syntax-highlighter/dist/esm/languages/prism/python";
+import javascriptLang from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
+import javaLang from "react-syntax-highlighter/dist/esm/languages/prism/java";
 import oneDark from "react-syntax-highlighter/dist/esm/styles/prism/one-dark";
+import oneLight from "react-syntax-highlighter/dist/esm/styles/prism/one-light";
 
-SyntaxHighlighter.registerLanguage("python", python);
-SyntaxHighlighter.registerLanguage("javascript", javascript);
+// Register languages exactly once
+SyntaxHighlighter.registerLanguage("python", pythonLang);
+SyntaxHighlighter.registerLanguage("javascript", javascriptLang);
+SyntaxHighlighter.registerLanguage("java", javaLang);
+
 const STICKY_THRESHOLD = 120;
 
-
-type Msg = { role: "user" | "assistant"; content: string };
-
-type Example = { id: number; input: string; output: string; explanation?: string };
-type ChatQuestion = {
+// Types
+export type Msg = { role: "user" | "assistant"; content: string };
+export type Example = { id: number; input: string; output: string; explanation?: string };
+export type ChatQuestion = {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
   problemStatement: string;
   examples?: Example[];
   testCases?: any[];
-  codeSnippets?: { language: "python" | "javascript"; code: string }[];
+  codeSnippets?: { language: "python" | "javascript" | "java"; code: string }[];
 };
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
-function renderMarkdown(text: string) {
+/** Simple hook to reflect presence of `dark` class on <html> */
+function useIsDark() {
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    document.documentElement.classList.contains("dark")
+  );
+  useEffect(() => {
+    const el = document.documentElement;
+    const obs = new MutationObserver(() => setIsDark(el.classList.contains("dark")));
+    obs.observe(el, { attributes: true, attributeFilter: ["class"] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
+
+function renderMarkdown(text: string, isDark: boolean) {
   const out: React.ReactNode[] = [];
   const fence = /```([a-zA-Z0-9+\-_]*)?\n([\s\S]*?)```/g;
   let last = 0;
   let m: RegExpExecArray | null;
 
   const renderInline = (t: string) => {
-    // first split out inline code spans so we don't format inside them
     const codeSplit = t.split(/(`[^`]+`)/g);
     return codeSplit.map((chunk, i) => {
       if (chunk.startsWith("`") && chunk.endsWith("`")) {
         return (
           <code
             key={`code-${i}`}
+            className="font-mono rounded-md px-1.5 border"
             style={{
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              background: "#f3f4f6",
-              border: "1px solid #e5e7eb",
-              padding: "0 4px",
-              borderRadius: 6,
+              background: isDark ? "rgba(255,255,255,0.06)" : "#f3f4f6",
             }}
           >
             {chunk.slice(1, -1)}
           </code>
         );
       }
-      // handle **bold** and *italic* in the non-code parts
       const parts = chunk.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
       return parts.map((p, j) => {
         if (/^\*\*[^*]+\*\*$/.test(p)) {
@@ -68,7 +81,7 @@ function renderMarkdown(text: string) {
     if (before.trim().length) {
       before.split(/\n{2,}/).forEach((para, i) => {
         out.push(
-          <p key={`p-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+          <p key={`p-${last}-${i}`} className="mb-2 whitespace-pre-wrap">
             {renderInline(para)}
           </p>
         );
@@ -79,22 +92,20 @@ function renderMarkdown(text: string) {
     const code = m[2].replace(/\n+$/, "");
     out.push(
       <SyntaxHighlighter
-    key={`code-${m.index}`}
-    language={(lang as any) || undefined}
-    style={oneDark}
-    customStyle={{
-      borderRadius: 10,
-      margin: 0,
-      border: "1px solid #111827",
-      fontSize: 13,
-    }}
-    showLineNumbers={false}
-    wrapLongLines
-  >
-    {code}
-  </SyntaxHighlighter>
+        key={`code-${m.index}`}
+        language={(lang as any) || undefined}
+        style={isDark ? oneDark : oneLight}
+        customStyle={{
+          borderRadius: 10,
+          margin: 0,
+          fontSize: 13,
+        }}
+        showLineNumbers={false}
+        wrapLongLines
+      >
+        {code}
+      </SyntaxHighlighter>
     );
-
     last = fence.lastIndex;
   }
 
@@ -102,7 +113,7 @@ function renderMarkdown(text: string) {
   if (tail.trim().length) {
     tail.split(/\n{2,}/).forEach((para, i) => {
       out.push(
-        <p key={`tail-${last}-${i}`} style={{ margin: "0 0 8px 0", whiteSpace: "pre-wrap" }}>
+        <p key={`tail-${last}-${i}`} className="mb-2 whitespace-pre-wrap">
           {renderInline(para)}
         </p>
       );
@@ -118,10 +129,11 @@ export default function Chat({
   sessionId,
 }: {
   question: ChatQuestion;
-  language?: "python" | "javascript";
+  language?: "python" | "javascript" | "java";
   code?: string;
   sessionId: string;
 }) {
+  const isDark = useIsDark();
   const STORAGE_KEY = `peerprep:${sessionId}:chat`;
 
   const [messages, setMessages] = useState<Msg[]>(() => {
@@ -144,26 +156,28 @@ export default function Chat({
   const abortRef = useRef<AbortController | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = React.useCallback((smooth = false) => {
+  const scrollToBottom = useCallback((smooth = false) => {
     const el = scrollerRef.current;
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
   }, []);
+
   useEffect(() => {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
   }, [messages, STORAGE_KEY]);
+
   useEffect(() => {
     sessionStorage.setItem(`${STORAGE_KEY}:input`, input);
   }, [input, STORAGE_KEY]);
 
   useEffect(() => {
-  const el = scrollerRef.current;
-  if (!el) return;
-  const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
-  const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
-  // smooth when user just sent; instant while streaming to avoid jitter
-  scrollToBottom(!loading && isNearBottom);
-}, [messages, loading]);
+    const el = scrollerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
+    // smooth when user just sent; instant while streaming to avoid jitter
+    scrollToBottom(!loading && isNearBottom);
+  }, [messages, loading, scrollToBottom]);
 
   function buildContext() {
     const ctx = {
@@ -190,11 +204,14 @@ export default function Chat({
     setErr(null);
     if (!forcedContent) setInput("");
 
-    setMessages((m) => [...m, { role: "user", content }, { role: "assistant", content: "" }]);
+    setMessages((m) => [
+      ...m,
+      { role: "user", content },
+      { role: "assistant", content: "" },
+    ]);
     setLoading(true);
 
     const contextJson = buildContext();
-
     const payload = {
       messages: [
         {
@@ -204,7 +221,10 @@ export default function Chat({
             "If hasCode=false or the user asks to explain code without code present, explain the question, outline an approach, pseudocode, and pitfalls. " +
             "If hasCode=true and the user asks about code, review the provided currentCode.",
         },
-        { role: "system", content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}` },
+        {
+          role: "system",
+          content: `CURRENT_QUESTION_CONTEXT_JSON=${contextJson}`,
+        },
         ...messages.map(({ role, content }) => ({ role, content })),
         { role: "user", content },
       ],
@@ -224,7 +244,9 @@ export default function Chat({
 
       if (!resp.ok) {
         const txt = await resp.text().catch(() => "");
-        throw new Error(`API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`);
+        throw new Error(
+          `API ${resp.status} ${resp.statusText} — ${txt.slice(0, 200)}`
+        );
       }
 
       const reader = resp.body?.getReader?.();
@@ -250,7 +272,6 @@ export default function Chat({
         while ((idx = buffer.indexOf("\n\n")) !== -1) {
           const frame = buffer.slice(0, idx);
           buffer = buffer.slice(idx + 2);
-
           if (!frame.startsWith("event:")) continue;
 
           if (frame.startsWith("event: chunk")) {
@@ -263,7 +284,10 @@ export default function Chat({
                 setMessages((m) => {
                   const copy = m.slice();
                   const last = copy[copy.length - 1];
-                  copy[copy.length - 1] = { ...last, content: (last.content || "") + delta };
+                  copy[copy.length - 1] = {
+                    ...last,
+                    content: (last.content || "") + delta,
+                  };
                   return copy;
                 });
               }
@@ -282,7 +306,8 @@ export default function Chat({
         }
       }
     } catch (e: any) {
-      if (e?.name !== "AbortError") setErr(e?.message || "Network/stream error");
+      if (e?.name !== "AbortError")
+        setErr(e?.message || "Network/stream error");
     } finally {
       setLoading(false);
     }
@@ -300,118 +325,93 @@ export default function Chat({
     );
   }
   function quickHint() {
-    return send(undefined, "Give me a gentle hint for this question. Don't reveal the full solution yet.");
+    return send(
+      undefined,
+      "Give me a gentle hint for this question. Don't reveal the full solution yet."
+    );
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", maxHeight: "100%" }}>
-      <header style={{ padding: 12, borderBottom: "1px solid #e5e7eb", fontWeight: 600 }}>Chat</header>
+    <div className="flex flex-col h-full max-h-full">
+      <header className="px-3 py-2 border-b font-semibold bg-white dark:bg-zinc-900 border-slate-200 dark:border-zinc-800 dark:text-zinc-100">
+        Chat
+      </header>
 
       {/* Quick actions */}
-      <div style={{ padding: 12, display: "flex", gap: 8, borderBottom: "1px solid #f1f5f9" }}>
+      <div className="px-3 py-2 flex gap-2 border-b bg-white dark:bg-zinc-900 border-slate-100 dark:border-zinc-800">
         <button
           type="button"
           onClick={quickExplain}
-          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+          className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-100"
         >
           Explain this question
         </button>
         <button
           type="button"
           onClick={quickHint}
-          style={{ padding: "6px 10px", border: "1px solid #e5e7eb", borderRadius: 8, background: "#fff" }}
+          className="px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50 dark:bg-zinc-800 dark:hover:bg-zinc-700 border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-100"
         >
           Give me a hint
         </button>
       </div>
 
-{/* Messages */}
-<div
-  ref={scrollerRef}
-  style={{
-    flex: 1,
-    overflow: "auto",
-    padding: 12,
-    background: "#f9fafb",
-  }}
->
-  <div
-      style={{
-        minHeight: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end", // anchor to bottom
-        gap: 12,
-      }}
-    >
-      {messages.map((m, i) => {
-        const isUser = m.role === "user";
-        return (
-          <div
-            key={i}
-            style={{
-              maxWidth: "75%",
-              alignSelf: isUser ? "flex-end" : "flex-start",
-              borderRadius: 16,
-              padding: "10px 14px",
-              lineHeight: 1.5,
-              background: isUser ? "#3b82f6" : "#fff",
-              color: isUser ? "#fff" : "#111",
-              border: !isUser ? "1px solid #e5e7eb" : "none",
-              boxShadow: !isUser ? "0 1px 2px rgba(0,0,0,0.04)" : "none",
-              textAlign: isUser ? "right" : "left",
-            }}
-          >
-            {isUser ? m.content : renderMarkdown(m.content)}
-          </div>
-        );
-      })}
-      <div style={{ height: 8 }} /> {/* spacer above composer */}
-    </div>
-</div>
+      {/* Messages */}
+      <div ref={scrollerRef} className="flex-1 overflow-auto p-3 bg-slate-50 dark:bg-zinc-900">
+        <div className="min-h-full flex flex-col justify-end gap-3">
+          {messages.map((m, i) => {
+            const isUser = m.role === "user";
+            return (
+              <div
+                key={i}
+                className={[
+                  "max-w-[75%] rounded-2xl px-3 py-2 leading-relaxed",
+                  isUser
+                    ? "self-end bg-blue-600 text-white text-right"
+                    : "self-start bg-white dark:bg-zinc-800 text-slate-900 dark:text-zinc-100 border border-slate-200 dark:border-zinc-700 shadow-sm",
+                ].join(" ")}
+              >
+                {isUser ? m.content : renderMarkdown(m.content, isDark)}
+              </div>
+            );
+          })}
+          <div className="h-2" />
+        </div>
+      </div>
 
-      {/* Composer (separate bar so it never overlaps the last message) */}
+      {/* Composer */}
       <form
         onSubmit={send}
-        style={{
-          position: "sticky",
-          bottom: 0,
-          background: "#fff",
-          borderTop: "1px solid #e5e7eb",
-          display: "flex",
-          gap: 8,
-          padding: 12,
-        }}
+        className="sticky bottom-0 bg-white dark:bg-zinc-900 border-t border-slate-200 dark:border-zinc-800 flex gap-2 p-3"
       >
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type a message…"
-          style={{
-            flex: 1,
-            border: "1px solid #e5e7eb",
-            borderRadius: 10,
-            padding: "12px 14px",
-            background: "#fff",
-          }}
+          className="flex-1 border rounded-xl px-3 py-3 bg-white dark:bg-zinc-800 placeholder-slate-400 dark:placeholder-zinc-400 border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-zinc-100"
         />
         <button
           type="submit"
           disabled={loading}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 10,
-            background: "#111827",
-            color: "#fff",
-            opacity: loading ? 0.6 : 1,
-          }}
+          className="px-4 py-3 rounded-xl bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 disabled:opacity-60"
         >
           {loading ? "Sending…" : "Send"}
         </button>
-        <button type="button" onClick={cancel} disabled={!loading} style={{ padding: "12px 12px", borderRadius: 10 }}>
+        <button
+          type="button"
+          onClick={cancel}
+          disabled={!loading}
+          className="px-3 py-3 rounded-xl border bg-white dark:bg-zinc-800 border-slate-200 dark:border-zinc-700 text-slate-900 dark:text-zinc-100 disabled:opacity-60"
+        >
           Cancel
         </button>
       </form>
+
+      {/* Error banner */}
+      {err && (
+        <div className="px-3 py-2 text-sm bg-red-50 text-red-700 border-t border-red-200">
+          {err}
+        </div>
+      )}
     </div>
   );
 }

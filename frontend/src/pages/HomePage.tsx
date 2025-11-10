@@ -55,7 +55,6 @@ const HomePage: React.FC = () => {
           return;
         }
         const data = await res.json();
-        console.log(data);
 
         if (
           !data.isActive ||
@@ -148,29 +147,55 @@ const HomePage: React.FC = () => {
       {/* Match Found Modal — styled like other modals */}
       {pendingMatch && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]">
+          <div
+            className="rounded-2xl shadow-2xl p-6 w-[32rem] max-w-[95vw]"
+            style={{
+              background: theme.backgroundLight,
+              border: `1px solid ${theme.border}`,
+              color: theme.textPrimary,
+            }}
+          >
             <div className="flex items-start justify-between">
-              <h2 className="text-xl font-semibold text-gray-900 m-0">
+              <h2 className="text-xl font-semibold m-0">
                 Match Found!
               </h2>
-              <span className="inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">
+              <span
+                className="inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-lg text-sm font-semibold"
+                style={{
+                  background: theme.backgroundMedium,
+                  color: theme.textPrimary,
+                  border: `1px solid ${theme.border}`,
+                }}
+              >
                 {countdown}s
               </span>
             </div>
 
-            <p className="text-gray-700 mt-4 min-h-[24px]">{modalMessage}</p>
+            <p className="mt-4 min-h-[24px]" style={{ color: theme.textSecondary }}>
+              {modalMessage}
+            </p>
 
             {showButtons && (
               <div className="flex gap-3 justify-end mt-5">
                 <button
                   onClick={() => handleMatchResponse("reject")}
-                  className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
-                >
+                  className="px-4 py-2 rounded-lg transition-colors"
+                  style={{
+                    background: theme.backgroundLight,
+                    color: theme.textPrimary,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                  >
                   Decline
                 </button>
                 <button
                   onClick={() => handleMatchResponse("accept")}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+                  className="px-4 py-2 rounded-lg transition-colors"
+                  style={{
+                    background: theme.accent,
+                    color: theme.accentForeground,
+                    border: `1px solid ${theme.accent}`,
+                  }}
                 >
                   Accept
                 </button>
