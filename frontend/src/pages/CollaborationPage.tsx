@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 
 const COLLAB_SERVICE_URL = "http://localhost:3004";
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
+const YJS_WEBSOCKET_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL;
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
@@ -145,13 +146,13 @@ function ProblemViewer({
 
 function MonacoEditor({
   language,
-  value,
-  onChange,
+  // value,
+  // onChange,
   onMount,
 }: {
   language: string;
-  value: string;
-  onChange: OnChange;
+  // value: string;
+  // onChange: OnChange;
   onMount?: (editor: any, monaco: any) => void;
 }) {
   return (
@@ -159,8 +160,8 @@ function MonacoEditor({
       height="100%"
       language={language}
       theme="vs-dark"
-      value={value}
-      onChange={onChange}
+      value=""
+      onChange={() =>{}}
       onMount={onMount}
       options={{
         minimap: { enabled: false },
@@ -175,8 +176,8 @@ function MonacoEditor({
 function CodeEditorTab({
   language,
   setLanguage,
-  code,
-  setCode,
+  // code,
+  // setCode,
   testCases,
   socketRef,
   sessionId,
@@ -185,11 +186,13 @@ function CodeEditorTab({
   onResultsChange,
   onErrorChange,
   sethasSubmitted,
+  yTextRef,
+  yMapRef,
 }: {
   language: Language;
   setLanguage: (lang: Language) => void;
-  code: string;
-  setCode: (c: string) => void;
+  // code: string;
+  // setCode: (c: string) => void;
   testCases: {
     hidden: boolean;
     input: any;
@@ -202,6 +205,8 @@ function CodeEditorTab({
   onResultsChange?: (results: ExecResult[]) => void;
   onErrorChange?: (err: string | null) => void;
   sethasSubmitted: (v: boolean) => void;
+  yTextRef: React.MutableRefObject<Y.Text | null>;
+  yMapRef: React.MutableRefObject<Y.Map<any> | null>; 
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -219,11 +224,15 @@ function CodeEditorTab({
   } | null>(null);
   const [decorationIds, setDecorationIds] = useState<string[]>([]);
 
-  // Yjs refs so we create them once and clean up on unmount
+  // Yjs refs
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
-  const yTextRef = useRef<Y.Text | null>(null);
+  const hasSeededRef = useRef(false);
+
+  // Track if we've initialized
+  const [isYjsReady, setIsYjsReady] = useState(false);
+  const [currentCode, setCurrentCode] = useState("");
 
   // --- Cleanup Yjs when component unmounts ---
   useEffect(() => {
@@ -233,6 +242,7 @@ function CodeEditorTab({
         bindingRef.current = null;
       }
       if (providerRef.current) {
+        providerRef.current.disconnect();
         providerRef.current.destroy();
         providerRef.current = null;
       }
@@ -243,11 +253,11 @@ function CodeEditorTab({
     };
   }, []);
 
-  // Mount editor, init Yjs once, and listen for local cursor movement
+    // Initialize Yjs when editor mounts
   const handleEditorMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
     editorRef.current = editor;
 
-    // socket.io cursor tracking
+    // Socket.io cursor tracking (keep this separate from Yjs)
     editor.onDidChangeCursorPosition((e) => {
       const pos = e.position;
       socketRef.current?.emit("cursor-change", {
@@ -257,29 +267,84 @@ function CodeEditorTab({
       });
     });
 
-    // --- Yjs init: only once per session ---
-    if (!sessionId) return;
-    if (ydocRef.current) return;
+    // --- Initialize Yjs ---
+    if (!sessionId || ydocRef.current) return;
+
+    console.log("[Yjs] Initializing for session:", sessionId);
 
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
-    const provider = new WebsocketProvider("ws://localhost:1234", sessionId, ydoc);
+    // Connect to the Yjs WebSocket server
+    const provider = new WebsocketProvider(
+      YJS_WEBSOCKET_URL,
+      sessionId, 
+      ydoc,
+      {
+        connect: true,
+      }
+    );
     providerRef.current = provider;
 
+    // Get shared types
     const yText = ydoc.getText("monaco");
+    const yMap = ydoc.getMap("metadata");
     yTextRef.current = yText;
+    yMapRef.current = yMap;
 
-    // Seed default snippet only if document is empty (first user in room)
-    if (yText.toString().trim().length === 0 && editorRef.current) {
-      setTimeout(() => {
-        if (yText.toString().trim().length === 0) {
-          console.log("Seeding default snippet once for", language);
-          yText.insert(0, defaultSnippets[language]);
-        }
-      }, 50);
-    }
+    // Set user awareness
+    provider.awareness.setLocalStateField("user", {
+      name: currentUsername,
+      color: getRandomColor(),
+    });
 
+    // Initialize default content if document is empty
+    // Use synced event which fires after initial sync is complete
+    provider.on("sync", (isSynced: boolean) => {
+      console.log("[Yjs] Sync event:", isSynced);
+
+      // Set ready immediately when synced
+      if (isSynced) {
+        setIsYjsReady(true);
+      }
+      
+      if (isSynced && !hasSeededRef.current) {
+        // Small delay to ensure we see any content from other clients
+        setTimeout(() => {
+          const currentContent = yText.toString().trim();
+          const currentLang = yMap.get("language") as string | undefined;
+          
+          console.log("[Yjs] Document synced. Content length:", currentContent.length, "Language:", currentLang);
+          
+          // Only seed if BOTH content and language are missing
+          if (currentContent.length === 0 && !currentLang) {
+            console.log("[Yjs] Seeding default content");
+            ydoc.transact(() => {
+              yText.insert(0, defaultSnippets[language]);
+              yMap.set("language", language);
+            });
+            hasSeededRef.current = true;
+          } else if (currentLang && currentLang !== language) {
+            // Document exists with a language - sync to it
+            console.log("[Yjs] Syncing to existing language:", currentLang);
+            setLanguage(currentLang as Language);
+            const model = editor.getModel();
+            if (model) {
+              monaco.editor.setModelLanguage(model, currentLang);
+            }
+          }
+        }, 100); // Small delay to let sync complete
+      }
+    });
+
+    provider.on("status", (event: { status: string }) => {
+      console.log("[Yjs] Connection status:", event.status);
+      if (event.status === "connected") {
+        setIsYjsReady(true);
+      }
+    });
+
+    // Bind Yjs to Monaco
     const model = editor.getModel();
     if (model) {
       const binding = new MonacoBinding(
@@ -291,17 +356,36 @@ function CodeEditorTab({
       bindingRef.current = binding;
     }
 
-    // Keep React state in sync so Run/Submit see latest code
+    // Keep local state in sync for Run/Submit
     yText.observe(() => {
-      setCode(yText.toString());
+      setCurrentCode(yText.toString());
     });
 
-    provider.awareness.setLocalStateField("user", {
-      name: currentUsername,
+    // Listen for language changes from other users
+    yMap.observe((event) => {
+      event.changes.keys.forEach((change, key) => {
+        if (key === "language" && change.action !== 'delete') {
+          const newLang = yMap.get("language") as string | undefined;
+          if (newLang) {  // Just check it exists, don't compare
+            console.log("[Yjs] Language changed by peer to:", newLang);  
+            setLanguage(newLang as Language);           
+            const model = editorRef.current?.getModel();
+            if (model) {
+              monaco.editor.setModelLanguage(model, newLang);
+            }
+          }
+        }
+      });
     });
 
     provider.on("status", (event: { status: string }) => {
-      console.log("Yjs connection:", event.status);
+      console.log("[Yjs] Connection status:", event.status);
+    });
+
+    provider.on("connection-error", (error: any) => {
+      console.error("[Yjs] Connection error:", error);
+      toast.error("Lost connection to collaboration server");
+      setIsYjsReady(false);
     });
   };
 
@@ -400,7 +484,7 @@ function CodeEditorTab({
         input: Array.isArray(tc.input) ? tc.input[0] : tc.input,
       }));
     try {
-      const res = await runCodeApi(language, code, toRun, timeout);
+      const res = await runCodeApi(language, currentCode, toRun, timeout);
       if (res.data.success) {
         const firstFail = res.data.output.findIndex(
           (r: { result: boolean }) => !r.result
@@ -433,7 +517,7 @@ function CodeEditorTab({
     setError(null);
     sethasSubmitted(true);
     try {
-      const res = await runCodeApi(language, code, testCases, timeout);
+      const res = await runCodeApi(language, currentCode, testCases, timeout);
 
       if (res.data.success) {
         setSubmitResults(res.data.output);
@@ -455,18 +539,58 @@ function CodeEditorTab({
     }
   };
 
-  // Reset button should reset the shared Yjs document, not just local state
-  const handleResetCode = () => {
-    const yText = yTextRef.current;
-    if (yText) {
-      yText.delete(0, yText.length);
-      yText.insert(0, defaultSnippets[language]);
-      // setCode will be triggered by yText.observe
-    } else {
-      // fallback (e.g. if Yjs not ready yet)
-      setCode(defaultSnippets[language]);
-    }
-  };
+  // Reset the shared document
+const handleResetCode = () => {
+  const yText = yTextRef.current;
+  const ydoc = ydocRef.current;
+
+  if (!yText || !ydoc) {
+    console.warn("[Reset] Yjs not ready");
+    return;
+  }
+
+  console.log("[Reset] Resetting shared document");
+
+  // DON'T disconnect - just do the transaction
+  // This ensures changes sync immediately
+  ydoc.transact(() => {
+    yText.delete(0, yText.length);
+    yText.insert(0, defaultSnippets[language]);
+  });
+};
+
+// Handle language change
+const handleLanguageChange = (newLang: Language) => {
+  const yText = yTextRef.current;
+  const yMap = yMapRef.current;
+  const ydoc = ydocRef.current;
+  
+  if (!yText || !yMap || !ydoc) {
+    console.warn("[Language] Yjs not ready");
+    return;
+  }
+
+  console.log("[Language] Changing to:", newLang);
+
+  // Update everything in one transaction
+  ydoc.transact(() => {
+    // Update language in shared state first
+    yMap.set("language", newLang);
+    
+    // Then replace code
+    yText.delete(0, yText.length);
+    yText.insert(0, defaultSnippets[newLang]);
+  });
+
+  // Update local state
+  setLanguage(newLang);
+
+  // Update Monaco syntax highlighting
+  const model = editorRef.current?.getModel();
+  if (model) {
+    monaco.editor.setModelLanguage(model, newLang);
+  }
+};
 
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
@@ -493,7 +617,18 @@ function CodeEditorTab({
         })}
       </div>
 
-      {/* Always keep Monaco mounted — just hide it when not on Editor tab */}
+      {/* Connection status */}
+      {!isYjsReady && (
+        <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
+          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+          </svg>
+          Connecting to collaboration server...
+        </div>
+      )}
+
+      {/* Monaco Editor */}
       <div
         className={`flex-1 rounded-xl border overflow-hidden min-h-0 dark:border-zinc-800 ${
           activeTab === "editor"
@@ -503,37 +638,18 @@ function CodeEditorTab({
       >
         <MonacoEditor
           language={language}
-          value={""}
-          onChange={() => {}}
           onMount={handleEditorMount}
         />
       </div>
+
 
       {/* Toolbar — shown only when Editor tab is active */}
       {activeTab === "editor" && (
         <div className="flex justify-between mb-2 items-center gap-2">
           <select
             value={language}
-            onChange={(e) => {
-              const newLang = e.target.value as Language;
-              setLanguage(newLang);
-
-              // 1️⃣ Update syntax highlighting
-              const editor = editorRef.current;
-              if (editor) {
-                const model = editor.getModel();
-                if (model) {
-                  monaco.editor.setModelLanguage(model, newLang);
-                }
-              }
-
-              // 2️⃣ Replace the shared text content
-              const yText = yTextRef.current;
-              if (yText) {
-                yText.delete(0, yText.length);
-                yText.insert(0, defaultSnippets[newLang]);
-              }
-            }}
+            onChange={(e) => handleLanguageChange(e.target.value as Language)}
+            disabled={!isYjsReady}
             className="border rounded px-3 py-1 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-zinc-900 dark:border-zinc-800 dark:text-zinc-100"
           >
             <option value="python">Python</option>
@@ -542,6 +658,7 @@ function CodeEditorTab({
           </select>
           <button
             onClick={handleResetCode}
+            disabled={!isYjsReady}
             className="border rounded px-3 py-1 shadow-sm hover:bg-slate-50 transition dark:border-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-800"
           >
             Reset Code
@@ -613,14 +730,14 @@ function CodeEditorTab({
         <div className="sticky bottom-0 mt-3 flex items-center gap-3 rounded-xl border bg-white px-3 py-2 shadow-sm dark:bg-zinc-900 dark:border-zinc-800">
           <button
             onClick={handleRun}
-            disabled={loading}
+            disabled={loading || !isYjsReady}
             className="bg-indigo-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-indigo-700 disabled:opacity-70 transition"
           >
             Run
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || !isYjsReady}
             className="bg-green-600 text-white rounded-lg px-4 py-2 font-medium shadow hover:bg-green-700 disabled:opacity-70 transition"
           >
             Submit
@@ -755,6 +872,15 @@ function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
   return <div className="text-sm text-gray-500 dark:text-zinc-300">{formatTime(elapsed)}</div>;
 }
 
+// Helper: Generate random color for user cursor
+function getRandomColor() {
+  const colors = [
+    "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
+    "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2"
+  ];
+  return colors[Math.floor(Math.random() * colors.length)];
+}
+
 // ----- Main Page -----
 export default function CollaborationPage() {
   const { sessionId } = useParams();
@@ -763,7 +889,7 @@ export default function CollaborationPage() {
   const [timeout, setTimeout] = useState<number>(1000);
   const [activeTab, setActiveTab] = useState<TabKey>("editor");
   const [language, setLanguage] = useState<Language>("python");
-  const [code, setCode] = useState(defaultSnippets["python"]);
+  // const [code, setCode] = useState(defaultSnippets["python"]);
   const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [currentUsername, setCurrentUsername] = useState<string>("");
   const [isCallActive, setIsCallActive] = useState(false);
@@ -775,6 +901,9 @@ export default function CollaborationPage() {
   const [latestResults, setLatestResults] = useState<ExecResult[]>([]);
   const [latestError, setLatestError] = useState<string | null>(null);
   const [hasSubmitted, sethasSubmitted] = useState(false);
+
+  const yTextRef = useRef<Y.Text | null>(null);
+  const yMapRef = useRef<Y.Map<any> | null>(null);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -798,7 +927,7 @@ export default function CollaborationPage() {
           setTimeout(data.question.timeout);
           if (data.question?.codeSnippets?.[0]) {
             setLanguage(data.question.codeSnippets[0].language);
-            setCode(data.question.codeSnippets[0].code);
+            // setCode(data.question.codeSnippets[0].code);
           }
 
           window.clearInterval(interval);
@@ -873,18 +1002,18 @@ export default function CollaborationPage() {
     });
 
     // Existing code-change / language-change handlers
-    socket.on("code-change", ({ code: newCode }: { code: string }) => {
-      setCode(newCode);
-    });
+    // socket.on("code-change", ({ code: newCode }: { code: string }) => {
+    //   setCode(newCode);
+    // });
 
-    socket.on(
-      "language-change",
-      ({ language: newLang }: { language: Language }) => {
-        console.log("Language changed to:", newLang);
-        setLanguage(newLang);
-        setCode(defaultSnippets[newLang]);
-      }
-    );
+    // socket.on(
+    //   "language-change",
+    //   ({ language: newLang }: { language: Language }) => {
+    //     console.log("Language changed to:", newLang);
+    //     setLanguage(newLang);
+    //     setCode(defaultSnippets[newLang]);
+    //   }
+    // );
 
     return () => {
       socket.disconnect();
@@ -892,19 +1021,19 @@ export default function CollaborationPage() {
     };
   }, [sessionId, currentUsername]);
 
-  const handleCodeChange = (newCode: string) => {
-    setCode(newCode);
-    // socketRef.current?.emit("code-change", { sessionId, code: newCode });
-  };
+  // const handleCodeChange = (newCode: string) => {
+  //   setCode(newCode);
+  //   // socketRef.current?.emit("code-change", { sessionId, code: newCode });
+  // };
 
-  const handleLanguageChange = (newLang: Language) => {
-    setLanguage(newLang);
-    setCode(defaultSnippets[newLang]);
-    socketRef.current?.emit("language-change", {
-      sessionId,
-      language: newLang,
-    });
-  };
+  // const handleLanguageChange = (newLang: Language) => {
+  //   setLanguage(newLang);
+  //   setCode(defaultSnippets[newLang]);
+  //   socketRef.current?.emit("language-change", {
+  //     sessionId,
+  //     language: newLang,
+  //   });
+  // };
 
   const handleLeaveSession = async () => {
     if (!sessionId || !currentUsername) return;
@@ -912,14 +1041,22 @@ export default function CollaborationPage() {
     if (!window.confirm("Are you sure you want to leave this session?")) return;
 
     try {
+      // Get the latest code and language from Yjs document before leaving 
+      const currentCode = yTextRef.current ? yTextRef.current.toString() : "";
+      const currentLanguage = yMapRef.current 
+        ? (yMapRef.current.get("language") as Language) || language 
+        : language;
+
+      console.log("[Leave] Saving code:", currentCode.length, "chars, language:", currentLanguage);
+
       // Notify backend (voluntary leave)
       socketRef.current?.emit("leave-session", {
         sessionId,
         username: currentUsername,
-        code,
+        code: currentCode,
         submitResults: latestResults,
         error: latestError,
-        language,
+        language: currentLanguage,
         hasSubmitted,
       });
 
@@ -941,7 +1078,9 @@ export default function CollaborationPage() {
       </div>
     );
   }
+
   if (!question) return <div>Question not found</div>;
+
   return (
     <div className="flex h-screen flex-col bg-gray-50 p-4 gap-4 dark:bg-zinc-950">
       <header className="flex items-center justify-between">
@@ -996,9 +1135,9 @@ export default function CollaborationPage() {
             {activeTab === "editor" && (
               <CodeEditorTab
                 language={language}
-                setLanguage={handleLanguageChange}
-                code={code}
-                setCode={handleCodeChange}
+                setLanguage={setLanguage}
+                // code={code}
+                // setCode={handleCodeChange}
                 testCases={question.testCases}
                 socketRef={socketRef}
                 sessionId={sessionId}
@@ -1007,13 +1146,15 @@ export default function CollaborationPage() {
                 onResultsChange={setLatestResults}
                 onErrorChange={setLatestError}
                 sethasSubmitted={sethasSubmitted}
+                yTextRef={yTextRef}
+                yMapRef={yMapRef} 
               />
             )}
             {activeTab === "chat" && (
               <Chat
                 question={question}
                 language={language}
-                code={code}
+                code={""}
                 sessionId={sessionId as string}
               />
             )}
