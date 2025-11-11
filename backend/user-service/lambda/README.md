@@ -34,12 +34,10 @@ fi
 docker run --rm \
   --platform linux/amd64 \
   -p 9000:8080 \
-  -e DB_CLOUD_URI="<your-mongodb-connection-string>" \
-  -e JWT_SECRET="<jwt-secret>" \
-  -e FRONTEND_ORIGIN="https://your-frontend.example" \
+  --env-file ./.env \
   --entrypoint /aws-lambda/aws-lambda-rie \
   user-service-lambda:latest \
-    lambda-handler.handler
+    /lambda-entrypoint.sh lambda-handler.handler
 
 # Invoke the locally running container
 curl "http://127.0.0.1:9000/2015-03-31/functions/function/invocations" \
