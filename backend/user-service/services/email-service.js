@@ -1,10 +1,8 @@
 // services/email-service.js
 import "dotenv/config";
+import { parseOriginsFromEnv } from "../utils/env.js";
 
-const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const FRONTEND_ORIGINS = parseOriginsFromEnv(process.env.FRONTEND_ORIGIN);
 
 if (FRONTEND_ORIGINS.length === 0) {
   throw new Error(

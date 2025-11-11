@@ -5,16 +5,14 @@ import passport from "./config/passport.js";
 import cloudinaryRouter from "./routes/cloudinary-routes.js";
 import userRoutes from "./routes/user-routes.js";
 import authRoutes from "./routes/auth-routes.js";
+import { parseOriginsFromEnv } from "./utils/env.js";
 const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(passport.initialize());
 
-const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
+const FRONTEND_ORIGINS = parseOriginsFromEnv(process.env.FRONTEND_ORIGIN);
 
 const corsAllowedOrigins = FRONTEND_ORIGINS.length > 0 ? FRONTEND_ORIGINS : true;
 
