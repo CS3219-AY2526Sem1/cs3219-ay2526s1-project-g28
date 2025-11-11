@@ -227,28 +227,59 @@ input:-webkit-autofill:focus {
   background-color: rgba(30, 41, 59, 0.7) !important;
 }
 
+.remote-cursor {
+  position: absolute !important;
+  width: 2px !important;
+  background-color: #6366f1 !important; /* indigo-500 */
+  pointer-events: none !important;
+  z-index: 1000 !important;
+}
+
 @keyframes blink {
   0%, 50%, 100% { opacity: 1; }
   25%, 75% { opacity: 0; }
 }
 
 .remote-cursor {
-  width: 2px !important;
-  background-color: rgba(99, 102, 241, 1) !important;
-  display: inline-block;
-  animation: blink 2s step-start infinite;
+  animation: blink 1.5s ease-in-out infinite;
 }
 
 .remote-cursor-label {
   position: absolute;
-  top: -18px; /* above the cursor */
-  left: 0;
-  background-color: rgba(99, 102, 241, 0.8); /* semi-transparent purple */
+  padding: 2px 6px;
+  background-color: #6366f1; /* indigo-500 - match cursor color */
   color: white;
-  font-size: 12px;
-  font-weight: bold;
-  padding: 1px 4px;
-  border-radius: 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
-  pointer-events: none; /* avoid blocking editor interaction */
+  pointer-events: none;
+  z-index: 1001;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.yRemoteSelection {
+  background-color: rgba(99, 102, 241, 0.3) !important; /* indigo with transparency */
+  pointer-events: none;
+}
+
+/* The cursor/caret at the selection boundary */
+.yRemoteSelectionHead {
+  position: absolute;
+  border-left: 2px solid #6366f1 !important;
+  border-top: 2px solid #6366f1 !important;
+  border-bottom: 2px solid #6366f1 !important;
+  height: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* Add a subtle pulse to the remote selection to show it's active */
+@keyframes pulse-selection {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.2; }
+}
+
+.yRemoteSelection {
+  animation: pulse-selection 2s ease-in-out infinite;
 }

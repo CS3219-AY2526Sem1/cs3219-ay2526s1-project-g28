@@ -23,17 +23,17 @@ export function initCollaborationSocket(io, redis) {
       socket.to(sessionId).emit("user-joined", { username });
     });
 
-    socket.on("code-change", ({ sessionId, code }) => {
-      // Broadcast code updates to other clients
-      socket.to(sessionId).emit("code-change", { code });
-      // Optionally cache code in Redis
-      redis.set(`session:${sessionId}:code`, code);
-    });
+    // socket.on("code-change", ({ sessionId, code }) => {
+    //   // Broadcast code updates to other clients
+    //   socket.to(sessionId).emit("code-change", { code });
+    //   // Optionally cache code in Redis
+    //   redis.set(`session:${sessionId}:code`, code);
+    // });
 
-    socket.on("language-change", ({ sessionId, language }) => {
-      // Broadcast language updates to others
-      socket.to(sessionId).emit("language-change", { language });
-    });
+    // socket.on("language-change", ({ sessionId, language }) => {
+    //   // Broadcast language updates to others
+    //   socket.to(sessionId).emit("language-change", { language });
+    // });
 
     socket.on("cursor-change", ({ sessionId, position, username }) => {
       socket.to(sessionId).emit("remote-cursor-change", { position, username });

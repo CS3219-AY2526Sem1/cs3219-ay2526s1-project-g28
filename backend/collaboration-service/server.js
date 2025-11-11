@@ -6,6 +6,7 @@ import { Server } from "socket.io";
 import { connectKafka } from "./kafka-utilties.js";
 import { initCollaborationSocket } from "./sockets/collaboration-socket.js";
 import { connectToDB } from "./model/repository.js";
+import { createYjsServer } from "./yjs-server.js";
 
 const port = process.env.PORT || 3004;
 const server = http.createServer(index);
@@ -32,6 +33,8 @@ const io = new Server(server, {
 // Attach WebSocket collaboration logic
 initCollaborationSocket(io, redis);
 
+createYjsServer(server);
+
 const startServer = async () => {
   try {
     // Connect to MongoDB
@@ -46,6 +49,8 @@ const startServer = async () => {
 
     server.listen(port, () => {
       console.log(`Collaboration service listening on port ${port}`);
+      console.log(`Socket.IO available at http://localhost:${port}`);
+      console.log(`Yjs WebSocket available at ws://localhost:${port}/yjs`);
     });
   } catch (error) {
     console.error("Failed to start server:", error);
