@@ -15,9 +15,13 @@ import {
 
 import { formatUserResponse } from "./user-controller.js";
 import { buildPasswordResetUrl, sendPasswordResetEmail } from "../services/email-service.js";
-import { parseOriginsFromEnv } from "../utils/env.js";
+import {
+  getEnvVar,
+  getNumericEnvVar,
+  parseOriginsFromEnv,
+} from "../utils/env.js";
 
-const FRONTEND_ORIGINS = parseOriginsFromEnv(process.env.FRONTEND_ORIGIN);
+const FRONTEND_ORIGINS = parseOriginsFromEnv(getEnvVar("FRONTEND_ORIGIN"));
 
 if (FRONTEND_ORIGINS.length === 0) {
   throw new Error(
@@ -26,8 +30,8 @@ if (FRONTEND_ORIGINS.length === 0) {
 }
 
 const FRONTEND_ORIGIN = FRONTEND_ORIGINS[0];
-const JWT_SECRET = process.env.JWT_SECRET;
-const PASSWORD_RESET_TTL_HOURS = Number(process.env.PASSWORD_RESET_TTL_HOURS || 1);
+const JWT_SECRET = getEnvVar("JWT_SECRET");
+const PASSWORD_RESET_TTL_HOURS = getNumericEnvVar("PASSWORD_RESET_TTL_HOURS", 1);
 
 // Small helper so we don’t depend on another utils file
 function baseUsername(displayName, email, fallback = "user") {

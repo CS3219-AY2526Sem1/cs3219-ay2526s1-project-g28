@@ -24,6 +24,8 @@
 
 6. Update the `DB_CLOUD_URI` of the `.env` file, and paste the string we copied earlier in step 4. Also remember to replace the `<password>` placeholder with the actual password.
 
+   > :information_source: Environment values are trimmed and allow inline comments after a `#` preceded by whitespace. For example, `SENDGRID_API_KEY=abc123   # production key` will load as `abc123` both locally and when running on Lambda.
+
 ## Running User Service
 
 1. Open Command Line/Terminal and navigate into the `user-service` directory.

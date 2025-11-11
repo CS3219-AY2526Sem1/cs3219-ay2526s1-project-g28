@@ -15,8 +15,9 @@ import {
   markUserEmailVerified as _markUserEmailVerified,
 } from "../model/repository.js";
 import { sendVerificationEmail, buildVerificationUrl } from "../services/email-service.js";
+import { getNumericEnvVar } from "../utils/env.js";
 
-const EMAIL_VERIFICATION_TTL_HOURS = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS || 48);
+const EMAIL_VERIFICATION_TTL_HOURS = getNumericEnvVar("EMAIL_VERIFICATION_TTL_HOURS", 48);
 
 /**
  * POST /users

@@ -3,8 +3,9 @@ import { pathToFileURL } from "url";
 import index from "./index.js";
 import "dotenv/config";
 import { connectToDB } from "./model/repository.js";
+import { getNumericEnvVar } from "./utils/env.js";
 
-const port = Number(process.env.PORT || 3001);
+const port = getNumericEnvVar("PORT", 3001);
 const server = http.createServer(index);
 let startupPromise = null;
 

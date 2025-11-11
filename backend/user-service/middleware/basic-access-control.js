@@ -1,5 +1,8 @@
 import jwt from "jsonwebtoken";
 import { findUserById as _findUserById } from "../model/repository.js";
+import { getEnvVar } from "../utils/env.js";
+
+const JWT_SECRET = getEnvVar("JWT_SECRET");
 
 export function verifyAccessToken(req, res, next) {
   const authHeader = req.headers["authorization"];
@@ -9,7 +12,7 @@ export function verifyAccessToken(req, res, next) {
 
   // request auth header: `Authorization: Bearer + <access_token>`
   const token = authHeader.split(" ")[1];
-  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+  jwt.verify(token, JWT_SECRET, async (err, user) => {
     if (err) {
       return res.status(401).json({ message: "Authentication failed" });
     }

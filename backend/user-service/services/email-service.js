@@ -1,8 +1,11 @@
 // services/email-service.js
 import "dotenv/config";
-import { parseOriginsFromEnv } from "../utils/env.js";
+import {
+  getEnvVar,
+  parseOriginsFromEnv,
+} from "../utils/env.js";
 
-const FRONTEND_ORIGINS = parseOriginsFromEnv(process.env.FRONTEND_ORIGIN);
+const FRONTEND_ORIGINS = parseOriginsFromEnv(getEnvVar("FRONTEND_ORIGIN"));
 
 if (FRONTEND_ORIGINS.length === 0) {
   throw new Error(
@@ -11,10 +14,10 @@ if (FRONTEND_ORIGINS.length === 0) {
 }
 
 const DEFAULT_ORIGIN = FRONTEND_ORIGINS[0];
-const EMAIL_FROM = process.env.EMAIL_FROM;
-const EMAIL_VERIFICATION_WEBHOOK = process.env.EMAIL_VERIFICATION_WEBHOOK;
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-const PASSWORD_RESET_WEBHOOK = process.env.PASSWORD_RESET_WEBHOOK;
+const EMAIL_FROM = getEnvVar("EMAIL_FROM");
+const EMAIL_VERIFICATION_WEBHOOK = getEnvVar("EMAIL_VERIFICATION_WEBHOOK");
+const SENDGRID_API_KEY = getEnvVar("SENDGRID_API_KEY");
+const PASSWORD_RESET_WEBHOOK = getEnvVar("PASSWORD_RESET_WEBHOOK");
 
 const EXPIRY_TIMEZONE = "Asia/Singapore";
 const EXPIRY_FORMATTER = new Intl.DateTimeFormat("en-SG", {
@@ -37,7 +40,7 @@ function getFetch() {
 }
 
 function resolveBaseUrl() {
-  const configured = process.env.EMAIL_VERIFICATION_URL;
+  const configured = getEnvVar("EMAIL_VERIFICATION_URL");
   if (!configured) {
     return new URL("/verify-email", DEFAULT_ORIGIN);
   }
@@ -57,7 +60,7 @@ export function buildVerificationUrl(token) {
 }
 
 function resolvePasswordResetBaseUrl() {
-  const configured = process.env.PASSWORD_RESET_URL;
+  const configured = getEnvVar("PASSWORD_RESET_URL");
   if (!configured) {
     return new URL("/reset-password", DEFAULT_ORIGIN);
   }

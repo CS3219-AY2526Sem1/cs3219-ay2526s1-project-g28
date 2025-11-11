@@ -2,8 +2,9 @@ import "dotenv/config";
 import http from "node:http";
 import { URL } from "node:url";
 import { startServer } from "./server.js";
+import { getNumericEnvVar } from "./utils/env.js";
 
-const port = Number(process.env.PORT || 3001);
+const port = getNumericEnvVar("PORT", 3001);
 const forwardUrl = new URL(`http://127.0.0.1:${port}`);
 
 const HOP_BY_HOP_HEADERS = new Set([

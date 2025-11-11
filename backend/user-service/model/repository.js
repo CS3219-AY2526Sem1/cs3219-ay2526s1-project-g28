@@ -3,15 +3,21 @@ import bcrypt from "bcrypt";
 import "dotenv/config";
 import mongoose from "mongoose";
 import UserModel from "./user-model.js";
+import { getEnvVar, getNumericEnvVar } from "../utils/env.js";
 
 let connectionPromise = null;
+
+const ENVIRONMENT = getEnvVar("ENV");
+const DB_LOCAL_URI = getEnvVar("DB_LOCAL_URI");
+const DB_CLOUD_URI = getEnvVar("DB_CLOUD_URI");
+const BCRYPT_ROUNDS = getNumericEnvVar("BCRYPT_ROUNDS", 10);
 
 export async function connectToDB() {
   // sanity: many people invert these; adjust if needed
   const mongoDBUri =
-    process.env.ENV === "DEV"
-      ? process.env.DB_LOCAL_URI || process.env.DB_CLOUD_URI
-      : process.env.DB_CLOUD_URI || process.env.DB_LOCAL_URI;
+    ENVIRONMENT === "DEV"
+      ? DB_LOCAL_URI || DB_CLOUD_URI
+      : DB_CLOUD_URI || DB_LOCAL_URI;
 
   if (!mongoDBUri) throw new Error("Missing MongoDB URI in env");
   if (mongoose.connection.readyState === 1) {
@@ -43,8 +49,7 @@ export async function ensureUniqueUsername(base) {
 }
 
 async function hashPassword(plain) {
-  const rounds = Number(process.env.BCRYPT_ROUNDS || 10);
-  return bcrypt.hash(plain, rounds);
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
 /* ---------- Local (email/password) ---------- */
