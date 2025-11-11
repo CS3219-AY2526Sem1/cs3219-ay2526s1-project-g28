@@ -12,7 +12,7 @@ await connectToDB()
     console.log("MongoDB Connected!");
 
     server.listen(port);
-    console.log("User service server listening on http://localhost:" + port);
+    console.log(`User service server listening on port ${port}`);
   })
   .catch((err) => {
     console.error("Failed to connect to DB");

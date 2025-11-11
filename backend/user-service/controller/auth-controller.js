@@ -16,7 +16,18 @@ import {
 import { formatUserResponse } from "./user-controller.js";
 import { buildPasswordResetUrl, sendPasswordResetEmail } from "../services/email-service.js";
 
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (FRONTEND_ORIGINS.length === 0) {
+  throw new Error(
+    "FRONTEND_ORIGIN environment variable is required for OAuth redirects"
+  );
+}
+
+const FRONTEND_ORIGIN = FRONTEND_ORIGINS[0];
 const JWT_SECRET = process.env.JWT_SECRET;
 const PASSWORD_RESET_TTL_HOURS = Number(process.env.PASSWORD_RESET_TTL_HOURS || 1);
 

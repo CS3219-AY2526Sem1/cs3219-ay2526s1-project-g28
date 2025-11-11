@@ -11,13 +11,16 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(passport.initialize());
 
-const FRONTEND =
-  process.env.FRONTEND_ORIGIN ||
-  "http://localhost:5173" ||
-  "http://localhost:5174";
+const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsAllowedOrigins = FRONTEND_ORIGINS.length > 0 ? FRONTEND_ORIGINS : true;
+
 app.use(
   cors({
-    origin: [FRONTEND, "http://127.0.0.1:5174"],
+    origin: corsAllowedOrigins,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [

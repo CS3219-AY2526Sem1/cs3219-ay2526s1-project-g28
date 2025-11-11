@@ -1,7 +1,18 @@
 // services/email-service.js
 import "dotenv/config";
 
-const DEFAULT_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
+const FRONTEND_ORIGINS = (process.env.FRONTEND_ORIGIN ?? "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+if (FRONTEND_ORIGINS.length === 0) {
+  throw new Error(
+    "FRONTEND_ORIGIN environment variable is required to build email links"
+  );
+}
+
+const DEFAULT_ORIGIN = FRONTEND_ORIGINS[0];
 const EMAIL_FROM = process.env.EMAIL_FROM;
 const EMAIL_VERIFICATION_WEBHOOK = process.env.EMAIL_VERIFICATION_WEBHOOK;
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
