@@ -1,8 +1,10 @@
 // model/repository.js
 import bcrypt from "bcrypt";
 import "dotenv/config";
+import mongoose from "mongoose";
 import UserModel from "./user-model.js";
-import { connect } from "mongoose";
+
+let connectionPromise = null;
 
 export async function connectToDB() {
   // sanity: many people invert these; adjust if needed
@@ -12,7 +14,18 @@ export async function connectToDB() {
       : process.env.DB_CLOUD_URI || process.env.DB_LOCAL_URI;
 
   if (!mongoDBUri) throw new Error("Missing MongoDB URI in env");
-  await connect(mongoDBUri);
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (!connectionPromise) {
+    connectionPromise = mongoose.connect(mongoDBUri).catch((err) => {
+      connectionPromise = null;
+      throw err;
+    });
+  }
+
+  return connectionPromise;
 }
 
 /* ---------- Utilities ---------- */

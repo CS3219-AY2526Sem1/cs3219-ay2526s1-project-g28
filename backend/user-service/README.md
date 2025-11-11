@@ -34,6 +34,10 @@
 
 4. Using applications like Postman, you can interact with the User Service on port 3001. If you wish to change this, please update the `.env` file.
 
+## Deploying to AWS Lambda
+
+The service can be packaged as a Lambda function using the container image workflow. A dedicated Lambda entry point (`lambda-handler.js`) proxies incoming invocation events to the Express server once the database connection has been established. Use the Dockerfile and deployment guide in [`lambda/`](./lambda/README.md) to build, test, and publish the container image to Amazon ECR before creating or updating the Lambda function.
+
 ## User Service API Guide
 
 ### Create User

@@ -1,20 +1,49 @@
 import http from "http";
+import { pathToFileURL } from "url";
 import index from "./index.js";
 import "dotenv/config";
 import { connectToDB } from "./model/repository.js";
 
-const port = process.env.PORT || 3001;
-
+const port = Number(process.env.PORT || 3001);
 const server = http.createServer(index);
+let startupPromise = null;
 
-await connectToDB()
-  .then(() => {
-    console.log("MongoDB Connected!");
+export function startServer() {
+  if (!startupPromise) {
+    startupPromise = (async () => {
+      await connectToDB();
+      console.log("MongoDB Connected!");
 
-    server.listen(port);
-    console.log(`User service server listening on port ${port}`);
-  })
-  .catch((err) => {
-    console.error("Failed to connect to DB");
-    console.error(err);
+      await new Promise((resolve, reject) => {
+        server.listen(port, (err) => {
+          if (err) return reject(err);
+          console.log(`User service server listening on port ${port}`);
+          resolve();
+        });
+      });
+
+      return server;
+    })().catch((err) => {
+      console.error("Failed to start user service server");
+      console.error(err);
+      startupPromise = null;
+      throw err;
+    });
+  }
+
+  return startupPromise;
+}
+
+export function getServer() {
+  return server;
+}
+
+const entryPoint = process.argv[1]
+  ? pathToFileURL(process.argv[1]).href
+  : null;
+
+if (entryPoint && import.meta.url === entryPoint) {
+  startServer().catch(() => {
+    process.exitCode = 1;
   });
+}
