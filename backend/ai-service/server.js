@@ -143,7 +143,7 @@ app.post("/ai/chat", async (req, res) => {
   }
 });
 
-const port = process.env.AI_SERVICE_PORT || 3000;
+const port = process.env.AI_SERVICE_PORT;
 app.listen(port, () => console.log(`AI service listening on ${port}`));
 
 module.exports = app;

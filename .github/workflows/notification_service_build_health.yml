@@ -1,8 +1,6 @@
-# .github/workflows/build-health-notification.yml
-name: Build & Health (notification-service)
+name: CI + CD (notification-service)
 
-on:
-  workflow_dispatch: {} # manual trigger only
+on: push
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,8 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout
       - uses: actions/checkout@v4
 
+      # Build Docker image (for local health check)
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
@@ -25,66 +25,100 @@ jobs:
             -f backend/notification-service/Dockerfile \
             backend/notification-service
 
-      - name: Auth to Google with key
+      # Authenticate to Google Cloud
+      - name: Auth to Google
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
+      # Fetch dotenv secret from Google Secret Manager
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/notification-service-env/versions/latest
 
-      - name: Write & normalize .env + CI flags
+      # Export GSM secrets to environment
+      - name: Export GSM secrets
         run: |
-          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > notification-service.env
-          sed -i 's/\r$//' notification-service.env
-          sed -i 's/[[:space:]]*$//' notification-service.env
-          grep -q '^PORT=' notification-service.env || echo 'PORT=3005' >> notification-service.env
-          grep -q '^HOST=' notification-service.env || echo 'HOST=0.0.0.0' >> notification-service.env
-          # turn on the tiny health server for CI
-          echo 'ENABLE_HEALTH_SERVER=1' >> notification-service.env
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
 
-      - name: Run notification-service
+      # Dynamically confirm GSM environment variable lengths
+      - name: Confirm all GSM env string lengths
+        run: |
+          echo "🔍 Checking all environment variables loaded from GSM..."
+          # Extract key names from the GSM payload and test them dynamically
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sort | while read -r key; do
+            value=$(printenv "$key" || true)
+            if [ -z "$value" ]; then
+              echo "$key: MISSING"
+            else
+              echo "$key len:${#value}"
+            fi
+          done
+
+      # Start Mongo if using local DB
+      - name: Start Mongo if needed
+        run: |
+          if echo "${DB_LOCAL_URI}" | grep -q "mongodb://host.docker.internal"; then
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+          else
+            echo "External DB configured; not starting local Mongo."
+          fi
+
+      # Run container for health check
+      - name: Run notification-service container
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name notification-service \
-            -p 3005:3005 \
-            --env-file ./notification-service.env \
+            -p 3007:3007 \
+            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/notification-service:dev"
 
-      - name: Confirm env inside container
+      # Health check
+      - name: Health check
         run: |
-          for k in PORT ENABLE_HEALTH_SERVER; do
-            docker exec notification-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
-          done
-
-      - name: Wait for /health (fail fast if container dies)
-        run: |
-          for i in {1..40}; do
-            docker ps -a --filter "name=notification-service" --format 'table {{.Names}}\t{{.Status}}'
-            if ! docker ps --format '{{.Names}}' | grep -q '^notification-service$'; then
-              echo "Container exited"
-              docker logs --timestamps --tail=200 notification-service || true
-              echo "Exit code: $(docker inspect notification-service --format='{{.State.ExitCode}}' || true)"
-              exit 1
-            fi
-            if curl -fsS http://127.0.0.1:3005/health >/dev/null; then
-              echo "✅ /health OK"
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
+              echo "✅ Health check OK"
               exit 0
             fi
-            echo "waiting for /health... ($i)"; sleep 1
+            echo "waiting for /health... ($i)"; sleep 2
           done
-          echo "❌ health never came up"; docker logs notification-service || true; exit 1
+          echo "❌ health never came up"
+          docker logs question-service || true
+          exit 1
 
-      - name: Logs (always show last lines)
+      - name: Install dependencies
+        working-directory: backend/notification-service
+        run: npm ci --omit=dev
+
+      # Deploy to AWS Lambda with Serverless
+      - name: Deploy to AWS Lambda
+        working-directory: backend/notification-service
+        run: |
+          npm install -g serverless@3
+          npx serverless deploy --stage prod --region ap-southeast-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_XZ }}
+
+      # Logs (always show)
+      - name: Logs (always)
         if: always()
         run: |
           echo "----- notification-service logs -----"
           docker logs --timestamps --tail=150 notification-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
 
+      # Cleanup
       - name: Cleanup
         if: always()
         run: |
           docker rm -f notification-service || true
+          docker rm -f mongo || true
