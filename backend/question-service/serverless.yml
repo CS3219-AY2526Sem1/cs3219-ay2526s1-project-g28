@@ -8,6 +8,7 @@ provider:
   lambdaHashingVersion: 20201221
   logs:
     httpApi: false # disables CloudWatch access logs for HTTP APIs
+<<<<<<< Updated upstream
   httpApi:
   cors:
     allowedOrigins:
@@ -29,6 +30,8 @@ provider:
       - Accept
       - Origin
     allowCredentials: true
+=======
+>>>>>>> Stashed changes
 
   environment:
     PORT: ${env:QUESTION_SERVICE_PORT}
