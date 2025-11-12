@@ -378,10 +378,6 @@ function CodeEditorTab({
       });
     });
 
-    provider.on("status", (event: { status: string }) => {
-      console.log("[Yjs] Connection status:", event.status);
-    });
-
     provider.on("connection-error", (error: any) => {
       console.error("[Yjs] Connection error:", error);
       toast.error("Lost connection to collaboration server");
@@ -592,6 +588,33 @@ const handleLanguageChange = (newLang: Language) => {
   }
 };
 
+// Clear all code in the editor
+const handleClearCode = () => {
+  const yText = yTextRef.current;
+  const ydoc = ydocRef.current;
+
+  if (!yText || !ydoc) {
+    console.warn("[Clear] Yjs not ready");
+    toast.error("Editor not ready yet");
+    return;
+  }
+
+  // Confirm before clearing
+  if (!window.confirm("Are you sure you want to clear all code? This will affect both users.")) {
+    return;
+  }
+
+  console.log("[Clear] Clearing shared document");
+
+  // Clear all content
+  ydoc.transact(() => {
+    yText.delete(0, yText.length);
+  });
+
+  toast.success("Code cleared");
+};
+
+
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
       {/* Tabs */}
@@ -656,6 +679,13 @@ const handleLanguageChange = (newLang: Language) => {
             <option value="javascript">JavaScript</option>
             <option value="java">Java</option>
           </select>
+          <button
+            onClick={handleClearCode}
+            disabled={!isYjsReady}
+            className="border rounded px-3 py-1 shadow-sm hover:bg-red-50 text-red-600 border-red-300 transition dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950 disabled:opacity-50"
+          >
+            Clear All
+          </button>
           <button
             onClick={handleResetCode}
             disabled={!isYjsReady}
