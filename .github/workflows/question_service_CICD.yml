@@ -76,12 +76,12 @@ jobs:
 
       # Run container for health check
       - name: Run question-service container
-        run: |
-          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker run -d --name question-service \
-            -p 3002:3002 \
-            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
-            "$NS/question-service:dev"
+            run: |
+              NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+              docker run -d --name question-service \
+                -p 3001:3001 \
+                $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
+                "$NS/question-service:dev"
 
       - name: Health check
         run: |
