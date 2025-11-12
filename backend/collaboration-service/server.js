@@ -8,7 +8,7 @@ import { initCollaborationSocket } from "./sockets/collaboration-socket.js";
 import { connectToDB } from "./model/repository.js";
 import { createYjsServer } from "./yjs-server.js";
 
-const port = process.env.PORT || 3004;
+const port = process.env.COLLABORATION_SERVICE_PORT || 3004;
 const server = http.createServer(index);
 
 const REDIS_URL = process.env.REDIS_URL;

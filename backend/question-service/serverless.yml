@@ -1,0 +1,36 @@
+service: question-service
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-southeast-1
+  stage: prod
+  lambdaHashingVersion: 20201221
+  logs:
+    httpApi: false # disables CloudWatch access logs for HTTP APIs
+
+  environment:
+    PORT: ${env:QUESTION_SERVICE_PORT}
+    DB_LOCAL_URI: ${env:DB_LOCAL_URI}
+    DB_CLOUD_URI: ${env:DB_CLOUD_URI}
+    ENV: ${env:ENV}
+    JWT_SECRET: ${env:JWT_SECRET}
+    KAFKA_BROKERS: ${env:KAFKA_BROKERS}
+    KAFKA_USERNAME: ${env:KAFKA_USERNAME}
+    KAFKA_PASSWORD: ${env:KAFKA_PASSWORD}
+    CLOUDINARY_CLOUD_NAME: ${env:CLOUDINARY_CLOUD_NAME}
+    CLOUDINARY_API_KEY: ${env:CLOUDINARY_API_KEY}
+    CLOUDINARY_API_SECRET: ${env:CLOUDINARY_API_SECRET}
+
+functions:
+  quesiton:
+    handler: lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+package:
+  patterns:
+    - "!node_modules/aws-sdk/**"
+    - "**"

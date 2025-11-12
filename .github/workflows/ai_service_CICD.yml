@@ -1,4 +1,4 @@
-name: CI + CD (user-service)
+name: CI + CD (ai-service)
 
 on:
   push:
@@ -14,7 +14,7 @@ permissions:
   contents: read
 
 jobs:
-  user-service:
+  ai-service:
     runs-on: ubuntu-latest
 
     steps:
@@ -25,9 +25,9 @@ jobs:
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker build -t "$NS/user-service:dev" \
-            -f backend/user-service/Dockerfile \
-            backend/user-service
+          docker build -t "$NS/ai-service:dev" \
+            -f backend/ai-service/Dockerfile \
+            backend/ai-service
 
       # Authenticate to Google Cloud
       - name: Auth to Google
@@ -40,7 +40,7 @@ jobs:
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
-            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/ai-service-env/versions/latest
 
       # Export GSM secrets to environment
       - name: Export GSM secrets
@@ -75,40 +75,40 @@ jobs:
           fi
 
       # Run container for health check
-      - name: Run user-service container
+      - name: Run ai-service container
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker run -d --name user-service \
-            -p 3001:3001 \
+          docker run -d --name ai-service \
+            -p 3007:3007 \
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
-            "$NS/user-service:dev"
+            "$NS/ai-service:dev"
 
       - name: Health check
         run: |
           for i in {1..40}; do
-            docker ps -a --filter "name=user-service" --format 'table {{.Names}}\t{{.Status}}'
-            if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
+            docker ps -a --filter "name=ai-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^ai-service$'; then
               echo "Container exited"
-              docker logs --timestamps --tail=200 user-service || true
+              docker logs --timestamps --tail=200 ai-service || true
               exit 1
             fi
-            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
               echo "✅ /health OK"
               exit 0
             fi
             echo "waiting for /health... ($i)"; sleep 1
           done
           echo "❌ health never came up"
-          docker logs user-service || true
+          docker logs ai-service || true
           exit 1
 
       - name: Install dependencies
-        working-directory: backend/user-service
+        working-directory: backend/ai-service
         run: npm ci --omit=dev
 
       # Deploy to AWS Lambda with Serverless
       - name: Deploy to AWS Lambda
-        working-directory: backend/user-service
+        working-directory: backend/ai-service
         run: |
           npm install -g serverless@3
           npx serverless deploy --stage prod --region ap-southeast-1
@@ -120,8 +120,8 @@ jobs:
       - name: Logs (always)
         if: always()
         run: |
-          echo "----- user-service logs -----"
-          docker logs --timestamps --tail=150 user-service || true
+          echo "----- ai-service logs -----"
+          docker logs --timestamps --tail=150 ai-service || true
           echo "----- mongo logs -----"
           docker logs --timestamps --tail=80 mongo || true
 
@@ -129,5 +129,5 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f user-service || true
+          docker rm -f ai-service || true
           docker rm -f mongo || true

@@ -1,0 +1,23 @@
+service: execution-service
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-southeast-1
+  stage: prod
+  lambdaHashingVersion: 20201221
+  logs:
+    httpApi: false # disables CloudWatch access logs for HTTP APIs
+
+functions:
+  execution:
+    handler: lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+package:
+  patterns:
+    - "!node_modules/aws-sdk/**"
+    - "**"
