@@ -1,0 +1,143 @@
+name: CI + CD (user-service)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {} # allow manual trigger
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  user-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout repository
+      - uses: actions/checkout@v4
+
+      # Build Docker image (for health check)
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/user-service:dev" \
+            -f backend/user-service/Dockerfile \
+            backend/user-service
+
+      # Authenticate to Google (service account JSON)
+      - name: Auth to Google
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Read .env secret from Google Secret Manager
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
+
+      # Write .env file and normalize it
+      - name: Write & normalize .env
+        run: |
+          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > .env
+          sed -i 's/\r$//' .env
+          sed -i 's/[[:space:]]*$//' .env
+          # Ensure defaults
+          grep -q '^PORT=' .env || echo 'PORT=3001' >> .env
+          grep -q '^HOST=' .env || echo 'HOST=0.0.0.0' >> .env
+          grep -q '^SESSION_SECRET=' .env || echo 'SESSION_SECRET=ci-session-secret' >> .env
+          # Map DB_* -> MONGO_URI if missing
+          if ! grep -q '^MONGO_URI=' .env; then
+            if grep -q '^DB_LOCAL_URI=' .env; then
+              echo "MONGO_URI=$(grep '^DB_LOCAL_URI=' .env | cut -d= -f2-)" >> .env
+            elif grep -q '^DB_CLOUD_URI=' .env; then
+              echo "MONGO_URI=$(grep '^DB_CLOUD_URI=' .env | cut -d= -f2-)" >> .env
+            else
+              echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> .env
+            fi
+          fi
+          cat .env | grep '=' >> $GITHUB_ENV
+
+      # Start Mongo if needed (for local testing)
+      - name: Start Mongo if needed
+        run: |
+          if grep -q '^MONGO_URI=mongodb://host.docker.internal' .env; then
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+          else
+            echo "External DB configured; not starting local Mongo."
+          fi
+
+      # Run container for health check
+      - name: Run user-service container
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name user-service \
+            -p 3001:3001 \
+            --env-file .env \
+            "$NS/user-service:dev"
+
+      # Wait for /health
+      - name: Health check
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=user-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 user-service || true
+              echo "Exit code: $(docker inspect user-service --format='{{.State.ExitCode}}' || true)"
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"; docker logs user-service || true; exit 1
+
+      # Deploy to AWS Lambda via Serverless
+      - name: Deploy to AWS Lambda
+        run: |
+          npm install -g serverless
+          npx serverless deploy --stage prod --region ap-southeast-1
+        working-directory: backend/user-service
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # Env vars already loaded from .env via $GITHUB_ENV
+          PORT: ${{ env.PORT }}
+          DB_LOCAL_URI: ${{ env.DB_LOCAL_URI }}
+          DB_CLOUD_URI: ${{ env.DB_CLOUD_URI }}
+          ENV: ${{ env.ENV }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ env.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ env.GOOGLE_CLIENT_SECRET }}
+          GITHUB_CLIENT_ID: ${{ env.GITHUB_CLIENT_ID }}
+          GITHUB_CLIENT_SECRET: ${{ env.GITHUB_CLIENT_SECRET }}
+          CLOUDINARY_URL: ${{ env.CLOUDINARY_URL }}
+
+      # Logs (always show)
+      - name: Logs (always)
+        if: always()
+        run: |
+          echo "----- user-service logs -----"
+          docker logs --timestamps --tail=150 user-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
+
+      # Cleanup
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f user-service || true
+          docker rm -f mongo || true
