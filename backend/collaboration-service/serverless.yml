@@ -1,0 +1,35 @@
+service: collaboration-service
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-southeast-1
+  stage: prod
+  lambdaHashingVersion: 20201221
+  logs:
+    httpApi: false # disables CloudWatch access logs for HTTP APIs
+
+  environment:
+    COLLABORATION_SERVICE_PORT: ${env:COLLABORATION_SERVICE_PORT}
+    ENV: ${env:ENV}
+    DB_LOCAL_URI: ${env:DB_LOCAL_URI}
+    DB_CLOUD_URI: ${env:DB_CLOUD_URI}
+    KAFKA_BROKERS: ${env:KAFKA_BROKERS}
+    KAFKA_USERNAME: ${env:KAFKA_USERNAME}
+    KAFKA_PASSWORD: ${env:KAFKA_PASSWORD}
+    DAILY_API_KEY: ${env:DAILY_API_KEY}
+    DAILY_API_URL: ${env:DAILY_API_URL}
+    REDIS_URL: ${env:REDIS_URL}
+
+functions:
+  collaboration:
+    handler: lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+package:
+  patterns:
+    - "!node_modules/aws-sdk/**"
+    - "**"

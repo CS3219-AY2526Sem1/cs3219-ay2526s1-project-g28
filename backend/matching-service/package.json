@@ -21,6 +21,7 @@
     "express": "^4.19.2",
     "ioredis": "^5.8.1",
     "kafkajs": "^2.2.4",
+    "serverless-http": "^4.0.0",
     "uuid": "^13.0.0"
   }
 }
