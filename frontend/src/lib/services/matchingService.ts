@@ -4,11 +4,14 @@ export async function startMatchApi(body: {
   topics: string[];
 }) {
   console.log(body);
-  const response = await fetch(`${import.meta.env.VITE_API_URL}/matching/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const response = await fetch(
+    `${import.meta.env.VITE_API_URL}/matching/matching/`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }
+  );
   console.log(response);
   const data = await response.json();
   return { response: response, data: data };
@@ -20,7 +23,7 @@ export async function respondMatchApi(body: {
   matchId: string;
 }) {
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/matching/${body.action}`,
+    `${import.meta.env.VITE_API_URL}/matching/matching/${body.action}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,7 +39,7 @@ export async function respondMatchApi(body: {
 
 export async function cancelMatchApi(userId: string) {
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/matching/${userId}`,
+    `${import.meta.env.VITE_API_URL}/matching/matching/${userId}`,
     {
       method: "DELETE",
     }

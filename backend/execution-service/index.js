@@ -5,6 +5,25 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+const FRONTEND =
+  process.env.FRONTEND_ORIGIN ||
+  "http://localhost:5173" ||
+  "http://localhost:5174";
+app.use(
+  cors({
+    origin: [FRONTEND, "http://127.0.0.1:5174"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
+  })
+);
+
 app.use(cors("*")); // config cors so that front-end can use  // i guess it does what it wants below????????
 // app.options("*", cors())
 

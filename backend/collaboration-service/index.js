@@ -25,6 +25,8 @@ app.use(
     ],
   })
 );
+// Handle preflight requests for all routes
+app.options("*", cors());
 
 app.get("/version", (req, res) => {
   res.json({

@@ -15,7 +15,12 @@ const STICKY_THRESHOLD = 120;
 
 // Types
 export type Msg = { role: "user" | "assistant"; content: string };
-export type Example = { id: number; input: string; output: string; explanation?: string };
+export type Example = {
+  id: number;
+  input: string;
+  output: string;
+  explanation?: string;
+};
 export type ChatQuestion = {
   title: string;
   difficulty: "Easy" | "Medium" | "Hard";
@@ -34,7 +39,9 @@ function useIsDark() {
   );
   useEffect(() => {
     const el = document.documentElement;
-    const obs = new MutationObserver(() => setIsDark(el.classList.contains("dark")));
+    const obs = new MutationObserver(() =>
+      setIsDark(el.classList.contains("dark"))
+    );
     obs.observe(el, { attributes: true, attributeFilter: ["class"] });
     return () => obs.disconnect();
   }, []);
@@ -173,7 +180,8 @@ export default function Chat({
   useEffect(() => {
     const el = scrollerRef.current;
     if (!el) return;
-    const distanceFromBottom = el.scrollHeight - (el.scrollTop + el.clientHeight);
+    const distanceFromBottom =
+      el.scrollHeight - (el.scrollTop + el.clientHeight);
     const isNearBottom = distanceFromBottom < STICKY_THRESHOLD;
     // smooth when user just sent; instant while streaming to avoid jitter
     scrollToBottom(!loading && isNearBottom);
@@ -235,7 +243,7 @@ export default function Chat({
     abortRef.current = ac;
 
     try {
-      const resp = await fetch(`${API_BASE}/ai/chat`, {
+      const resp = await fetch(`${API_BASE}/ai/ai/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -356,7 +364,10 @@ export default function Chat({
       </div>
 
       {/* Messages */}
-      <div ref={scrollerRef} className="flex-1 overflow-auto p-3 bg-slate-50 dark:bg-zinc-900">
+      <div
+        ref={scrollerRef}
+        className="flex-1 overflow-auto p-3 bg-slate-50 dark:bg-zinc-900"
+      >
         <div className="min-h-full flex flex-col justify-end gap-3">
           {messages.map((m, i) => {
             const isUser = m.role === "user";
