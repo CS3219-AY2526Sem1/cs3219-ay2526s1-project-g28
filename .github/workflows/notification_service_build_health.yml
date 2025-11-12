@@ -75,7 +75,7 @@ jobs:
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name notification-service \
-            -p 3007:3007 \
+            -p 3005:3005 \
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/notification-service:dev"
 
@@ -83,7 +83,7 @@ jobs:
       - name: Health check
         run: |
           for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
+            if curl -fsS http://127.0.0.1:3005/health >/dev/null; then
               echo "✅ Health check OK"
               exit 0
             fi
