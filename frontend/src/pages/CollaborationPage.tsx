@@ -317,35 +317,17 @@ function CodeEditorTab({
     // Initialize default content if document is empty
     provider.on("sync", (isSynced: boolean) => {
       console.log("[Yjs] Sync event:", isSynced);
-<<<<<<< Updated upstream
       if (isSynced) setIsYjsReady(true);
-=======
-
-      // Set ready immediately when synced
-      if (isSynced) {
-        setIsYjsReady(true);
-      }
-
->>>>>>> Stashed changes
       if (isSynced && !hasSeededRef.current) {
         setTimeout(() => {
           const currentContent = yText.toString().trim();
           const currentLang = yMap.get("language") as string | undefined;
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
           console.log(
             "[Yjs] Document synced. Content length:",
             currentContent.length,
             "Language:",
             currentLang
           );
-<<<<<<< Updated upstream
-=======
-
-          // Only seed if BOTH content and language are missing
->>>>>>> Stashed changes
           if (currentContent.length === 0 && !currentLang) {
             console.log("[Yjs] Seeding default content");
             ydoc.transact(() => {
@@ -391,10 +373,6 @@ function CodeEditorTab({
         if (key === "language" && change.action !== "delete") {
           const newLang = yMap.get("language") as string | undefined;
           if (newLang) {
-<<<<<<< Updated upstream
-=======
-            // Just check it exists, don't compare
->>>>>>> Stashed changes
             console.log("[Yjs] Language changed by peer to:", newLang);
             setLanguage(newLang as Language);
             const model = editorRef.current?.getModel();
@@ -572,7 +550,6 @@ function CodeEditorTab({
   const handleResetCode = () => {
     const yText = yTextRef.current;
     const ydoc = ydocRef.current;
-<<<<<<< Updated upstream
     if (!yText || !ydoc) {
       console.warn("[Reset] Yjs not ready");
       return;
@@ -666,119 +643,10 @@ function CodeEditorTab({
         </code>
       </div>
     );
-=======
-
-    if (!yText || !ydoc) {
-      console.warn("[Reset] Yjs not ready");
-      return;
-    }
-
-    console.log("[Reset] Resetting shared document");
-
-    // DON'T disconnect - just do the transaction
-    // This ensures changes sync immediately
-    ydoc.transact(() => {
-      yText.delete(0, yText.length);
-      yText.insert(0, defaultSnippets[language]);
-    });
-  };
-
-  // Handle language change
-  const handleLanguageChange = (newLang: Language) => {
-    const yText = yTextRef.current;
-    const yMap = yMapRef.current;
-    const ydoc = ydocRef.current;
-
-    if (!yText || !yMap || !ydoc) {
-      console.warn("[Language] Yjs not ready");
-      return;
-    }
-
-    console.log("[Language] Changing to:", newLang);
-
-    // Update everything in one transaction
-    ydoc.transact(() => {
-      // Update language in shared state first
-      yMap.set("language", newLang);
-
-      // Then replace code
-      yText.delete(0, yText.length);
-      yText.insert(0, defaultSnippets[newLang]);
-    });
-
-    // Update local state
-    setLanguage(newLang);
-
-    // Update Monaco syntax highlighting
-    const model = editorRef.current?.getModel();
-    if (model) {
-      monaco.editor.setModelLanguage(model, newLang);
-    }
-  };
-
-  // Clear all code in the editor
-  const handleClearCode = () => {
-    const yText = yTextRef.current;
-    const ydoc = ydocRef.current;
-
-    if (!yText || !ydoc) {
-      console.warn("[Clear] Yjs not ready");
-      toast.error("Editor not ready yet");
-      return;
-    }
-
-    // Confirm before clearing
-    if (
-      !window.confirm(
-        "Are you sure you want to clear all code? This will affect both users."
-      )
-    ) {
-      return;
-    }
-
-    console.log("[Clear] Clearing shared document");
-
-    // Clear all content
-    ydoc.transact(() => {
-      yText.delete(0, yText.length);
-    });
-
-    toast.success("Code cleared");
->>>>>>> Stashed changes
   };
 
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
-<<<<<<< Updated upstream
-=======
-      {/* Tabs */}
-      <div
-        role="tablist"
-        aria-label="Editor console tabs"
-        className="flex gap-2 mb-3"
-      >
-        {(["editor", "console"] as const).map((tab) => {
-          const active = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setActiveTab(tab)}
-              className={[
-                "px-4 py-2 rounded-md text-sm font-semibold transition-colors outline-none",
-                active
-                  ? "bg-slate-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-                  : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200",
-              ].join(" ")}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          );
-        })}
-      </div>
-
->>>>>>> Stashed changes
       {/* Connection status */}
       {!isYjsReady && (
         <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
@@ -817,11 +685,7 @@ function CodeEditorTab({
         <MonacoEditor language={language} onMount={handleEditorMount} />
       </div>
 
-<<<<<<< Updated upstream
       {/* Toolbar — only when Editor tab is active */}
-=======
-      {/* Toolbar — shown only when Editor tab is active */}
->>>>>>> Stashed changes
       {activeTab === "editor" && (
         <div className="flex justify-between mb-2 items-center gap-2">
           <select
@@ -858,7 +722,6 @@ function CodeEditorTab({
       {/* Test Cases */}
       {activeTab === "editor" && (
         <div className="mt-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden transition-all duration-300">
-<<<<<<< Updated upstream
           <div className="flex justify-between items-center px-4 py-2">
             <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">
               Test Cases
@@ -877,18 +740,6 @@ function CodeEditorTab({
                 {showTests ? "Hide" : "Show"}
               </button>
             </div>
-=======
-          <div
-            className="flex justify-between items-center px-4 py-2 cursor-pointer"
-            onClick={() => setShowTests(!showTests)}
-          >
-            <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">
-              Test Cases
-            </h3>
-            <span className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline">
-              {showTests ? "Hide" : "Show"}
-            </span>
->>>>>>> Stashed changes
           </div>
 
           <div
@@ -918,20 +769,9 @@ function CodeEditorTab({
                       <div className="font-semibold text-slate-800 dark:text-zinc-100 mb-1">
                         Case {idx + 1}
                       </div>
-<<<<<<< Updated upstream
 
                       {renderParamKv(displayInput)}
 
-=======
-                      <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
-                        Input:{" "}
-                        <code>
-                          {typeof tc.input === "string"
-                            ? tc.input
-                            : JSON.stringify(tc.input)}
-                        </code>
-                      </div>
->>>>>>> Stashed changes
                       <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
                         Expected: <code>{JSON.stringify(tc.expected)}</code>
                       </div>
@@ -1059,20 +899,9 @@ function CodeEditorTab({
                     <div className="font-semibold text-slate-800 dark:text-zinc-100 mb-1">
                       Case {firstFail + 1} / {total}
                     </div>
-<<<<<<< Updated upstream
 
                     {renderParamKv(failureDisplay)}
 
-=======
-                    <div className="text-sm text-slate-600 dark:text-zinc-300">
-                      <strong>Input:</strong>{" "}
-                      <code>
-                        {Array.isArray(tc.args)
-                          ? JSON.stringify(tc.args)
-                          : tc.args}
-                      </code>
-                    </div>
->>>>>>> Stashed changes
                     <div className="text-sm text-slate-600 dark:text-zinc-300">
                       <strong>Expected:</strong>{" "}
                       <code>{JSON.stringify(tc.expected)}</code>
@@ -1273,10 +1102,6 @@ export default function CollaborationPage() {
     if (!window.confirm("Are you sure you want to leave this session?")) return;
 
     try {
-<<<<<<< Updated upstream
-=======
-      // Get the latest code and language from Yjs document before leaving
->>>>>>> Stashed changes
       const currentCode = yTextRef.current ? yTextRef.current.toString() : "";
       const currentLanguage = yMapRef.current
         ? (yMapRef.current.get("language") as Language) || language

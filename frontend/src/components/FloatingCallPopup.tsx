@@ -22,111 +22,115 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   const [inCall, setInCall] = useState(false);
 
   useEffect(() => {
-  let mounted = true;
-  let callCreated = false;
-  let counter = 0;
+    let mounted = true;
+    let callCreated = false;
+    let counter = 0;
 
-  const startCall = async () => {
-    if (!mounted || callCreated) return;
-    callCreated = true;
+    const startCall = async () => {
+      if (!mounted || callCreated) return;
+      callCreated = true;
 
-    try {
-      let data: any = {};
-      // Retry logic for creating daily room
-      while (!data.url && counter < 3) {
-        let res = await fetch(
-          `${apiGatewayUrl}/collaboration/create-daily-room/${sessionId?.split(":")[1]}`,
-          { method: "POST" }
-        );
-        data = await res.json();
-        if (!data.url) {
-          counter++;
-          setTimeout(function(){
-            console.log("Retrying to create daily room...");
-          }, 2000);
-        }
-        
-      }
-      if (!data.url) throw new Error("No room URL returned from server");
-
-      const container = containerRef.current;
-      if (!container) throw new Error("Daily container not found");
-
-      // Prevent creating multiple frames
-      if (container.querySelector("iframe")) {
-        console.warn("Daily iframe already exists — skipping duplicate creation.");
-        return;
-      }
-
-      const newCall = DailyIframe.createFrame(container, {
-        showLeaveButton: true,
-        iframeStyle: {
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          top: "0",
-          left: "0",
-          border: "0",
-          borderRadius: "0.75rem",
-        },
-      });
-
-      await newCall.join({ url: data.url });
-      if (!mounted) return;
-
-      setCallFrame(newCall);
-      setInCall(true);
-
-      counter = 0;
-      newCall.on("left-meeting", async () => {
-        console.log("pressed leave meeting");
-        const num = newCall.participantCounts();
-        console.log("participant counts:", num);
-        if (num.present == 0) {
-          try {
-            let res = null;
-            while (!res?.ok && counter < 3) {
-              res = await fetch(
-                `${apiGatewayUrl}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,
-                { method: "DELETE" }
-              );
-              console.log("response from close daily room:", res);
-              if (!res.ok) {
-                setTimeout(function(){
-                  console.log("Retrying to close daily room...");
-                }, 2000);
-                counter++;
-              }
-            }  
-          } catch (err) {
-            console.error("Failed to close room:", err);
+      try {
+        let data: any = {};
+        // Retry logic for creating daily room
+        while (!data.url && counter < 3) {
+          let res = await fetch(
+            `${apiGatewayUrl}/collaboration/collaboration/create-daily-room/${
+              sessionId?.split(":")[1]
+            }`,
+            { method: "POST" }
+          );
+          data = await res.json();
+          if (!data.url) {
+            counter++;
+            setTimeout(function () {
+              console.log("Retrying to create daily room...");
+            }, 2000);
           }
         }
+        if (!data.url) throw new Error("No room URL returned from server");
 
-        socketRef.current?.emit("end-call", {
-          sessionId: sessionId?.split(":")[1],
+        const container = containerRef.current;
+        if (!container) throw new Error("Daily container not found");
+
+        // Prevent creating multiple frames
+        if (container.querySelector("iframe")) {
+          console.warn(
+            "Daily iframe already exists — skipping duplicate creation."
+          );
+          return;
+        }
+
+        const newCall = DailyIframe.createFrame(container, {
+          showLeaveButton: true,
+          iframeStyle: {
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            top: "0",
+            left: "0",
+            border: "0",
+            borderRadius: "0.75rem",
+          },
         });
 
-        newCall.destroy();
-        setInCall(false);
+        await newCall.join({ url: data.url });
+        if (!mounted) return;
+
+        setCallFrame(newCall);
+        setInCall(true);
+
+        counter = 0;
+        newCall.on("left-meeting", async () => {
+          console.log("pressed leave meeting");
+          const num = newCall.participantCounts();
+          console.log("participant counts:", num);
+          if (num.present == 0) {
+            try {
+              let res = null;
+              while (!res?.ok && counter < 3) {
+                res = await fetch(
+                  `${apiGatewayUrl}/collaboration/collaboration/close-daily-room/${
+                    sessionId?.split(":")[1]
+                  }`,
+                  { method: "DELETE" }
+                );
+                console.log("response from close daily room:", res);
+                if (!res.ok) {
+                  setTimeout(function () {
+                    console.log("Retrying to close daily room...");
+                  }, 2000);
+                  counter++;
+                }
+              }
+            } catch (err) {
+              console.error("Failed to close room:", err);
+            }
+          }
+
+          socketRef.current?.emit("end-call", {
+            sessionId: sessionId?.split(":")[1],
+          });
+
+          newCall.destroy();
+          setInCall(false);
+          onCallEnd();
+        });
+      } catch (err) {
+        console.error("Daily error:", err);
+        alert("Could not start video call. Reload the page to try again.");
         onCallEnd();
-      });
-    } catch (err) {
-      console.error("Daily error:", err);
-      alert("Could not start video call. Reload the page to try again.");
-      onCallEnd();
-    }
-  };
+      }
+    };
 
-  startCall();
+    startCall();
 
-  return () => {
-    mounted = false;
-    callCreated = true;
-    if (callFrame) callFrame.destroy();
-  };
-}, []);
-
+    return () => {
+      mounted = false;
+      callCreated = true;
+      if (callFrame) callFrame.destroy();
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50">
