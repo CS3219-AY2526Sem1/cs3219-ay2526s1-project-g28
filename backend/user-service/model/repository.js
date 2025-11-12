@@ -1,5 +1,5 @@
 // model/repository.js
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import "dotenv/config";
 import UserModel from "./user-model.js";
 import { connect } from "mongoose";
@@ -18,11 +18,17 @@ export async function connectToDB() {
 /* ---------- Utilities ---------- */
 
 export async function isUsernameTaken(username) {
-  return !!(await UserModel.findOne({ username: username.toLowerCase().trim() }).select("_id"));
+  return !!(await UserModel.findOne({
+    username: username.toLowerCase().trim(),
+  }).select("_id"));
 }
 
 export async function ensureUniqueUsername(base) {
-  const clean = (base || "user").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 20) || "user";
+  const clean =
+    (base || "user")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "")
+      .slice(0, 20) || "user";
   if (!(await isUsernameTaken(clean))) return clean;
   let i = 1;
   while (await isUsernameTaken(`${clean}${i}`)) i++;
@@ -60,7 +66,9 @@ export async function createLocalUser({
     isEmailVerified: false,
     emailVerificationTokenHash,
     emailVerificationExpiresAt,
-    providers: [{ provider: "password", providerId: `local:${email.toLowerCase()}` }],
+    providers: [
+      { provider: "password", providerId: `local:${email.toLowerCase()}` },
+    ],
   });
 
   return doc.save();
@@ -212,7 +220,14 @@ export async function findUserByProviderId(provider, providerId) {
 }
 
 // Creates a user coming from OAuth (email may be null for GitHub)
-export async function createOAuthUser({ provider, providerId, username, fullname, email, avatarUrl }) {
+export async function createOAuthUser({
+  provider,
+  providerId,
+  username,
+  fullname,
+  email,
+  avatarUrl,
+}) {
   const uname = await ensureUniqueUsername(
     username || (email ? email.split("@")[0] : fullname) || "user"
   );

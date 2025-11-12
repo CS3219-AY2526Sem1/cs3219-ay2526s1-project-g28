@@ -1,24 +1,29 @@
 // controller/auth-controller.js
 import crypto from "crypto";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
 // Use one import name; don't import the same thing twice
 import {
-  findUserByEmail,              // local login + email lookup for OAuth
-  findUserByProviderId,         // OAuth lookup
-  createOAuthUser,              // create user for OAuth
-  ensureUniqueUsername,         // repo helper we added
-  updateUserById,          // keep existing users in sync with provider data
+  findUserByEmail, // local login + email lookup for OAuth
+  findUserByProviderId, // OAuth lookup
+  createOAuthUser, // create user for OAuth
+  ensureUniqueUsername, // repo helper we added
+  updateUserById, // keep existing users in sync with provider data
   findUserByPasswordResetTokenHash,
 } from "../model/repository.js";
 
 import { formatUserResponse } from "./user-controller.js";
-import { buildPasswordResetUrl, sendPasswordResetEmail } from "../services/email-service.js";
+import {
+  buildPasswordResetUrl,
+  sendPasswordResetEmail,
+} from "../services/email-service.js";
 
 const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 const JWT_SECRET = process.env.JWT_SECRET;
-const PASSWORD_RESET_TTL_HOURS = Number(process.env.PASSWORD_RESET_TTL_HOURS || 1);
+const PASSWORD_RESET_TTL_HOURS = Number(
+  process.env.PASSWORD_RESET_TTL_HOURS || 1
+);
 
 // Small helper so we don’t depend on another utils file
 function baseUsername(displayName, email, fallback = "user") {
@@ -38,16 +43,22 @@ export async function handleLogin(req, res) {
 
   try {
     const user = await findUserByEmail(email);
-    if (!user) return res.status(401).json({ message: "Wrong email and/or password" });
+    if (!user)
+      return res.status(401).json({ message: "Wrong email and/or password" });
 
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.status(401).json({ message: "Wrong email and/or password" });
+    if (!match)
+      return res.status(401).json({ message: "Wrong email and/or password" });
 
     if (!user.isEmailVerified) {
-      return res.status(403).json({ message: "Email address has not been verified" });
+      return res
+        .status(403)
+        .json({ message: "Email address has not been verified" });
     }
 
-    const accessToken = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "1d" });
+    const accessToken = jwt.sign({ id: user.id }, JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
     return res.status(200).json({
       message: "User logged in",
@@ -101,14 +112,17 @@ export async function requestPasswordReset(req, res) {
 
     if (!user || !user.password) {
       return res.status(200).json({
-        message: "If an account exists for this email, a reset link has been sent.",
+        message:
+          "If an account exists for this email, a reset link has been sent.",
         data: { dispatched: false },
       });
     }
 
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const expiration = new Date(Date.now() + PASSWORD_RESET_TTL_HOURS * 60 * 60 * 1000);
+    const expiration = new Date(
+      Date.now() + PASSWORD_RESET_TTL_HOURS * 60 * 60 * 1000
+    );
 
     await updateUserById(user.id, {
       passwordResetTokenHash: tokenHash,
@@ -142,7 +156,9 @@ export async function requestPasswordReset(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when requesting password reset" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when requesting password reset" });
   }
 }
 
@@ -167,7 +183,9 @@ export async function resetPassword(req, res) {
     const user = await findUserByPasswordResetTokenHash(tokenHash);
 
     if (!user || !user.passwordResetExpiresAt) {
-      return res.status(400).json({ message: "Invalid or expired reset token" });
+      return res
+        .status(400)
+        .json({ message: "Invalid or expired reset token" });
     }
 
     if (user.passwordResetExpiresAt.getTime() < Date.now()) {
@@ -186,7 +204,9 @@ export async function resetPassword(req, res) {
     });
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ message: "Unknown error when resetting password" });
+    return res
+      .status(500)
+      .json({ message: "Unknown error when resetting password" });
   }
 }
 
@@ -194,7 +214,9 @@ export async function resetPassword(req, res) {
 export async function handleVerifyToken(_req, res) {
   try {
     const verifiedUser = _req.user;
-    return res.status(200).json({ message: "Token verified", data: verifiedUser });
+    return res
+      .status(200)
+      .json({ message: "Token verified", data: verifiedUser });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
@@ -202,13 +224,14 @@ export async function handleVerifyToken(_req, res) {
 
 /* ========== Google OAuth callback (find-or-create) ========== */
 export const googleCallback = async (req, res) => {
-  if (!req.user) return res.status(400).json({ error: "User not found in request" });
+  if (!req.user)
+    return res.status(400).json({ error: "User not found in request" });
 
   const provider = "google";
   const providerId = req.user.id;
   const displayName = req.user.displayName || "";
-  const profilePic  = req.user.photos?.[0]?.value || "";
-  const email       = req.user.emails?.[0]?.value || null; // Google emails are verified
+  const profilePic = req.user.photos?.[0]?.value || "";
+  const email = req.user.emails?.[0]?.value || null; // Google emails are verified
 
   try {
     // 1) Try by provider id
@@ -233,7 +256,7 @@ export const googleCallback = async (req, res) => {
         providerId,
         username,
         fullname: displayName || username,
-        email,                // may be null, schema allows it
+        email, // may be null, schema allows it
         avatarUrl: profilePic,
       });
     }
@@ -254,7 +277,10 @@ export const googleCallback = async (req, res) => {
     // 5) Redirect back to FE to reuse your existing localStorage flow
     const redirectUrl = new URL("/login/success", FRONTEND_ORIGIN);
     redirectUrl.searchParams.set("token", token);
-    redirectUrl.searchParams.set("displayName", user.fullname || user.username || "");
+    redirectUrl.searchParams.set(
+      "displayName",
+      user.fullname || user.username || ""
+    );
     redirectUrl.searchParams.set("profilePic", user.avatarUrl || "");
     redirectUrl.searchParams.set("id", String(user.id));
     redirectUrl.searchParams.set("username", user.username || "");
@@ -268,17 +294,18 @@ export const googleCallback = async (req, res) => {
 
 /* ========== GitHub OAuth callback (find-or-create) ========== */
 export const githubCallback = async (req, res) => {
-  if (!req.user) return res.status(400).json({ error: "User not found in request" });
+  if (!req.user)
+    return res.status(400).json({ error: "User not found in request" });
 
   const provider = "github";
   const providerId = req.user.id;
   const ghUsername = req.user.username || "";
   const displayName = req.user.displayName || ghUsername || "";
-  const profilePic  = req.user.photos?.[0]?.value || "";
+  const profilePic = req.user.photos?.[0]?.value || "";
 
   // Choose a verified (or first) email if available
   const emails = req.user.emails || [];
-  const verified = emails.find(e => e.verified) || emails[0];
+  const verified = emails.find((e) => e.verified) || emails[0];
   const email = verified?.value || null;
 
   try {
@@ -320,7 +347,10 @@ export const githubCallback = async (req, res) => {
 
     const redirectUrl = new URL("/login/success", FRONTEND_ORIGIN);
     redirectUrl.searchParams.set("token", token);
-    redirectUrl.searchParams.set("displayName", user.fullname || user.username || "");
+    redirectUrl.searchParams.set(
+      "displayName",
+      user.fullname || user.username || ""
+    );
     redirectUrl.searchParams.set("profilePic", user.avatarUrl || "");
     redirectUrl.searchParams.set("id", String(user.id));
     redirectUrl.searchParams.set("username", user.username || "");
