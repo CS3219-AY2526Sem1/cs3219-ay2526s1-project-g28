@@ -6,8 +6,6 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(cors("*")); // config cors so that front-end can use  // i guess it does what it wants below????????
-// app.options("*", cors())
 
 const FRONTEND =
   process.env.FRONTEND_ORIGIN ||
