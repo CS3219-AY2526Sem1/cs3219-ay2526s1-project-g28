@@ -143,7 +143,7 @@ function escapeJavaString(s) {
   return s
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
-    .replace(/\b/g, "\\b")
+    .replace(/\x08/g, "\\b")
     .replace(/\f/g, "\\f")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "\\r")
@@ -232,57 +232,90 @@ async function runOneJavaCase(userCode, methodName, args, timeoutMs) {
   const serializerFile = path.join(dir, "Serializer.java");
 
   const runnerSrc = `
-public class Runner {
-  public static void main(String[] a) throws Exception {
-    Object out = Solution.${methodName}(${(Array.isArray(args) ? args : [args]).map(toJavaExpr).join(",")});
-    System.out.print(Serializer.toJson(out));
+  public class Runner {
+    public static void main(String[] a) throws Exception {
+      Object[] args = new Object[]{ ${(Array.isArray(args) ? args : [args]).map(toJavaExpr).join(",")} };
+
+      // find the static method by name and arity
+      java.lang.reflect.Method target = null;
+      for (java.lang.reflect.Method m : Solution.class.getDeclaredMethods()) {
+        if (java.lang.reflect.Modifier.isStatic(m.getModifiers())
+            && m.getName().equals("${methodName}")
+            && m.getParameterCount() == args.length) {
+          target = m;
+          break;
+        }
+      }
+      if (target == null) throw new RuntimeException("Method not found: ${methodName}/" + args.length);
+
+      // adapt top-level array -> List if the parameter type is a java.util.List
+      Class<?>[] types = target.getParameterTypes();
+      for (int i = 0; i < args.length; i++) {
+        Object arg = args[i];
+        if (arg == null) continue;
+        Class<?> pt = types[i];
+
+        // If parameter expects a List and the provided arg is an array, wrap it
+        if (java.util.List.class.isAssignableFrom(pt) && arg.getClass().isArray()) {
+          Object arr = arg;
+          int n = java.lang.reflect.Array.getLength(arr);
+          java.util.ArrayList<Object> list = new java.util.ArrayList<>(n);
+          for (int j = 0; j < n; j++) {
+            list.add(java.lang.reflect.Array.get(arr, j));
+          }
+          args[i] = list;
+        }
+      }
+
+      Object out = target.invoke(null, args);
+      System.out.print(Serializer.toJson(out));
+    }
   }
-}
-`.trim();
+  `.trim();
 
   const serializerSrc = `
-import java.lang.reflect.Array;
-class Serializer {
-  public static String toJson(Object o) {
-    if (o == null) return "null";
-    Class<?> c = o.getClass();
-    if (c.isArray()) {
-      int n = Array.getLength(o);
-      StringBuilder sb = new StringBuilder("[");
-      for (int i = 0; i < n; i++) {
-        if (i > 0) sb.append(',');
-        sb.append(toJson(Array.get(o, i)));
+  import java.lang.reflect.Array;
+  class Serializer {
+    public static String toJson(Object o) {
+      if (o == null) return "null";
+      Class<?> c = o.getClass();
+      if (c.isArray()) {
+        int n = Array.getLength(o);
+        StringBuilder sb = new StringBuilder("[");
+        for (int i = 0; i < n; i++) {
+          if (i > 0) sb.append(',');
+          sb.append(toJson(Array.get(o, i)));
+        }
+        sb.append(']');
+        return sb.toString();
       }
-      sb.append(']');
+      if (o instanceof Number || o instanceof Boolean) return o.toString();
+      if (o instanceof Character) return quote(o.toString());
+      if (o instanceof String) return quote((String) o);
+      return quote(String.valueOf(o));
+    }
+    private static String quote(String s) {
+      StringBuilder sb = new StringBuilder("\\"");
+      for (int i = 0; i < s.length(); i++) {
+        char ch = s.charAt(i);
+        switch (ch) {
+          case '\\\\': sb.append("\\\\\\\\"); break;
+          case '\"': sb.append("\\\\\\""); break;   // <-- fixed
+          case '\\b': sb.append("\\\\b"); break;
+          case '\\f': sb.append("\\\\f"); break;
+          case '\\n': sb.append("\\\\n"); break;
+          case '\\r': sb.append("\\\\r"); break;
+          case '\\t': sb.append("\\\\t"); break;
+          default:
+            if (ch < 32) sb.append(String.format("\\\\u%04x", (int) ch));
+            else sb.append(ch);
+        }
+      }
+      sb.append("\\"");
       return sb.toString();
     }
-    if (o instanceof Number || o instanceof Boolean) return o.toString();
-    if (o instanceof Character) return quote(o.toString());
-    if (o instanceof String) return quote((String) o);
-    return quote(String.valueOf(o));
   }
-  private static String quote(String s) {
-    StringBuilder sb = new StringBuilder("\\"");
-    for (int i = 0; i < s.length(); i++) {
-      char ch = s.charAt(i);
-      switch (ch) {
-        case '\\\\': sb.append("\\\\\\\\"); break;
-        case '\"': sb.append("\\\\\\""); break;   // <-- fixed
-        case '\\b': sb.append("\\\\b"); break;
-        case '\\f': sb.append("\\\\f"); break;
-        case '\\n': sb.append("\\\\n"); break;
-        case '\\r': sb.append("\\\\r"); break;
-        case '\\t': sb.append("\\\\t"); break;
-        default:
-          if (ch < 32) sb.append(String.format("\\\\u%04x", (int) ch));
-          else sb.append(ch);
-      }
-    }
-    sb.append("\\"");
-    return sb.toString();
-  }
-}
-`.trim();
+  `.trim();
 
   await fs.writeFile(solutionFile,   userCode,     "utf-8");
   await fs.writeFile(serializerFile, serializerSrc, "utf-8");

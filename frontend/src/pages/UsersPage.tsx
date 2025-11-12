@@ -26,7 +26,7 @@ const UsersPage: React.FC = () => {
   const [showEdit, setShowEdit] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const currentPageName = "Users";
+  const currentPageName = "User Management";
 
   const currentUserId = useMemo(() => {
     try {

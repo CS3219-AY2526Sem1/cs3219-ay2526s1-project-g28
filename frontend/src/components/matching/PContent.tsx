@@ -27,10 +27,10 @@ const DIFF_BADGES: Record<(typeof DIFFICULTIES)[number], string> = {
   Hard: "bg-red-100 text-red-800",
 };
 
-const SEGMENT_CLASSES: Record<(typeof DIFFICULTIES)[number], string> = {
-  Easy: "data-[active=true]:bg-green-600 data-[active=true]:text-white",
-  Medium: "data-[active=true]:bg-yellow-500 data-[active=true]:text-black",
-  Hard: "data-[active=true]:bg-red-600 data-[active=true]:text-white",
+const SEGMENT_ACTIVE: Record<(typeof DIFFICULTIES)[number], string> = {
+  Easy: "bg-green-600 text-white",
+  Medium: "bg-yellow-500 text-black",
+  Hard: "bg-red-600 text-white",
 };
 
 const PContent: React.FC<PContentProps> = ({
@@ -96,7 +96,7 @@ const PContent: React.FC<PContentProps> = ({
               <label className="block text-base font-semibold text-gray-800 mb-3">
                 Difficulty
               </label>
-              <div className="inline-flex rounded-xl border border-gray-300 overflow-hidden">
+              <div className="inline-flex rounded-xl border border-gray-300 dark:border-gray-700 overflow-hidden">
                 {DIFFICULTIES.map((d, idx) => {
                   const active = d === difficulty;
                   const radius =
@@ -109,18 +109,17 @@ const PContent: React.FC<PContentProps> = ({
                     <button
                       key={d}
                       type="button"
-                      data-active={active}
                       disabled={isQueueing}
                       onClick={() => setDifficulty(d)}
                       className={[
                         "px-6 py-3 text-base font-semibold transition outline-none",
-                        "bg-white text-gray-800 hover:bg-gray-50",
-                        SEGMENT_CLASSES[d],
+                        "border-r last:border-r-0 border-gray-300 dark:border-gray-700",
                         radius,
                         "disabled:opacity-60 disabled:cursor-not-allowed",
                         !active
-                          ? "border-r border-gray-300 last:border-r-0"
+                          ? "bg-white text-gray-800 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
                           : "",
+                        active ? SEGMENT_ACTIVE[d] : "",
                       ].join(" ")}
                       aria-pressed={active}
                       title={d}

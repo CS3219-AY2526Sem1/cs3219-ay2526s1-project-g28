@@ -4,10 +4,9 @@ import { theme } from "../theme";
 import {
   HomeIcon,
   HistoryIcon,
-  LeaderboardIcon,
-  UsersIcon,
   AnalyticsIcon,
 } from "./Icons";
+import { UsersIcon } from "@heroicons/react/24/outline";
 
 type Style = React.CSSProperties;
 
@@ -42,7 +41,6 @@ const CollapsibleSidebar: React.FC<SidebarProps> = ({
   const userNavItems: NavItem[] = [
     { name: "Challenges", icon: <HomeIcon /> },
     { name: "My History", icon: <HistoryIcon /> },
-    { name: "Leaderboard", icon: <LeaderboardIcon /> },
   ];
 
   const adminNavItems: NavItem[] = [
