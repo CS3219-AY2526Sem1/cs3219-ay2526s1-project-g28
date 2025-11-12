@@ -75,22 +75,27 @@ jobs:
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name ai-service \
-            -p 3007:3007 \
+            -p 3005:3005 \
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/ai-service:dev"
 
-      # Health check
       - name: Health check
         run: |
-          for i in {1..30}; do
+          for i in {1..40}; do
+            docker ps -a --filter "name=ai-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^ai-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 ai-service || true
+              exit 1
+            fi
             if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
-              echo "✅ Health check OK"
+              echo "✅ /health OK"
               exit 0
             fi
-            echo "waiting for /health... ($i)"; sleep 2
+            echo "waiting for /health... ($i)"; sleep 1
           done
           echo "❌ health never came up"
-          docker logs question-service || true
+          docker logs user-service || true
           exit 1
 
       - name: Install dependencies
