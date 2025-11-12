@@ -13,6 +13,7 @@ app.use(
       "http://localhost:5173",
       "http://127.0.0.1:5174",
       "https://qp8he0nic9.execute-api.ap-southeast-1.amazonaws.com",
+      "https://d2a6nuxq78ul43.cloudfront.net",
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

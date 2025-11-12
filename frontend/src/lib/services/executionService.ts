@@ -5,7 +5,7 @@ export async function runCodeApi(
   timeout?: number
 ) {
   const response = await fetch(
-    `${import.meta.env.VITE_API_URL}/execute/execute/run`,
+    "https://4esosnme10.execute-api.ap-southeast-1.amazonaws.com/execute/run",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
