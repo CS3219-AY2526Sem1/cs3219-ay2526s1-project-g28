@@ -14,7 +14,40 @@ import {
   updateUserPrivilegeById as _updateUserPrivilegeById,
   markUserEmailVerified as _markUserEmailVerified,
 } from "../model/repository.js";
-import { sendVerificationEmail, buildVerificationUrl } from "../services/email-service.js";
+import { sendVerificationEmail as _sendVerificationEmail, buildVerificationUrl as _buildVerificationUrl } from "../services/email-service.js";
+
+const originalRepository = {
+  createLocalUser: _createLocalUser,
+  deleteUserById: _deleteUserById,
+  findAllUsers: _findAllUsers,
+  findUserByEmail: _findUserByEmail,
+  findUserById: _findUserById,
+  findUserByUsername: _findUserByUsername,
+  findUserByUsernameOrEmail: _findUserByUsernameOrEmail,
+  findUserByEmailVerificationTokenHash: _findUserByEmailVerificationTokenHash,
+  updateUserById: _updateUserById,
+  updateUserPrivilegeById: _updateUserPrivilegeById,
+  markUserEmailVerified: _markUserEmailVerified,
+};
+
+const repository = { ...originalRepository };
+
+const originalEmailService = {
+  sendVerificationEmail: _sendVerificationEmail,
+  buildVerificationUrl: _buildVerificationUrl,
+};
+
+const emailService = { ...originalEmailService };
+
+export function __setTestDeps({ repository: repoOverrides = {}, email: emailOverrides = {} } = {}) {
+  Object.assign(repository, repoOverrides);
+  Object.assign(emailService, emailOverrides);
+}
+
+export function __resetTestDeps() {
+  Object.assign(repository, originalRepository);
+  Object.assign(emailService, originalEmailService);
+}
 
 const EMAIL_VERIFICATION_TTL_HOURS = Number(process.env.EMAIL_VERIFICATION_TTL_HOURS || 48);
 
@@ -33,7 +66,7 @@ export async function createUser(req, res) {
         .json({ message: "username and/or fullname and/or email and/or password are missing" });
     }
 
-    const existingUser = await _findUserByUsernameOrEmail(username, email);
+    const existingUser = await repository.findUserByUsernameOrEmail(username, email);
     if (existingUser) {
       return res.status(409).json({ message: "username or email already exists" });
     }
@@ -43,7 +76,7 @@ export async function createUser(req, res) {
     const expiration = new Date(Date.now() + EMAIL_VERIFICATION_TTL_HOURS * 60 * 60 * 1000);
 
     // repo hashes the password internally
-    const createdUser = await _createLocalUser({
+    const createdUser = await repository.createLocalUser({
       username,
       fullname,
       email,
@@ -52,11 +85,11 @@ export async function createUser(req, res) {
       emailVerificationExpiresAt: expiration,
     });
 
-    const verificationUrl = buildVerificationUrl(verificationToken);
+    const verificationUrl = emailService.buildVerificationUrl(verificationToken);
 
     let emailDispatched = false;
     try {
-      await sendVerificationEmail({
+      await emailService.sendVerificationEmail({
         to: email,
         name: fullname || username,
         verificationUrl,
@@ -97,7 +130,7 @@ export async function verifyEmail(req, res) {
     }
 
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-    const user = await _findUserByEmailVerificationTokenHash(tokenHash);
+    const user = await repository.findUserByEmailVerificationTokenHash(tokenHash);
 
     if (!user || !user.emailVerificationExpiresAt) {
       return res.status(400).json({ message: "Invalid or expired verification token" });
@@ -114,7 +147,7 @@ export async function verifyEmail(req, res) {
       });
     }
 
-    const updatedUser = await _markUserEmailVerified(user.id);
+    const updatedUser = await repository.markUserEmailVerified(user.id);
 
     return res.status(200).json({
       message: "Email verified successfully",
@@ -136,7 +169,7 @@ export async function getUser(req, res) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    const user = await _findUserById(userId);
+    const user = await repository.findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
@@ -152,7 +185,7 @@ export async function getUser(req, res) {
  */
 export async function getAllUsers(_req, res) {
   try {
-    const users = await _findAllUsers();
+    const users = await repository.findAllUsers();
     return res.status(200).json({ message: "Found users", data: users.map(formatUserResponse) });
   } catch (err) {
     console.error(err);
@@ -180,20 +213,20 @@ export async function updateUser(req, res) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    const user = await _findUserById(userId);
+    const user = await repository.findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
     // Uniqueness checks if username/email are changing
     if (username) {
-      const existingUser = await _findUserByUsername(username);
+      const existingUser = await repository.findUserByUsername(username);
       if (existingUser && String(existingUser.id) !== String(userId)) {
         return res.status(409).json({ message: "username already exists" });
       }
     }
     if (email) {
-      const existingUser = await _findUserByEmail(email);
+      const existingUser = await repository.findUserByEmail(email);
       if (existingUser && String(existingUser.id) !== String(userId)) {
         return res.status(409).json({ message: "email already exists" });
       }
@@ -222,12 +255,12 @@ export async function updateUser(req, res) {
       updatePayload.emailVerificationExpiresAt = expiration;
       updatePayload.emailVerifiedAt = null;
 
-      const verificationUrl = buildVerificationUrl(verificationToken);
+      const verificationUrl = emailService.buildVerificationUrl(verificationToken);
       const recipientName = fullname || user.fullname || user.username || "there";
 
       let emailDispatched = false;
       try {
-        await sendVerificationEmail({
+        await emailService.sendVerificationEmail({
           to: incomingEmail,
           name: recipientName,
           verificationUrl,
@@ -245,7 +278,7 @@ export async function updateUser(req, res) {
       };
     }
 
-    const updatedUser = await _updateUserById(userId, updatePayload);
+    const updatedUser = await repository.updateUserById(userId, updatePayload);
 
     const baseMessage = `Updated data for user ${userId}`;
     const message = verificationDetails
@@ -284,12 +317,12 @@ export async function updateUserPrivilege(req, res) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    const user = await _findUserById(userId);
+    const user = await repository.findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    const updatedUser = await _updateUserPrivilegeById(userId, isAdmin === true);
+    const updatedUser = await repository.updateUserPrivilegeById(userId, isAdmin === true);
     return res.status(200).json({
       message: `Updated privilege for user ${userId}`,
       data: formatUserResponse(updatedUser),
@@ -309,12 +342,12 @@ export async function deleteUser(req, res) {
     if (!isValidObjectId(userId)) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
-    const user = await _findUserById(userId);
+    const user = await repository.findUserById(userId);
     if (!user) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    await _deleteUserById(userId);
+    await repository.deleteUserById(userId);
     return res.status(200).json({ message: `Deleted user ${userId} successfully` });
   } catch (err) {
     console.error(err);
