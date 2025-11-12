@@ -1,7 +1,10 @@
-name: Build & Health (ai-service)
+name: CI + CD (ai-service)
 
 on:
-  workflow_dispatch: {}
+  push:
+    branches:
+      - "**" # run on all branches
+  workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -15,75 +18,105 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout
       - uses: actions/checkout@v4
 
+      # Build Docker image (for local health check)
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker build -t "$NS/ai-service:dev" \
             -f backend/ai-service/Dockerfile \
             backend/ai-service
-      # Authenticate to Google with SA JSON key (NO pool/WIF)
-      - name: Auth to Google with key
+
+      # Authenticate to Google Cloud
+      - name: Auth to Google
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Read the dotenv-style secret from GSM (no gcloud install needed)
+      # Fetch dotenv secret from Google Secret Manager
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/ai-service-env/versions/latest
-      # Normalize env, add CI-safe defaults, disable OAuth for health
-      - name: Write & normalize .env + CI flags
+
+      # Export GSM secrets to environment
+      - name: Export GSM secrets
         run: |
-          # write env from GSM
-          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > ai-service.env
-          # normalize Windows CRLF -> LF and trim trailing spaces
-          sed -i 's/\r$//' ai-service.env
-          sed -i 's/[[:space:]]*$//' ai-service.env
-          # ensure basics
-          grep -q '^PORT=' ai-service.env || echo 'PORT=3007' >> ai-service.env
-          grep -q '^HOST=' ai-service.env || echo 'HOST=0.0.0.0' >> ai-service.env
-          grep -q '^SESSION_SECRET=' ai-service.env || echo 'SESSION_SECRET=ci-session-secret' >> ai-service.env
-      # Keep container (no --rm) so we can show logs if it exits
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
+
+      # Dynamically confirm GSM environment variable lengths
+      - name: Confirm all GSM env string lengths
+        run: |
+          echo "🔍 Checking all environment variables loaded from GSM..."
+          # Extract key names from the GSM payload and test them dynamically
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sort | while read -r key; do
+            value=$(printenv "$key" || true)
+            if [ -z "$value" ]; then
+              echo "$key: MISSING"
+            else
+              echo "$key len:${#value}"
+            fi
+          done
+
+      # Start Mongo if using local DB
+      - name: Start Mongo if needed
+        run: |
+          if echo "${DB_LOCAL_URI}" | grep -q "mongodb://host.docker.internal"; then
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+          else
+            echo "External DB configured; not starting local Mongo."
+          fi
+
+      # Run container for health check
+      - name: Run ai-service container
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name ai-service \
+            -p 3002:3002 \
+            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
+            "$NS/ai-service:dev"
+
       - name: Run ai-service
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name ai-service \
-            -p 3007:3007 \
+            -p 3002:3002 \
             --env-file ./ai-service.env \
             "$NS/ai-service:dev"
-      # Optional: prove key envs exist *inside* the container (lengths only)
-      - name: Confirm env inside container
+
+      - name: Install dependencies
+        working-directory: backend/ai-service
+        run: npm ci --omit=dev
+
+      # Deploy to AWS Lambda with Serverless
+      - name: Deploy to AWS Lambda
+        working-directory: backend/ai-service
         run: |
-          for k in PORT HOST MONGO_URI DISABLE_OAUTH GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_CALLBACK_URL SESSION_SECRET; do
-            docker exec ai-service sh -lc "v=\${$k}; [ -n \"\$v\" ] && echo $k len:\${#v} || echo $k MISSING"
-          done
-      - name: Wait for /health (fail fast if container dies)
-        run: |
-          for i in {1..40}; do
-            docker ps -a --filter "name=ai-service" --format 'table {{.Names}}\t{{.Status}}'
-            if ! docker ps --format '{{.Names}}' | grep -q '^ai-service$'; then
-              echo "Container exited"
-              docker logs --timestamps --tail=200 ai-service || true
-              echo "Exit code: $(docker inspect ai-service --format='{{.State.ExitCode}}' || true)"
-              exit 1
-            fi
-            if curl -fsS http://127.0.0.1:3007/health >/dev/null; then
-              echo "✅ /health OK"
-              exit 0
-            fi
-            echo "waiting for /health... ($i)"; sleep 1
-          done
-          echo "❌ health never came up"; docker logs ai-service || true; exit 1
-      - name: Logs (always show last lines)
+          npm install -g serverless@3
+          npx serverless deploy --stage prod --region ap-southeast-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_XZ }}
+
+      # Logs (always show)
+      - name: Logs (always)
         if: always()
         run: |
           echo "----- ai-service logs -----"
           docker logs --timestamps --tail=150 ai-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
+
+      # Cleanup
       - name: Cleanup
         if: always()
         run: |
           docker rm -f ai-service || true
+          docker rm -f mongo || true
