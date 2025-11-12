@@ -1,0 +1,7 @@
+{
+    "Name": "peerprep456-frontend",
+    "Description": "Access control for S3 origin",
+    "SigningProtocol": "sigv4",
+    "SigningBehavior": "always",
+    "OriginAccessControlOriginType": "s3"
+}
