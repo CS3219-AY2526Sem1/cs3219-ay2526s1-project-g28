@@ -10,7 +10,7 @@ provider:
     httpApi: false # disables CloudWatch access logs for HTTP APIs
 
   environment:
-    PORT: ${env:AI_SERVICE_PORT}
+    AI_SERVICE_PORT: ${env:AI_SERVICE_PORT}
     OPENAI_API_KEY: ${env:OPENAI_API_KEY}
     OPENAI_MODEL: ${env:OPENAI_MODEL}
     SITE_URL: ${env:SITE_URL}

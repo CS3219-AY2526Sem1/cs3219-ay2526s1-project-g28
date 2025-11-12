@@ -1,4 +1,4 @@
-service: notifcation-service
+service: matching-service
 
 provider:
   name: aws
@@ -10,12 +10,15 @@ provider:
     httpApi: false # disables CloudWatch access logs for HTTP APIs
 
   environment:
-    NOTIFICATION_SERVICE_PORT: ${env:NOTIFICATION_SERVICE_PORT}
+    MATCHING_SERVICE_PORT: ${env:MATCHING_SERVICE_PORT}
     ENV: ${env:ENV}
+    KAFKA_BROKERS: ${env:KAFKA_BROKERS}
+    KAFKA_USERNAME: ${env:KAFKA_USERNAME}
+    KAFKA_PASSWORD: ${env:KAFKA_PASSWORD}
     REDIS_URL: ${env:REDIS_URL}
 
 functions:
-  notifcation:
+  matching:
     handler: lambda.handler
     events:
       - httpApi:
