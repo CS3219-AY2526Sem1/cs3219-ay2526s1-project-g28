@@ -58,7 +58,7 @@ function ThemeButton() {
 }
 
 const defaultSnippets: Record<Language, string> = {
-  python: "def solution():\n  # Write your code here\n  pass",
+  python: "def solution():  # Write your code below",
   javascript: "function solution() {\n  // Write your code here\n}",
   java: "public class Solution {\n  public static Object function(Object o) {\n    // Write your code here\n    return null;\n  }\n}",
 };
