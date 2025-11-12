@@ -5,7 +5,24 @@ const rateLimit = require("express-rate-limit");
 const OpenAI = require("openai");
 
 const app = express();
-app.use(cors());
+const FRONTEND =
+  process.env.FRONTEND_ORIGIN ||
+  "http://localhost:5173" ||
+  "http://localhost:5174";
+app.use(
+  cors({
+    origin: [FRONTEND, "http://127.0.0.1:5174"],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "Origin",
+    ],
+  })
+);
 app.use(express.json({ limit: "1mb" }));
 app.use("/ai/", rateLimit({ windowMs: 60_000, max: 60 }));
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
