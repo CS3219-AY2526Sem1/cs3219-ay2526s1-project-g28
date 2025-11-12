@@ -11,7 +11,7 @@ app.use("/ai/", rateLimit({ windowMs: 60_000, max: 60 }));
 app.get("/health", (_req, res) => res.status(200).json({ ok: true }));
 // --- OpenRouter client ---
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, 
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 app.get("/health", (_, res) => res.json({ ok: true }));
@@ -99,7 +99,7 @@ app.post("/ai/chat", async (req, res) => {
     "You are a concise coding interview tutor. Use the provided CURRENT_QUESTION_CONTEXT_JSON if present. " +
     "If hasCode=false or user asks to explain code without code, explain the question, outline an approach, give high-level pseudocode, and pitfalls. " +
     "If hasCode=true and user asks about code, review that code.";
-    // Build final message list
+  // Build final message list
   const final = [...messages];
 
   // Only add if caller didn't already set a system message
@@ -118,7 +118,7 @@ app.post("/ai/chat", async (req, res) => {
   }
   try {
     const stream = await openai.chat.completions.create({
-      model: process.env.OPENAI_MODEL  || "gpt-4",
+      model: process.env.OPENAI_MODEL || "gpt-4",
       stream: true,
       messages: final,
     });
@@ -143,5 +143,5 @@ app.post("/ai/chat", async (req, res) => {
   }
 });
 
-const port = process.env.PORT;
+const port = process.env.AI_SERVICE_PORT;
 app.listen(port, () => console.log(`API listening on :${port}`));

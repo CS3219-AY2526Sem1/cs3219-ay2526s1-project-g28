@@ -74,6 +74,23 @@ jobs:
             echo "External DB configured; not starting local Mongo."
           fi
 
+      # Run container for health check
+      - name: Run question-service container
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name question-service \
+            -p 3002:3002 \
+            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
+            "$NS/question-service:dev"
+
+      - name: Run question-service
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name question-service \
+            -p 3002:3002 \
+            --env-file ./question-service.env \
+            "$NS/question-service:dev"
+
       - name: Install dependencies
         working-directory: backend/question-service
         run: npm ci --omit=dev
