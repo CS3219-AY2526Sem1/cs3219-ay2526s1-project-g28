@@ -1,0 +1,32 @@
+{
+  "CallerReference": "frontend-setup-2025",
+  "Comment": "CloudFront for frontend app",
+  "Enabled": true,
+  "Origins": {
+    "Items": [
+      {
+        "Id": "S3-peerprep456-frontend",
+        "DomainName": "peerprep4566.s3.ap-southeast-1.amazonaws.com",
+        "S3OriginConfig": {
+          "OriginAccessIdentity": ""
+        },
+        "OriginAccessControlId": "E3P6YOP73SGPR9"
+      }
+    ],
+    "Quantity": 1
+  },
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "S3-peerprep456-frontend",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {
+      "Quantity": 2,
+      "Items": ["GET", "HEAD"]
+    },
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6" 
+  },
+  "DefaultRootObject": "index.html",
+  "PriceClass": "PriceClass_100",
+  "ViewerCertificate": {
+    "CloudFrontDefaultCertificate": true
+  }
+}
