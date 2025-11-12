@@ -1,7 +1,8 @@
 name: Build & Health (execution-service)
 
 on:
-  workflow_dispatch: {} # manual trigger only
+  push:
+  workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

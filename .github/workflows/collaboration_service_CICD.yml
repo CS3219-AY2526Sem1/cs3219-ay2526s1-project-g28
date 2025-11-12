@@ -1,6 +1,8 @@
 name: CI + CD (collaboration-service)
 
-on: push
+on:
+  push:
+  workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
