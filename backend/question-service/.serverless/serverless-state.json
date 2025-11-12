@@ -15,7 +15,7 @@
       },
       "cors": {
         "allowedOrigins": [
-          "https://your-frontend-domain.com",
+          "https://d2a6nuxq78ul43.cloudfront.net",
           "http://localhost:5173",
           "http://localhost:5174",
           "http://127.0.0.1:5173"
@@ -49,7 +49,7 @@
         "CLOUDINARY_CLOUD_NAME": "dyizbfggo",
         "CLOUDINARY_API_KEY": "783516565847746",
         "CLOUDINARY_API_SECRET": "OcUjRj5dZYs58DhdklQx_RpOw9g",
-        "API_GATEWAY_URL": "OcUjRj5dZYs58DhdklQx_RpOw9g"
+        "API_GATEWAY_URL": "https://qp8he0nic9.execute-api.ap-southeast-1.amazonaws.com"
       },
       "versionFunctions": true,
       "httpApi": null,
@@ -217,7 +217,7 @@
                 "S3Bucket": {
                   "Ref": "ServerlessDeploymentBucket"
                 },
-                "S3Key": "serverless/question-service/prod/1762975407374-2025-11-12T19:23:27.374Z/question-service.zip"
+                "S3Key": "serverless/question-service/prod/1762976022094-2025-11-12T19:33:42.094Z/question-service.zip"
               },
               "Handler": "lambda.handler",
               "Runtime": "nodejs20.x",
@@ -237,7 +237,7 @@
                   "CLOUDINARY_CLOUD_NAME": "dyizbfggo",
                   "CLOUDINARY_API_KEY": "783516565847746",
                   "CLOUDINARY_API_SECRET": "OcUjRj5dZYs58DhdklQx_RpOw9g",
-                  "API_GATEWAY_URL": "OcUjRj5dZYs58DhdklQx_RpOw9g"
+                  "API_GATEWAY_URL": "https://qp8he0nic9.execute-api.ap-southeast-1.amazonaws.com"
                 }
               },
               "Role": {
@@ -251,14 +251,14 @@
               "QuesitonLogGroup"
             ]
           },
-          "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4": {
+          "QuesitonLambdaVersionWE4T2qo2XXac5K6qmbdALfHuqHk6Vrsachdw7XRHf8": {
             "Type": "AWS::Lambda::Version",
             "DeletionPolicy": "Retain",
             "Properties": {
               "FunctionName": {
                 "Ref": "QuesitonLambdaFunction"
               },
-              "CodeSha256": "kx3W9E966g2003S67Ni0nSDPR+P02LBXp0OIaWsoaCI="
+              "CodeSha256": "yaaVzomgKKeknBKy4IzwtD8c5BeqCkGKeGptQTl44cM="
             }
           },
           "HttpApi": {
@@ -366,7 +366,7 @@
           "QuesitonLambdaFunctionQualifiedArn": {
             "Description": "Current Lambda function version",
             "Value": {
-              "Ref": "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4"
+              "Ref": "QuesitonLambdaVersionWE4T2qo2XXac5K6qmbdALfHuqHk6Vrsachdw7XRHf8"
             },
             "Export": {
               "Name": "sls-question-service-prod-QuesitonLambdaFunctionQualifiedArn"
@@ -512,7 +512,7 @@
         "timeout": 6,
         "runtime": "nodejs20.x",
         "vpc": {},
-        "versionLogicalId": "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4"
+        "versionLogicalId": "QuesitonLambdaVersionWE4T2qo2XXac5K6qmbdALfHuqHk6Vrsachdw7XRHf8"
       }
     },
     "configValidationMode": "warn",
@@ -532,7 +532,7 @@
         ],
         "artifactsS3KeyDirname": "serverless/question-service/prod/code-artifacts",
         "artifact": "C:\\Users\\zette\\Downloads\\cs3219-ay2526s1-project-g28\\backend\\question-service\\.serverless\\question-service.zip",
-        "artifactDirectoryName": "serverless/question-service/prod/1762975407374-2025-11-12T19:23:27.374Z"
+        "artifactDirectoryName": "serverless/question-service/prod/1762976022094-2025-11-12T19:33:42.094Z"
       }
     },
     "appId": null,
@@ -541,7 +541,7 @@
     "artifact": "C:\\Users\\zette\\Downloads\\cs3219-ay2526s1-project-g28\\backend\\question-service\\.serverless\\question-service.zip"
   },
   "package": {
-    "artifactDirectoryName": "serverless/question-service/prod/1762975407374-2025-11-12T19:23:27.374Z",
+    "artifactDirectoryName": "serverless/question-service/prod/1762976022094-2025-11-12T19:33:42.094Z",
     "artifact": "question-service.zip"
   }
 }

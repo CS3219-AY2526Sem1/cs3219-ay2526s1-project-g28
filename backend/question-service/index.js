@@ -6,6 +6,7 @@ const app = express();
 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+const FRONTEND = process.env.FRONTEND_ORIGIN;
 
 app.use(
   cors({

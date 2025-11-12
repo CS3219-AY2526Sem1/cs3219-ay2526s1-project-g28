@@ -162,7 +162,7 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/question-service/prod/1762975407374-2025-11-12T19:23:27.374Z/question-service.zip"
+          "S3Key": "serverless/question-service/prod/1762976022094-2025-11-12T19:33:42.094Z/question-service.zip"
         },
         "Handler": "lambda.handler",
         "Runtime": "nodejs20.x",
@@ -182,7 +182,7 @@
             "CLOUDINARY_CLOUD_NAME": "dyizbfggo",
             "CLOUDINARY_API_KEY": "783516565847746",
             "CLOUDINARY_API_SECRET": "OcUjRj5dZYs58DhdklQx_RpOw9g",
-            "API_GATEWAY_URL": "OcUjRj5dZYs58DhdklQx_RpOw9g"
+            "API_GATEWAY_URL": "https://qp8he0nic9.execute-api.ap-southeast-1.amazonaws.com"
           }
         },
         "Role": {
@@ -196,14 +196,14 @@
         "QuesitonLogGroup"
       ]
     },
-    "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4": {
+    "QuesitonLambdaVersionWE4T2qo2XXac5K6qmbdALfHuqHk6Vrsachdw7XRHf8": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "QuesitonLambdaFunction"
         },
-        "CodeSha256": "kx3W9E966g2003S67Ni0nSDPR+P02LBXp0OIaWsoaCI="
+        "CodeSha256": "yaaVzomgKKeknBKy4IzwtD8c5BeqCkGKeGptQTl44cM="
       }
     },
     "HttpApi": {
@@ -314,7 +314,7 @@
     "QuesitonLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4"
+        "Ref": "QuesitonLambdaVersionWE4T2qo2XXac5K6qmbdALfHuqHk6Vrsachdw7XRHf8"
       },
       "Export": {
         "Name": "sls-question-service-prod-QuesitonLambdaFunctionQualifiedArn"
