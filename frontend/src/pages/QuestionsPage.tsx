@@ -82,7 +82,10 @@ const QuestionsPage: React.FC = () => {
     setError(null);
 
     try {
-      await api(`/questions/id/${questionToDelete}`, { method: "DELETE" });
+      await fetch(
+        `https://42zi4ioo3c.execute-api.ap-southeast-1.amazonaws.com//questions/id/${questionToDelete}`,
+        { method: "DELETE" }
+      );
       setQuestions((prev) => prev.filter((q) => q.id !== questionToDelete));
       setQuestionToDelete(null);
     } catch (err: any) {

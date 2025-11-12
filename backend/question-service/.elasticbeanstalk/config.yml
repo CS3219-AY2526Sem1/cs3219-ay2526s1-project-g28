@@ -1,0 +1,18 @@
+branch-defaults:
+  default:
+    environment: question-env
+    group_suffix: null
+global:
+  application_name: question-service
+  branch: null
+  default_ec2_keyname: eb-keypair-rsa
+  default_platform: Docker running on 64bit Amazon Linux 2023
+  default_region: ap-southeast-1
+  include_git_submodules: true
+  instance_profile: null
+  platform_name: null
+  platform_version: null
+  profile: null
+  repository: null
+  sc: null
+  workspace_type: Application
