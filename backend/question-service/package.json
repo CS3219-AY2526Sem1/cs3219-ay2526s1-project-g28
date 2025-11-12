@@ -25,6 +25,7 @@
     "kafkajs": "^2.2.4",
     "mongoose": "^8.5.4",
     "multer": "^2.0.2",
+    "serverless-http": "^4.0.0",
     "streamifier": "^0.1.1",
     "uuid": "^13.0.0"
   }

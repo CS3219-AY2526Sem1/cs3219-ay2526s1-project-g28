@@ -6,7 +6,7 @@ import { connectToDB } from "./model/repository.js";
 // --- FIX 1: Import your new Kafka connection function ---
 import { connectKafka } from "./kafka-utilties.js";
 
-const port = process.env.PORT || 3002;
+const port = process.env.QUESTION_SERVICE_PORT || 3002;
 const server = http.createServer(index);
 
 // --- FIX 2: Use an async function for cleaner startup ---
