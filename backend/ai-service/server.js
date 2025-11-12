@@ -2,7 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
-const { OpenAI } = require("openai");
+const OpenAI = require("openai");
 
 const app = express();
 app.use(cors());
@@ -143,5 +143,7 @@ app.post("/ai/chat", async (req, res) => {
   }
 });
 
-const port = process.env.AI_SERVICE_PORT;
-app.listen(port, () => console.log(`API listening on :${port}`));
+const port = process.env.AI_SERVICE_PORT || 3000;
+app.listen(port, () => console.log(`AI service listening on ${port}`));
+
+module.exports = app;

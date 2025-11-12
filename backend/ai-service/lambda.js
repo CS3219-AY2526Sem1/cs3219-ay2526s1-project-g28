@@ -1,8 +1,4 @@
-// lambda.js
-import serverless from "serverless-http";
-import app from "./server.js";
+const serverless = require("serverless-http");
+const app = require("./server");
 
-export const handler = async (event, context) => {
-  const expressHandler = serverless(app);
-  return expressHandler(event, context);
-};
+module.exports.handler = serverless(app);
