@@ -1,4 +1,4 @@
-service: question-service
+service: user-service
 
 provider:
   name: aws
