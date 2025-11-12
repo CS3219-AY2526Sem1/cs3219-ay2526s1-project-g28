@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { motion, useDragControls } from "framer-motion";
+import { delay, motion, useDragControls } from "framer-motion";
 import DailyIframe from "@daily-co/daily-js";
 
 // You can pass these in from the parent so no hard-coding needed
@@ -7,14 +7,14 @@ interface FloatingCallPopupProps {
   sessionId: string | undefined;
   socketRef: React.MutableRefObject<any>;
   onCallEnd: () => void;
-  collabServiceUrl: string;
+  apiGatewayUrl: string;
 }
 
 const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   sessionId,
   socketRef,
   onCallEnd,
-  collabServiceUrl,
+  apiGatewayUrl,
 }) => {
   const dragControls = useDragControls();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,17 +24,29 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
   useEffect(() => {
   let mounted = true;
   let callCreated = false;
+  let counter = 0;
 
   const startCall = async () => {
     if (!mounted || callCreated) return;
     callCreated = true;
 
     try {
-      const res = await fetch(
-        `${collabServiceUrl}/collaboration/create-daily-room/${sessionId?.split(":")[1]}`,
-        { method: "POST" }
-      );
-      const data = await res.json();
+      let data: any = {};
+      // Retry logic for creating daily room
+      while (!data.url && counter < 3) {
+        let res = await fetch(
+          `${apiGatewayUrl}/collaboration/create-daily-room/${sessionId?.split(":")[1]}`,
+          { method: "POST" }
+        );
+        data = await res.json();
+        if (!data.url) {
+          counter++;
+          setTimeout(function(){
+            console.log("Retrying to create daily room...");
+          }, 2000);
+        }
+        
+      }
       if (!data.url) throw new Error("No room URL returned from server");
 
       const container = containerRef.current;
@@ -65,21 +77,30 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
       setCallFrame(newCall);
       setInCall(true);
 
+      counter = 0;
       newCall.on("left-meeting", async () => {
-        newCall.destroy();
-        setInCall(false);
-        onCallEnd();
-      });
-
-
-      newCall.on("left-meeting", async () => {
-        try {
-          await fetch(
-            `${collabServiceUrl}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,
-            { method: "DELETE" }
-          );
-        } catch (err) {
-          console.error("Failed to close room:", err);
+        console.log("pressed leave meeting");
+        const num = newCall.participantCounts();
+        console.log("participant counts:", num);
+        if (num.present == 0) {
+          try {
+            let res = null;
+            while (!res?.ok && counter < 3) {
+              res = await fetch(
+                `${apiGatewayUrl}/collaboration/close-daily-room/${sessionId?.split(":")[1]}`,
+                { method: "DELETE" }
+              );
+              console.log("response from close daily room:", res);
+              if (!res.ok) {
+                setTimeout(function(){
+                  console.log("Retrying to close daily room...");
+                }, 2000);
+                counter++;
+              }
+            }  
+          } catch (err) {
+            console.error("Failed to close room:", err);
+          }
         }
 
         socketRef.current?.emit("end-call", {
@@ -92,7 +113,7 @@ const FloatingCallPopup: React.FC<FloatingCallPopupProps> = ({
       });
     } catch (err) {
       console.error("Daily error:", err);
-      alert("Could not start video call.");
+      alert("Could not start video call. Reload the page to try again.");
       onCallEnd();
     }
   };

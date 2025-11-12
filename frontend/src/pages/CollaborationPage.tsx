@@ -13,7 +13,6 @@ import { MonacoBinding } from "y-monaco";
 import { api } from "../lib/api";
 import toast from "react-hot-toast";
 
-const COLLAB_SERVICE_URL = "http://localhost:3004";
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
 const YJS_WEBSOCKET_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL;
 
@@ -1192,7 +1191,7 @@ export default function CollaborationPage() {
             setIsCallActive(false);
             setShowCallPopup(false);
           }}
-          collabServiceUrl={COLLAB_SERVICE_URL}
+          apiGatewayUrl={GATEWAY_URL}
         />
       )}
     </div>
