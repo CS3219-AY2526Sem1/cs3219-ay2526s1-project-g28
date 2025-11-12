@@ -1,0 +1,35 @@
+service: question-service
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: ap-southeast-1
+  stage: prod
+  lambdaHashingVersion: 20201221
+  logs:
+    httpApi: false # disables CloudWatch access logs for HTTP APIs
+
+  environment:
+    PORT: ${env:PORT}
+    DB_LOCAL_URI: ${env:DB_LOCAL_URI}
+    DB_CLOUD_URI: ${env:DB_CLOUD_URI}
+    ENV: ${env:ENV}
+    JWT_SECRET: ${env:JWT_SECRET}
+    GOOGLE_CLIENT_ID: ${env:GOOGLE_CLIENT_ID}
+    GOOGLE_CLIENT_SECRET: ${env:GOOGLE_CLIENT_SECRET}
+    GITHUB_CLIENT_ID: ${env:GITHUB_CLIENT_ID}
+    GITHUB_CLIENT_SECRET: ${env:GITHUB_CLIENT_SECRET}
+    CLOUDINARY_URL: ${env:CLOUDINARY_URL}
+
+functions:
+  user:
+    handler: lambda.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+
+package:
+  patterns:
+    - "!node_modules/aws-sdk/**"
+    - "**"
