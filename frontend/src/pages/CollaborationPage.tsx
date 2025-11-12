@@ -624,33 +624,6 @@ function CodeEditorTab({
     toast.success("Code cleared");
   };
 
-// Clear all code in the editor
-const handleClearCode = () => {
-  const yText = yTextRef.current;
-  const ydoc = ydocRef.current;
-
-  if (!yText || !ydoc) {
-    console.warn("[Clear] Yjs not ready");
-    toast.error("Editor not ready yet");
-    return;
-  }
-
-  // Confirm before clearing
-  if (!window.confirm("Are you sure you want to clear all code? This will affect both users.")) {
-    return;
-  }
-
-  console.log("[Clear] Clearing shared document");
-
-  // Clear all content
-  ydoc.transact(() => {
-    yText.delete(0, yText.length);
-  });
-
-  toast.success("Code cleared");
-};
-
-
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
       {/* Tabs */}
