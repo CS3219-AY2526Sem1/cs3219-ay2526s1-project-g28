@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout
+      # Checkout
       - uses: actions/checkout@v4
 
-      # 2️⃣ Build Docker image (for local health check)
+      # Build Docker image (for local health check)
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
@@ -29,25 +29,25 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
-      # 3️⃣ Authenticate to Google Cloud
+      # Authenticate to Google Cloud
       - name: Auth to Google
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # 4️⃣ Fetch dotenv secret from Google Secret Manager
+      # Fetch dotenv secret from Google Secret Manager
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
 
-      # 5️⃣ Export GSM secrets to environment
+      # Export GSM secrets to environment
       - name: Export GSM secrets
         run: |
           echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
 
-      # 6️⃣ Dynamically confirm GSM environment variable lengths
+      # Dynamically confirm GSM environment variable lengths
       - name: Confirm all GSM env string lengths
         run: |
           echo "🔍 Checking all environment variables loaded from GSM..."
@@ -61,7 +61,7 @@ jobs:
             fi
           done
 
-      # 7️⃣ Start Mongo if using local DB
+      # Start Mongo if using local DB
       - name: Start Mongo if needed
         run: |
           if echo "${DB_LOCAL_URI}" | grep -q "mongodb://host.docker.internal"; then
@@ -74,7 +74,7 @@ jobs:
             echo "External DB configured; not starting local Mongo."
           fi
 
-      # 8️⃣ Run container for health check
+      # Run container for health check
       - name: Run user-service container
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
@@ -102,7 +102,11 @@ jobs:
           docker logs user-service || true
           exit 1
 
-      # 9️⃣ Deploy to AWS Lambda with Serverless
+      - name: Install dependencies
+        working-directory: backend/user-service
+        run: npm ci --omit=dev
+
+      # Deploy to AWS Lambda with Serverless
       - name: Deploy to AWS Lambda
         working-directory: backend/user-service
         run: |
@@ -112,7 +116,7 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_XZ }}
 
-      # 🔟 Logs (always show)
+      # Logs (always show)
       - name: Logs (always)
         if: always()
         run: |
@@ -121,7 +125,7 @@ jobs:
           echo "----- mongo logs -----"
           docker logs --timestamps --tail=80 mongo || true
 
-      # 1️⃣1️⃣ Cleanup
+      # Cleanup
       - name: Cleanup
         if: always()
         run: |
