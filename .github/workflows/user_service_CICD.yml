@@ -1,7 +1,6 @@
 name: CI + CD (user-service)
 
 on:
-  push:
   workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
