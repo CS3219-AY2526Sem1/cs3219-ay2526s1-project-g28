@@ -58,7 +58,7 @@ function ThemeButton() {
 }
 
 const defaultSnippets: Record<Language, string> = {
-  python: "def solution():  # Write your code below",
+  python: "def solution():\n  # Write your code here\n  pass",
   javascript: "function solution() {\n  // Write your code here\n}",
   java: "public class Solution {\n  public static Object function(Object o) {\n    // Write your code here\n    return null;\n  }\n}",
 };
@@ -91,6 +91,7 @@ function ProblemViewer({
   difficulty,
   description,
   examples,
+  constraints,
 }: {
   title: string;
   difficulty: Difficulty;
@@ -102,23 +103,19 @@ function ProblemViewer({
     explanation?: string;
     image?: { url: string; width: number; height: number };
   }[];
+  constraints: string[];
 }) {
   return (
     <aside className="w-full md:w-2/5 overflow-y-auto bg-white rounded-2xl border shadow-sm p-4 dark:bg-zinc-900 dark:border-zinc-800">
       <h2 className="text-lg font-semibold mb-2 dark:text-zinc-100">{title}</h2>
       <Tag className={difficultyStyles[difficulty]}>{difficulty}</Tag>
-      <p className="mt-2 whitespace-pre-wrap dark:text-zinc-100">
-        {description}
-      </p>
+      <p className="mt-2 whitespace-pre-wrap dark:text-zinc-100">{description}</p>
       {examples.length > 0 && (
         <div className="mt-4">
           <h3 className="font-semibold dark:text-zinc-100">Examples</h3>
           {examples.map((ex, idx) => {
             return (
-              <div
-                key={idx}
-                className="border rounded p-2 my-1 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700"
-              >
+              <div key={idx} className="border rounded p-2 my-1 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700">
                 <div className="flex items-center">
                   {ex.image?.url && (
                     <img
@@ -145,6 +142,16 @@ function ProblemViewer({
           })}
         </div>
       )}
+      {constraints && constraints.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-semibold dark:text-zinc-100">Constraints</h3>
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            {constraints.map((c, i) => (
+              <li key={i} className="text-sm dark:text-zinc-100">{c}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </aside>
   );
 }
@@ -166,7 +173,7 @@ function MonacoEditor({
       language={language}
       theme="vs-dark"
       value=""
-      onChange={() => {}}
+      onChange={() =>{}}
       onMount={onMount}
       options={{
         minimap: { enabled: false },
@@ -184,6 +191,7 @@ function CodeEditorTab({
   // code,
   // setCode,
   testCases,
+  paramNames,
   socketRef,
   sessionId,
   currentUsername,
@@ -200,9 +208,11 @@ function CodeEditorTab({
   // setCode: (c: string) => void;
   testCases: {
     hidden: boolean;
-    input: any;
-    expected: string;
+    input?: any;
+    args?: any;
+    expected: any;
   }[];
+  paramNames: string[];
   socketRef: React.MutableRefObject<any>;
   sessionId: string | undefined;
   currentUsername: string;
@@ -211,7 +221,7 @@ function CodeEditorTab({
   onErrorChange?: (err: string | null) => void;
   sethasSubmitted: (v: boolean) => void;
   yTextRef: React.MutableRefObject<Y.Text | null>;
-  yMapRef: React.MutableRefObject<Y.Map<any> | null>;
+  yMapRef: React.MutableRefObject<Y.Map<any> | null>; 
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -281,9 +291,14 @@ function CodeEditorTab({
     ydocRef.current = ydoc;
 
     // Connect to the Yjs WebSocket server
-    const provider = new WebsocketProvider(YJS_WEBSOCKET_URL, sessionId, ydoc, {
-      connect: true,
-    });
+    const provider = new WebsocketProvider(
+      YJS_WEBSOCKET_URL,
+      sessionId, 
+      ydoc,
+      {
+        connect: true,
+      }
+    );
     providerRef.current = provider;
 
     // Get shared types
@@ -299,29 +314,14 @@ function CodeEditorTab({
     });
 
     // Initialize default content if document is empty
-    // Use synced event which fires after initial sync is complete
     provider.on("sync", (isSynced: boolean) => {
       console.log("[Yjs] Sync event:", isSynced);
-
-      // Set ready immediately when synced
-      if (isSynced) {
-        setIsYjsReady(true);
-      }
-
+      if (isSynced) setIsYjsReady(true);
       if (isSynced && !hasSeededRef.current) {
-        // Small delay to ensure we see any content from other clients
         setTimeout(() => {
           const currentContent = yText.toString().trim();
           const currentLang = yMap.get("language") as string | undefined;
-
-          console.log(
-            "[Yjs] Document synced. Content length:",
-            currentContent.length,
-            "Language:",
-            currentLang
-          );
-
-          // Only seed if BOTH content and language are missing
+          console.log("[Yjs] Document synced. Content length:", currentContent.length, "Language:", currentLang);
           if (currentContent.length === 0 && !currentLang) {
             console.log("[Yjs] Seeding default content");
             ydoc.transact(() => {
@@ -330,23 +330,18 @@ function CodeEditorTab({
             });
             hasSeededRef.current = true;
           } else if (currentLang && currentLang !== language) {
-            // Document exists with a language - sync to it
             console.log("[Yjs] Syncing to existing language:", currentLang);
             setLanguage(currentLang as Language);
             const model = editor.getModel();
-            if (model) {
-              monaco.editor.setModelLanguage(model, currentLang);
-            }
+            if (model) monaco.editor.setModelLanguage(model, currentLang);
           }
-        }, 100); // Small delay to let sync complete
+        }, 100);
       }
     });
 
     provider.on("status", (event: { status: string }) => {
       console.log("[Yjs] Connection status:", event.status);
-      if (event.status === "connected") {
-        setIsYjsReady(true);
-      }
+      if (event.status === "connected") setIsYjsReady(true);
     });
 
     // Bind Yjs to Monaco
@@ -369,16 +364,13 @@ function CodeEditorTab({
     // Listen for language changes from other users
     yMap.observe((event) => {
       event.changes.keys.forEach((change, key) => {
-        if (key === "language" && change.action !== "delete") {
+        if (key === "language" && change.action !== 'delete') {
           const newLang = yMap.get("language") as string | undefined;
-          if (newLang) {
-            // Just check it exists, don't compare
-            console.log("[Yjs] Language changed by peer to:", newLang);
-            setLanguage(newLang as Language);
+          if (newLang) {  
+            console.log("[Yjs] Language changed by peer to:", newLang);  
+            setLanguage(newLang as Language);           
             const model = editorRef.current?.getModel();
-            if (model) {
-              monaco.editor.setModelLanguage(model, newLang);
-            }
+            if (model) monaco.editor.setModelLanguage(model, newLang);
           }
         }
       });
@@ -420,14 +412,11 @@ function CodeEditorTab({
   // Update Monaco Content Widget for remote cursor
   useEffect(() => {
     if (!editorRef.current || !remoteCursor) return;
-
     const editor = editorRef.current;
 
     // Remove previous widget
     if (cursorWidgetRef.current) {
-      try {
-        editor.removeContentWidget(cursorWidgetRef.current);
-      } catch {}
+      try { editor.removeContentWidget(cursorWidgetRef.current); } catch {}
       cursorWidgetRef.current = null;
     }
 
@@ -436,15 +425,11 @@ function CodeEditorTab({
     domNode.className = "remote-cursor-label";
     domNode.textContent = remoteCursor.username;
 
-    // Define content widget
     const widget: monaco.editor.IContentWidget = {
       getId: () => "remoteCursorWidget",
       getDomNode: () => domNode,
       getPosition: () => ({
-        position: {
-          lineNumber: remoteCursor.lineNumber,
-          column: remoteCursor.column,
-        },
+        position: { lineNumber: remoteCursor.lineNumber, column: remoteCursor.column },
         preference: [
           monaco.editor.ContentWidgetPositionPreference.ABOVE,
           monaco.editor.ContentWidgetPositionPreference.BELOW,
@@ -455,7 +440,6 @@ function CodeEditorTab({
     editor.addContentWidget(widget);
     cursorWidgetRef.current = widget;
 
-    // Remove previous cursor decorations
     const newDecorations = [
       {
         range: new monaco.Range(
@@ -464,10 +448,7 @@ function CodeEditorTab({
           remoteCursor.lineNumber,
           remoteCursor.column
         ),
-        options: {
-          className: "remote-cursor", // CSS for vertical line
-          isWholeLine: false,
-        },
+        options: { className: "remote-cursor", isWholeLine: false },
       },
     ];
 
@@ -481,10 +462,13 @@ function CodeEditorTab({
     setHasRunSubmitted(true);
     const toRun = testCases
       .filter((tc) => !tc.hidden)
-      .map((tc) => ({
-        ...tc,
-        input: Array.isArray(tc.input) ? tc.input[0] : tc.input,
-      }));
+      .map((tc) => {
+        const raw = tc.input !== undefined ? tc.input : tc.args;
+        const normalized = Array.isArray(raw)
+          ? (paramNames.length <= 1 ? raw[0] : raw)
+          : raw;
+        return { ...tc, input: normalized };
+      });
     try {
       const res = await runCodeApi(language, currentCode, toRun, timeout);
       if (res.data.success) {
@@ -519,8 +503,14 @@ function CodeEditorTab({
     setError(null);
     sethasSubmitted(true);
     try {
-      const res = await runCodeApi(language, currentCode, testCases, timeout);
-
+      const toSubmit = testCases.map((tc) => {
+        const raw = tc.input !== undefined ? tc.input : tc.args;
+        const normalized = Array.isArray(raw)
+          ? (paramNames.length <= 1 ? raw[0] : raw)
+          : raw;
+        return { ...tc, input: normalized };
+      });
+      const res = await runCodeApi(language, currentCode, toSubmit, timeout);
       if (res.data.success) {
         setSubmitResults(res.data.output);
         onResultsChange?.(res.data.output);
@@ -545,163 +535,103 @@ function CodeEditorTab({
   const handleResetCode = () => {
     const yText = yTextRef.current;
     const ydoc = ydocRef.current;
-
     if (!yText || !ydoc) {
       console.warn("[Reset] Yjs not ready");
       return;
     }
-
     console.log("[Reset] Resetting shared document");
-
-    // DON'T disconnect - just do the transaction
-    // This ensures changes sync immediately
     ydoc.transact(() => {
       yText.delete(0, yText.length);
       yText.insert(0, defaultSnippets[language]);
     });
   };
 
+  // >>> Added: Clear All (integrated) <<<
+  const handleClearCode = () => {
+    const yText = yTextRef.current;
+    const ydoc = ydocRef.current;
+    if (!yText || !ydoc) {
+      console.warn("[Clear] Yjs not ready");
+      toast.error("Editor not ready yet");
+      return;
+    }
+    if (!window.confirm("Are you sure you want to clear all code? This will affect both users.")) {
+      return;
+    }
+    console.log("[Clear] Clearing shared document");
+    ydoc.transact(() => {
+      yText.delete(0, yText.length);
+    });
+    toast.success("Code cleared");
+  };
+  // <<< Added: Clear All (integrated) <<<
+
   // Handle language change
   const handleLanguageChange = (newLang: Language) => {
     const yText = yTextRef.current;
     const yMap = yMapRef.current;
     const ydoc = ydocRef.current;
-
     if (!yText || !yMap || !ydoc) {
       console.warn("[Language] Yjs not ready");
       return;
     }
-
     console.log("[Language] Changing to:", newLang);
-
-    // Update everything in one transaction
     ydoc.transact(() => {
-      // Update language in shared state first
       yMap.set("language", newLang);
-
-      // Then replace code
       yText.delete(0, yText.length);
       yText.insert(0, defaultSnippets[newLang]);
     });
-
-    // Update local state
     setLanguage(newLang);
-
-    // Update Monaco syntax highlighting
     const model = editorRef.current?.getModel();
     if (model) {
       monaco.editor.setModelLanguage(model, newLang);
     }
   };
 
-  // Clear all code in the editor
-  const handleClearCode = () => {
-    const yText = yTextRef.current;
-    const ydoc = ydocRef.current;
-
-    if (!yText || !ydoc) {
-      console.warn("[Clear] Yjs not ready");
-      toast.error("Editor not ready yet");
-      return;
+  // Build a { paramName: value } map for display
+  const toParamMap = (raw: any): any => {
+    if (Array.isArray(raw) && paramNames && paramNames.length > 0) {
+      const map: Record<string, any> = {};
+      for (let i = 0; i < paramNames.length; i++) {
+        map[paramNames[i]] = raw[i];
+      }
+      return map;
     }
-
-    // Confirm before clearing
-    if (
-      !window.confirm(
-        "Are you sure you want to clear all code? This will affect both users."
-      )
-    ) {
-      return;
-    }
-
-    console.log("[Clear] Clearing shared document");
-
-    // Clear all content
-    ydoc.transact(() => {
-      yText.delete(0, yText.length);
-    });
-
-    toast.success("Code cleared");
+    return raw;
   };
 
-// Clear all code in the editor
-const handleClearCode = () => {
-  const yText = yTextRef.current;
-  const ydoc = ydocRef.current;
-
-  if (!yText || !ydoc) {
-    console.warn("[Clear] Yjs not ready");
-    toast.error("Editor not ready yet");
-    return;
-  }
-
-  // Confirm before clearing
-  if (!window.confirm("Are you sure you want to clear all code? This will affect both users.")) {
-    return;
-  }
-
-  console.log("[Clear] Clearing shared document");
-
-  // Clear all content
-  ydoc.transact(() => {
-    yText.delete(0, yText.length);
-  });
-
-  toast.success("Code cleared");
-};
-
+  // Render param map as separate lines, no "Input:" label
+  const renderParamKv = (val: any) => {
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const entries = Object.entries(val);
+      return (
+        <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
+          {entries.map(([k, v], i) => (
+            <div key={i}>
+              <strong>{k}:</strong>{" "}
+              <code>
+                {typeof v === "string" ? `"${v}"` : JSON.stringify(v)}
+              </code>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
+        <code>{typeof val === "string" ? `"${val}"` : JSON.stringify(val)}</code>
+      </div>
+    );
+  };
 
   return (
     <div className="flex-1 flex flex-col gap-3 min-h-0 font-sans">
-      {/* Tabs */}
-      <div
-        role="tablist"
-        aria-label="Editor console tabs"
-        className="flex gap-2 mb-3"
-      >
-        {(["editor", "console"] as const).map((tab) => {
-          const active = activeTab === tab;
-          return (
-            <button
-              key={tab}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setActiveTab(tab)}
-              className={[
-                "px-4 py-2 rounded-md text-sm font-semibold transition-colors outline-none",
-                active
-                  ? "bg-slate-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
-                  : "text-slate-500 hover:text-slate-800 dark:text-zinc-400 dark:hover:text-zinc-200",
-              ].join(" ")}
-            >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </button>
-          );
-        })}
-      </div>
-
       {/* Connection status */}
       {!isYjsReady && (
         <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
-          <svg
-            className="animate-spin h-4 w-4"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            />
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-            />
+          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
           </svg>
           Connecting to collaboration server...
         </div>
@@ -718,7 +648,7 @@ const handleClearCode = () => {
         <MonacoEditor language={language} onMount={handleEditorMount} />
       </div>
 
-      {/* Toolbar — shown only when Editor tab is active */}
+      {/* Toolbar — only when Editor tab is active */}
       {activeTab === "editor" && (
         <div className="flex justify-between mb-2 items-center gap-2">
           <select
@@ -731,6 +661,8 @@ const handleClearCode = () => {
             <option value="javascript">JavaScript</option>
             <option value="java">Java</option>
           </select>
+
+          {/* >>> Added: Clear All button from your friend <<< */}
           <button
             onClick={handleClearCode}
             disabled={!isYjsReady}
@@ -738,6 +670,8 @@ const handleClearCode = () => {
           >
             Clear All
           </button>
+          {/* <<< Added: Clear All button >>> */}
+
           <button
             onClick={handleResetCode}
             disabled={!isYjsReady}
@@ -751,16 +685,22 @@ const handleClearCode = () => {
       {/* Test Cases */}
       {activeTab === "editor" && (
         <div className="mt-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden transition-all duration-300">
-          <div
-            className="flex justify-between items-center px-4 py-2 cursor-pointer"
-            onClick={() => setShowTests(!showTests)}
-          >
-            <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">
-              Test Cases
-            </h3>
-            <span className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline">
-              {showTests ? "Hide" : "Show"}
-            </span>
+          <div className="flex justify-between items-center px-4 py-2">
+            <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">Test Cases</h3>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setActiveTab("console")}
+                className="text-sm px-3 py-1 rounded border shadow-sm hover:bg-slate-50 transition dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+              >
+                Console
+              </button>
+              <button
+                onClick={() => setShowTests(!showTests)}
+                className="text-indigo-600 dark:text-indigo-400 text-sm hover:underline"
+              >
+                {showTests ? "Hide" : "Show"}
+              </button>
+            </div>
           </div>
 
           <div
@@ -780,19 +720,18 @@ const handleClearCode = () => {
                       ? "min-w-[220px] flex-shrink-0 rounded-xl p-3 shadow-sm bg-green-50 dark:bg-transparent border border-green-400 dark:border-green-500"
                       : "min-w-[220px] flex-shrink-0 rounded-xl p-3 shadow-sm bg-red-50 dark:bg-transparent border border-red-400 dark:border-red-500";
                   }
+
+                  const rawDisplay = tc.input !== undefined ? tc.input : tc.args;
+                  const displayInput = toParamMap(rawDisplay);
+
                   return (
                     <div key={idx} className={boxClasses}>
                       <div className="font-semibold text-slate-800 dark:text-zinc-100 mb-1">
                         Case {idx + 1}
                       </div>
-                      <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
-                        Input:{" "}
-                        <code>
-                          {typeof tc.input === "string"
-                            ? tc.input
-                            : JSON.stringify(tc.input)}
-                        </code>
-                      </div>
+
+                      {renderParamKv(displayInput)}
+
                       <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
                         Expected: <code>{JSON.stringify(tc.expected)}</code>
                       </div>
@@ -800,7 +739,9 @@ const handleClearCode = () => {
                         <div className="text-sm text-slate-700 dark:text-zinc-200 mb-1">
                           Output:{" "}
                           <code>
-                            {runResults[idx]?.output
+                            {(runResults[idx] !== undefined &&
+                              runResults[idx].output !== undefined &&
+                              runResults[idx].output !== null)
                               ? JSON.stringify(runResults[idx].output)
                               : "No output"}
                           </code>
@@ -814,7 +755,7 @@ const handleClearCode = () => {
         </div>
       )}
 
-      {/* Footer — shown only when Editor tab is active */}
+      {/* Footer — only when Editor tab is active */}
       {activeTab === "editor" && (
         <div className="sticky bottom-0 mt-3 flex items-center gap-3 rounded-xl border bg-white px-3 py-2 shadow-sm dark:bg-zinc-900 dark:border-zinc-800">
           <button
@@ -862,6 +803,16 @@ const handleClearCode = () => {
       {/* Console Tab */}
       {activeTab === "console" && (
         <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-4 max-h-[400px] overflow-auto dark:bg-zinc-900 dark:border-zinc-800">
+          <div className="flex justify-between items-center">
+            <div className="font-semibold text-slate-800 dark:text-zinc-100">Console</div>
+            <button
+              onClick={() => setActiveTab("editor")}
+              className="text-sm px-3 py-1 rounded border shadow-sm hover:bg-slate-50 transition dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Back to Editor
+            </button>
+          </div>
+
           {error && (
             <div className="text-red-600 font-medium text-sm">
               <strong>Error:</strong> {error}
@@ -890,6 +841,14 @@ const handleClearCode = () => {
                 const tc = results[firstFail];
                 const total = results.length;
 
+                const failureDisplay =
+                  Array.isArray(tc.args) && paramNames.length > 0
+                    ? paramNames.reduce((acc: any, name: string, i: number) => {
+                        acc[name] = tc.args[i];
+                        return acc;
+                      }, {})
+                    : tc.args;
+
                 return (
                   <div
                     key={firstFail}
@@ -898,14 +857,9 @@ const handleClearCode = () => {
                     <div className="font-semibold text-slate-800 dark:text-zinc-100 mb-1">
                       Case {firstFail + 1} / {total}
                     </div>
-                    <div className="text-sm text-slate-600 dark:text-zinc-300">
-                      <strong>Input:</strong>{" "}
-                      <code>
-                        {Array.isArray(tc.args)
-                          ? JSON.stringify(tc.args)
-                          : tc.args}
-                      </code>
-                    </div>
+
+                    {renderParamKv(failureDisplay)}
+
                     <div className="text-sm text-slate-600 dark:text-zinc-300">
                       <strong>Expected:</strong>{" "}
                       <code>{JSON.stringify(tc.expected)}</code>
@@ -913,7 +867,9 @@ const handleClearCode = () => {
                     <div className="text-sm text-slate-700 dark:text-zinc-200">
                       <strong>Output:</strong>{" "}
                       <code>
-                        {tc.output ? JSON.stringify(tc.output) : "No output"}
+                        {tc.output !== undefined && tc.output !== null
+                          ? JSON.stringify(tc.output)
+                          : "No output"}
                       </code>
                     </div>
                     {tc.error && (
@@ -932,51 +888,34 @@ const handleClearCode = () => {
 }
 
 function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
-  const [elapsed, setElapsed] = useState(0); // seconds
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     if (!startedAt) return;
-
     const startTime = new Date(startedAt).getTime();
-
     const interval = setInterval(() => {
       const now = Date.now();
       const diff = Math.floor((now - startTime) / 1000);
       setElapsed(diff);
     }, 1000);
-
-    return () => clearInterval(interval);
+  return () => clearInterval(interval);
   }, [startedAt]);
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600)
-      .toString()
-      .padStart(2, "0");
-    const m = Math.floor((seconds % 3600) / 60)
-      .toString()
-      .padStart(2, "0");
+    const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
+    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
     return `${h}:${m}:${s}`;
   };
 
-  return (
-    <div className="text-sm text-gray-500 dark:text-zinc-300">
-      {formatTime(elapsed)}
-    </div>
-  );
+  return <div className="text-sm text-gray-500 dark:text-zinc-300">{formatTime(elapsed)}</div>;
 }
 
 // Helper: Generate random color for user cursor
 function getRandomColor() {
   const colors = [
-    "#FF6B6B",
-    "#4ECDC4",
-    "#45B7D1",
-    "#FFA07A",
-    "#98D8C8",
-    "#F7DC6F",
-    "#BB8FCE",
-    "#85C1E2",
+    "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
+    "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2"
   ];
   return colors[Math.floor(Math.random() * colors.length)];
 }
@@ -1029,7 +968,6 @@ export default function CollaborationPage() {
             setLanguage(data.question.codeSnippets[0].language);
             // setCode(data.question.codeSnippets[0].code);
           }
-
           window.clearInterval(interval);
           setLoading(false);
         }
@@ -1038,7 +976,6 @@ export default function CollaborationPage() {
       }
     };
 
-    // Start polling every 1s
     const interval = window.setInterval(fetchSession, 1000);
     fetchSession();
     return () => {
@@ -1065,17 +1002,14 @@ export default function CollaborationPage() {
       localStorage.setItem("activeSessionId", sessionId);
     });
 
-    // Auto rejoin if reconnected
     socket.on("reconnect", () => {
       console.log("Reconnected to socket");
       socket.emit("join-session", { sessionId, username: currentUsername });
       localStorage.setItem("activeSessionId", sessionId);
     });
 
-    // Listen for peer events
     socket.on("user-joined", ({ username }) => {
       if (username === currentUsername) return;
-
       if (knownUsersRef.current.has(username)) {
         toast.success(`${username} has rejoined the session.`);
       } else {
@@ -1101,60 +1035,24 @@ export default function CollaborationPage() {
       }
     });
 
-    // Existing code-change / language-change handlers
-    // socket.on("code-change", ({ code: newCode }: { code: string }) => {
-    //   setCode(newCode);
-    // });
-
-    // socket.on(
-    //   "language-change",
-    //   ({ language: newLang }: { language: Language }) => {
-    //     console.log("Language changed to:", newLang);
-    //     setLanguage(newLang);
-    //     setCode(defaultSnippets[newLang]);
-    //   }
-    // );
-
     return () => {
       socket.disconnect();
       socketRef.current = null;
     };
   }, [sessionId, currentUsername]);
 
-  // const handleCodeChange = (newCode: string) => {
-  //   setCode(newCode);
-  //   // socketRef.current?.emit("code-change", { sessionId, code: newCode });
-  // };
-
-  // const handleLanguageChange = (newLang: Language) => {
-  //   setLanguage(newLang);
-  //   setCode(defaultSnippets[newLang]);
-  //   socketRef.current?.emit("language-change", {
-  //     sessionId,
-  //     language: newLang,
-  //   });
-  // };
-
   const handleLeaveSession = async () => {
     if (!sessionId || !currentUsername) return;
-
     if (!window.confirm("Are you sure you want to leave this session?")) return;
 
     try {
-      // Get the latest code and language from Yjs document before leaving
       const currentCode = yTextRef.current ? yTextRef.current.toString() : "";
-      const currentLanguage = yMapRef.current
-        ? (yMapRef.current.get("language") as Language) || language
+      const currentLanguage = yMapRef.current 
+        ? (yMapRef.current.get("language") as Language) || language 
         : language;
 
-      console.log(
-        "[Leave] Saving code:",
-        currentCode.length,
-        "chars, language:",
-        currentLanguage
-      );
+      console.log("[Leave] Saving code:", currentCode.length, "chars, language:", currentLanguage);
 
-      // Notify backend (voluntary leave)
       socketRef.current?.emit("leave-session", {
         sessionId,
         username: currentUsername,
@@ -1165,10 +1063,7 @@ export default function CollaborationPage() {
         hasSubmitted,
       });
 
-      // Optionally mark session inactive locally
       localStorage.removeItem("activeSessionId");
-
-      // Navigate back to home
       navigate("/home");
     } catch (err) {
       console.error("Failed to leave session:", err);
@@ -1188,33 +1083,36 @@ export default function CollaborationPage() {
 
   return (
     <div className="flex h-screen flex-col bg-gray-50 p-4 gap-4 dark:bg-zinc-950">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold dark:text-zinc-100">PeerPrep</h1>
-        <SessionTimer startedAt={startedAt} />
-        <div className="flex items-center gap-2">
-          <ThemeButton />
+      {/* Header: title left, timer centered, theme+leave right */}
+      <header className="grid grid-cols-3 items-center">
+        <h1 className="text-xl font-bold dark:text-zinc-100 justify-self-start">PeerPrep</h1>
+        <div className="justify-self-center">
+          <SessionTimer startedAt={startedAt} />
         </div>
-        <button
-          onClick={handleLeaveSession}
-          className="px-3 py-1 border rounded bg-red-500 text-white hover:bg-red-600"
-        >
-          Leave
-        </button>
+        <div className="justify-self-end flex items-center gap-2">
+          <ThemeButton />
+          <button
+            onClick={handleLeaveSession}
+            className="px-3 py-1 border rounded bg-red-500 text-white hover:bg-red-600"
+          >
+            Leave
+          </button>
+        </div>
       </header>
+
       <div className="flex flex-1 gap-4 min-h-0">
         <ProblemViewer
           title={question.title}
           difficulty={question.difficulty}
           description={question.problemStatement}
           examples={question.examples || []}
+          constraints={question.constraints || []}
         />
         <div className="w-full md:w-3/5 flex flex-col">
           <div className="flex gap-2 mb-2">
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "editor"
-                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
-                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "editor" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("editor")}
             >
@@ -1222,9 +1120,7 @@ export default function CollaborationPage() {
             </button>
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "chat"
-                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
-                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "chat" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("chat")}
             >
@@ -1232,9 +1128,7 @@ export default function CollaborationPage() {
             </button>
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "call"
-                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
-                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "call" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("call")}
             >
@@ -1247,9 +1141,8 @@ export default function CollaborationPage() {
               <CodeEditorTab
                 language={language}
                 setLanguage={setLanguage}
-                // code={code}
-                // setCode={handleCodeChange}
                 testCases={question.testCases}
+                paramNames={question.signature?.params?.map((p: any) => p.name) || []}
                 socketRef={socketRef}
                 sessionId={sessionId}
                 currentUsername={currentUsername}
@@ -1258,7 +1151,7 @@ export default function CollaborationPage() {
                 onErrorChange={setLatestError}
                 sethasSubmitted={sethasSubmitted}
                 yTextRef={yTextRef}
-                yMapRef={yMapRef}
+                yMapRef={yMapRef} 
               />
             )}
             {activeTab === "chat" && (
@@ -1290,6 +1183,7 @@ export default function CollaborationPage() {
           </div>
         </div>
       </div>
+
       {showCallPopup && (
         <FloatingCallPopup
           sessionId={sessionId}
