@@ -10,7 +10,6 @@ import { useTheme } from "../theme/ThemeProvider";
 export type Page =
   | "Challenges"
   | "My History"
-  | "Leaderboard"
   | "User Management"
   | "Questions"
   | "Custom Lobby"
@@ -49,7 +48,6 @@ const AUThed_NAV = [
 const NAME_TO_PATH: Record<string, string> = {
   Challenges: "/home",
   "My History": "/history",
-  Leaderboard: "/leaderboard",
   "User Management": "/users",
   Questions: "/questions",
   "Custom Lobby": "/custom-lobby",
