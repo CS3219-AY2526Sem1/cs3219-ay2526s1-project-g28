@@ -1,9 +1,6 @@
 name: CI + CD (question-service)
 
 on:
-  push:
-    branches:
-      - "**" # run on all branches
   workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
@@ -42,16 +39,15 @@ jobs:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/question-service-env/versions/latest
 
-      # Export GSM secrets to environment
+      # Export GSM secrets to environment (safe)
       - name: Export GSM secrets
         run: |
-          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV || true
 
-      # Dynamically confirm GSM environment variable lengths
+      # Confirm GSM environment variable lengths
       - name: Confirm all GSM env string lengths
         run: |
           echo "🔍 Checking all environment variables loaded from GSM..."
-          # Extract key names from the GSM payload and test them dynamically
           echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sort | while read -r key; do
             value=$(printenv "$key" || true)
             if [ -z "$value" ]; then
@@ -83,14 +79,21 @@ jobs:
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/question-service:dev"
 
-      - name: Run question-service
+      # Health check
+      - name: Health check
         run: |
-          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
-          docker run -d --name question-service \
-            -p 3002:3002 \
-            --env-file ./question-service.env \
-            "$NS/question-service:dev"
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
+              echo "✅ Health check OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 2
+          done
+          echo "❌ health never came up"
+          docker logs question-service || true
+          exit 1
 
+      # Install dependencies
       - name: Install dependencies
         working-directory: backend/question-service
         run: npm ci --omit=dev
