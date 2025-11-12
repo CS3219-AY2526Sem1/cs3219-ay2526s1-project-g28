@@ -75,7 +75,7 @@ jobs:
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name ai-service \
-            -p 3005:3005 \
+            -p 3007:3007 \
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/ai-service:dev"
 

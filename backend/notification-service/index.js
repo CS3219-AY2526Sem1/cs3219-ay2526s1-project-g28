@@ -5,7 +5,7 @@ import express from "express";
 import { Server } from "socket.io";
 import IORedis from "ioredis";
 
-const PORT = process.env.NOTIFICATION_SERVICE_PORT || 3004;
+const PORT = process.env.NOTIFICATION_SERVICE_PORT || 3005;
 const REDIS_URL = process.env.REDIS_URL;
 
 if (!REDIS_URL) {
@@ -96,7 +96,9 @@ server.listen(PORT, () => {
   console.log(`Notification service listening on http://localhost:${PORT}`);
 });
 
-const port = process.env.AI_SERVICE_PORT || 3000;
-app.listen(port, () => console.log(`AI service listening on ${port}`));
+const port = process.env.NOTIFICATION_SERVICE_PORT || 3005;
+app.listen(port, () =>
+  console.log(`Notification service listening on ${port}`)
+);
 
 export default app;
