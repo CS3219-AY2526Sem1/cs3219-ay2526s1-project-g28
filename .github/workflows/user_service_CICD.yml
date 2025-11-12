@@ -3,8 +3,8 @@ name: CI + CD (user-service)
 on:
   push:
     branches:
-      - main
-  workflow_dispatch: {} # allow manual trigger
+      - master
+  workflow_dispatch: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -18,10 +18,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout repository
+      # 1️⃣ Checkout
       - uses: actions/checkout@v4
 
-      # Build Docker image (for health check)
+      # 2️⃣ Build Docker image (for local health check)
       - name: Build image
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
@@ -29,45 +29,42 @@ jobs:
             -f backend/user-service/Dockerfile \
             backend/user-service
 
-      # Authenticate to Google (service account JSON)
+      # 3️⃣ Authenticate to Google Cloud
       - name: Auth to Google
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Read .env secret from Google Secret Manager
+      # 4️⃣ Fetch dotenv secret from Google Secret Manager
       - id: sm
         uses: google-github-actions/get-secretmanager-secrets@v2
         with:
           secrets: |
             DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/user-service-env/versions/latest
 
-      # Write .env file and normalize it
-      - name: Write & normalize .env
+      # 5️⃣ Export GSM secrets to environment
+      - name: Export GSM secrets
         run: |
-          printf '%s' "${{ steps.sm.outputs.DOTENV }}" > .env
-          sed -i 's/\r$//' .env
-          sed -i 's/[[:space:]]*$//' .env
-          # Ensure defaults
-          grep -q '^PORT=' .env || echo 'PORT=3001' >> .env
-          grep -q '^HOST=' .env || echo 'HOST=0.0.0.0' >> .env
-          grep -q '^SESSION_SECRET=' .env || echo 'SESSION_SECRET=ci-session-secret' >> .env
-          # Map DB_* -> MONGO_URI if missing
-          if ! grep -q '^MONGO_URI=' .env; then
-            if grep -q '^DB_LOCAL_URI=' .env; then
-              echo "MONGO_URI=$(grep '^DB_LOCAL_URI=' .env | cut -d= -f2-)" >> .env
-            elif grep -q '^DB_CLOUD_URI=' .env; then
-              echo "MONGO_URI=$(grep '^DB_CLOUD_URI=' .env | cut -d= -f2-)" >> .env
-            else
-              echo 'MONGO_URI=mongodb://host.docker.internal:27017/test' >> .env
-            fi
-          fi
-          cat .env | grep '=' >> $GITHUB_ENV
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
 
-      # Start Mongo if needed (for local testing)
+      # 6️⃣ Dynamically confirm GSM environment variable lengths
+      - name: Confirm all GSM env string lengths
+        run: |
+          echo "🔍 Checking all environment variables loaded from GSM..."
+          # Extract key names from the GSM payload and test them dynamically
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sort | while read -r key; do
+            value=$(printenv "$key" || true)
+            if [ -z "$value" ]; then
+              echo "$key: MISSING"
+            else
+              echo "$key len:${#value}"
+            fi
+          done
+
+      # 7️⃣ Start Mongo if using local DB
       - name: Start Mongo if needed
         run: |
-          if grep -q '^MONGO_URI=mongodb://host.docker.internal' .env; then
+          if echo "${DB_LOCAL_URI}" | grep -q "mongodb://host.docker.internal"; then
             docker run -d --name mongo -p 27017:27017 mongo:7
             for i in {1..40}; do
               docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
@@ -77,16 +74,15 @@ jobs:
             echo "External DB configured; not starting local Mongo."
           fi
 
-      # Run container for health check
+      # 8️⃣ Run container for health check
       - name: Run user-service container
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
           docker run -d --name user-service \
             -p 3001:3001 \
-            --env-file .env \
+            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/user-service:dev"
 
-      # Wait for /health
       - name: Health check
         run: |
           for i in {1..40}; do
@@ -94,7 +90,6 @@ jobs:
             if ! docker ps --format '{{.Names}}' | grep -q '^user-service$'; then
               echo "Container exited"
               docker logs --timestamps --tail=200 user-service || true
-              echo "Exit code: $(docker inspect user-service --format='{{.State.ExitCode}}' || true)"
               exit 1
             fi
             if curl -fsS http://127.0.0.1:3001/health >/dev/null; then
@@ -103,30 +98,21 @@ jobs:
             fi
             echo "waiting for /health... ($i)"; sleep 1
           done
-          echo "❌ health never came up"; docker logs user-service || true; exit 1
+          echo "❌ health never came up"
+          docker logs user-service || true
+          exit 1
 
-      # Deploy to AWS Lambda via Serverless
+      # 9️⃣ Deploy to AWS Lambda with Serverless
       - name: Deploy to AWS Lambda
+        working-directory: backend/user-service
         run: |
           npm install -g serverless
           npx serverless deploy --stage prod --region ap-southeast-1
-        working-directory: backend/user-service
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # Env vars already loaded from .env via $GITHUB_ENV
-          PORT: ${{ env.PORT }}
-          DB_LOCAL_URI: ${{ env.DB_LOCAL_URI }}
-          DB_CLOUD_URI: ${{ env.DB_CLOUD_URI }}
-          ENV: ${{ env.ENV }}
-          JWT_SECRET: ${{ env.JWT_SECRET }}
-          GOOGLE_CLIENT_ID: ${{ env.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ env.GOOGLE_CLIENT_SECRET }}
-          GITHUB_CLIENT_ID: ${{ env.GITHUB_CLIENT_ID }}
-          GITHUB_CLIENT_SECRET: ${{ env.GITHUB_CLIENT_SECRET }}
-          CLOUDINARY_URL: ${{ env.CLOUDINARY_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_XZ }}
 
-      # Logs (always show)
+      # 🔟 Logs (always show)
       - name: Logs (always)
         if: always()
         run: |
@@ -135,7 +121,7 @@ jobs:
           echo "----- mongo logs -----"
           docker logs --timestamps --tail=80 mongo || true
 
-      # Cleanup
+      # 1️⃣1️⃣ Cleanup
       - name: Cleanup
         if: always()
         run: |
