@@ -1,8 +1,6 @@
 name: CI + CD (question-service)
 
-on:
-  workflow_dispatch: {} # allow manual trigger too
-
+on: push
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

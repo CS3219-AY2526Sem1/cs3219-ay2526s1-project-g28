@@ -1,9 +1,6 @@
 name: CI + CD (ai-service)
 
 on:
-  push:
-    branches:
-      - "**" # run on all branches
   workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
