@@ -106,7 +106,7 @@ jobs:
       - name: Deploy to AWS Lambda
         working-directory: backend/user-service
         run: |
-          npm install -g serverless
+          npm install -g serverless@3
           npx serverless deploy --stage prod --region ap-southeast-1
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
