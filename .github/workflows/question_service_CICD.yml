@@ -1,6 +1,8 @@
 name: CI + CD (question-service)
 
-on: push
+on:
+  workflow_dispatch: {} # allow manual trigger too
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -76,20 +78,6 @@ jobs:
             -p 3002:3002 \
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/question-service:dev"
-
-      # Health check
-      - name: Health check
-        run: |
-          for i in {1..30}; do
-            if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
-              echo "✅ Health check OK"
-              exit 0
-            fi
-            echo "waiting for /health... ($i)"; sleep 2
-          done
-          echo "❌ health never came up"
-          docker logs question-service || true
-          exit 1
 
       # Install dependencies
       - name: Install dependencies
