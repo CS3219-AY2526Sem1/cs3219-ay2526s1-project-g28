@@ -70,7 +70,7 @@ jobs:
             echo "External DB configured; not starting local Mongo."
           fi
 
-      # Run container for health check
+      # Run container for health chec
       - name: Run question-service container
         run: |
           NS="${{ secrets.DOCKER_HUB_USERNAME }}"
