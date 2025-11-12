@@ -108,13 +108,18 @@ function ProblemViewer({
     <aside className="w-full md:w-2/5 overflow-y-auto bg-white rounded-2xl border shadow-sm p-4 dark:bg-zinc-900 dark:border-zinc-800">
       <h2 className="text-lg font-semibold mb-2 dark:text-zinc-100">{title}</h2>
       <Tag className={difficultyStyles[difficulty]}>{difficulty}</Tag>
-      <p className="mt-2 whitespace-pre-wrap dark:text-zinc-100">{description}</p>
+      <p className="mt-2 whitespace-pre-wrap dark:text-zinc-100">
+        {description}
+      </p>
       {examples.length > 0 && (
         <div className="mt-4">
           <h3 className="font-semibold dark:text-zinc-100">Examples</h3>
           {examples.map((ex, idx) => {
             return (
-              <div key={idx} className="border rounded p-2 my-1 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700">
+              <div
+                key={idx}
+                className="border rounded p-2 my-1 bg-gray-50 dark:bg-zinc-800 dark:border-zinc-700"
+              >
                 <div className="flex items-center">
                   {ex.image?.url && (
                     <img
@@ -146,7 +151,9 @@ function ProblemViewer({
           <h3 className="font-semibold dark:text-zinc-100">Constraints</h3>
           <ul className="list-disc pl-5 mt-1 space-y-1">
             {constraints.map((c, i) => (
-              <li key={i} className="text-sm dark:text-zinc-100">{c}</li>
+              <li key={i} className="text-sm dark:text-zinc-100">
+                {c}
+              </li>
             ))}
           </ul>
         </div>
@@ -172,7 +179,7 @@ function MonacoEditor({
       language={language}
       theme="vs-dark"
       value=""
-      onChange={() =>{}}
+      onChange={() => {}}
       onMount={onMount}
       options={{
         minimap: { enabled: false },
@@ -220,7 +227,7 @@ function CodeEditorTab({
   onErrorChange?: (err: string | null) => void;
   sethasSubmitted: (v: boolean) => void;
   yTextRef: React.MutableRefObject<Y.Text | null>;
-  yMapRef: React.MutableRefObject<Y.Map<any> | null>; 
+  yMapRef: React.MutableRefObject<Y.Map<any> | null>;
 }) {
   const [showTests, setShowTests] = useState(true);
   const [runResults, setRunResults] = useState<any[]>([]);
@@ -290,14 +297,9 @@ function CodeEditorTab({
     ydocRef.current = ydoc;
 
     // Connect to the Yjs WebSocket server
-    const provider = new WebsocketProvider(
-      YJS_WEBSOCKET_URL,
-      sessionId, 
-      ydoc,
-      {
-        connect: true,
-      }
-    );
+    const provider = new WebsocketProvider(YJS_WEBSOCKET_URL, sessionId, ydoc, {
+      connect: true,
+    });
     providerRef.current = provider;
 
     // Get shared types
@@ -320,7 +322,12 @@ function CodeEditorTab({
         setTimeout(() => {
           const currentContent = yText.toString().trim();
           const currentLang = yMap.get("language") as string | undefined;
-          console.log("[Yjs] Document synced. Content length:", currentContent.length, "Language:", currentLang);
+          console.log(
+            "[Yjs] Document synced. Content length:",
+            currentContent.length,
+            "Language:",
+            currentLang
+          );
           if (currentContent.length === 0 && !currentLang) {
             console.log("[Yjs] Seeding default content");
             ydoc.transact(() => {
@@ -363,11 +370,11 @@ function CodeEditorTab({
     // Listen for language changes from other users
     yMap.observe((event) => {
       event.changes.keys.forEach((change, key) => {
-        if (key === "language" && change.action !== 'delete') {
+        if (key === "language" && change.action !== "delete") {
           const newLang = yMap.get("language") as string | undefined;
-          if (newLang) {  
-            console.log("[Yjs] Language changed by peer to:", newLang);  
-            setLanguage(newLang as Language);           
+          if (newLang) {
+            console.log("[Yjs] Language changed by peer to:", newLang);
+            setLanguage(newLang as Language);
             const model = editorRef.current?.getModel();
             if (model) monaco.editor.setModelLanguage(model, newLang);
           }
@@ -415,7 +422,9 @@ function CodeEditorTab({
 
     // Remove previous widget
     if (cursorWidgetRef.current) {
-      try { editor.removeContentWidget(cursorWidgetRef.current); } catch {}
+      try {
+        editor.removeContentWidget(cursorWidgetRef.current);
+      } catch {}
       cursorWidgetRef.current = null;
     }
 
@@ -428,7 +437,10 @@ function CodeEditorTab({
       getId: () => "remoteCursorWidget",
       getDomNode: () => domNode,
       getPosition: () => ({
-        position: { lineNumber: remoteCursor.lineNumber, column: remoteCursor.column },
+        position: {
+          lineNumber: remoteCursor.lineNumber,
+          column: remoteCursor.column,
+        },
         preference: [
           monaco.editor.ContentWidgetPositionPreference.ABOVE,
           monaco.editor.ContentWidgetPositionPreference.BELOW,
@@ -464,7 +476,9 @@ function CodeEditorTab({
       .map((tc) => {
         const raw = tc.input !== undefined ? tc.input : tc.args;
         const normalized = Array.isArray(raw)
-          ? (paramNames.length <= 1 ? raw[0] : raw)
+          ? paramNames.length <= 1
+            ? raw[0]
+            : raw
           : raw;
         return { ...tc, input: normalized };
       });
@@ -505,7 +519,9 @@ function CodeEditorTab({
       const toSubmit = testCases.map((tc) => {
         const raw = tc.input !== undefined ? tc.input : tc.args;
         const normalized = Array.isArray(raw)
-          ? (paramNames.length <= 1 ? raw[0] : raw)
+          ? paramNames.length <= 1
+            ? raw[0]
+            : raw
           : raw;
         return { ...tc, input: normalized };
       });
@@ -554,7 +570,11 @@ function CodeEditorTab({
       toast.error("Editor not ready yet");
       return;
     }
-    if (!window.confirm("Are you sure you want to clear all code? This will affect both users.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to clear all code? This will affect both users."
+      )
+    ) {
       return;
     }
     console.log("[Clear] Clearing shared document");
@@ -618,7 +638,9 @@ function CodeEditorTab({
     }
     return (
       <div className="text-sm text-slate-600 dark:text-zinc-300 mb-1">
-        <code>{typeof val === "string" ? `"${val}"` : JSON.stringify(val)}</code>
+        <code>
+          {typeof val === "string" ? `"${val}"` : JSON.stringify(val)}
+        </code>
       </div>
     );
   };
@@ -628,9 +650,25 @@ function CodeEditorTab({
       {/* Connection status */}
       {!isYjsReady && (
         <div className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-2">
-          <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+          <svg
+            className="animate-spin h-4 w-4"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+            />
           </svg>
           Connecting to collaboration server...
         </div>
@@ -685,7 +723,9 @@ function CodeEditorTab({
       {activeTab === "editor" && (
         <div className="mt-3 rounded-xl border bg-white dark:bg-zinc-900 dark:border-zinc-800 overflow-hidden transition-all duration-300">
           <div className="flex justify-between items-center px-4 py-2">
-            <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">Test Cases</h3>
+            <h3 className="text-sm font-medium text-slate-800 dark:text-zinc-100">
+              Test Cases
+            </h3>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setActiveTab("console")}
@@ -720,7 +760,8 @@ function CodeEditorTab({
                       : "min-w-[220px] flex-shrink-0 rounded-xl p-3 shadow-sm bg-red-50 dark:bg-transparent border border-red-400 dark:border-red-500";
                   }
 
-                  const rawDisplay = tc.input !== undefined ? tc.input : tc.args;
+                  const rawDisplay =
+                    tc.input !== undefined ? tc.input : tc.args;
                   const displayInput = toParamMap(rawDisplay);
 
                   return (
@@ -738,9 +779,9 @@ function CodeEditorTab({
                         <div className="text-sm text-slate-700 dark:text-zinc-200 mb-1">
                           Output:{" "}
                           <code>
-                            {(runResults[idx] !== undefined &&
-                              runResults[idx].output !== undefined &&
-                              runResults[idx].output !== null)
+                            {runResults[idx] !== undefined &&
+                            runResults[idx].output !== undefined &&
+                            runResults[idx].output !== null
                               ? JSON.stringify(runResults[idx].output)
                               : "No output"}
                           </code>
@@ -803,7 +844,9 @@ function CodeEditorTab({
       {activeTab === "console" && (
         <div className="rounded-xl border bg-white p-4 shadow-sm flex flex-col gap-4 max-h-[400px] overflow-auto dark:bg-zinc-900 dark:border-zinc-800">
           <div className="flex justify-between items-center">
-            <div className="font-semibold text-slate-800 dark:text-zinc-100">Console</div>
+            <div className="font-semibold text-slate-800 dark:text-zinc-100">
+              Console
+            </div>
             <button
               onClick={() => setActiveTab("editor")}
               className="text-sm px-3 py-1 rounded border shadow-sm hover:bg-slate-50 transition dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-800"
@@ -897,24 +940,38 @@ function SessionTimer({ startedAt }: { startedAt: string | Date | null }) {
       const diff = Math.floor((now - startTime) / 1000);
       setElapsed(diff);
     }, 1000);
-  return () => clearInterval(interval);
+    return () => clearInterval(interval);
   }, [startedAt]);
 
   const formatTime = (seconds: number) => {
-    const h = Math.floor(seconds / 3600).toString().padStart(2, "0");
-    const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
+    const h = Math.floor(seconds / 3600)
+      .toString()
+      .padStart(2, "0");
+    const m = Math.floor((seconds % 3600) / 60)
+      .toString()
+      .padStart(2, "0");
     const s = (seconds % 60).toString().padStart(2, "0");
     return `${h}:${m}:${s}`;
   };
 
-  return <div className="text-sm text-gray-500 dark:text-zinc-300">{formatTime(elapsed)}</div>;
+  return (
+    <div className="text-sm text-gray-500 dark:text-zinc-300">
+      {formatTime(elapsed)}
+    </div>
+  );
 }
 
 // Helper: Generate random color for user cursor
 function getRandomColor() {
   const colors = [
-    "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", 
-    "#98D8C8", "#F7DC6F", "#BB8FCE", "#85C1E2"
+    "#FF6B6B",
+    "#4ECDC4",
+    "#45B7D1",
+    "#FFA07A",
+    "#98D8C8",
+    "#F7DC6F",
+    "#BB8FCE",
+    "#85C1E2",
   ];
   return colors[Math.floor(Math.random() * colors.length)];
 }
@@ -958,7 +1015,7 @@ export default function CollaborationPage() {
 
     const fetchSession = async () => {
       try {
-        const data = await api(`/collaboration/${sessionId}`);
+        const data = await api(`/collaboration/collaboration/${sessionId}`);
         if (data.question) {
           setQuestion(data.question);
           setStartedAt(data.startedAt);
@@ -1046,11 +1103,16 @@ export default function CollaborationPage() {
 
     try {
       const currentCode = yTextRef.current ? yTextRef.current.toString() : "";
-      const currentLanguage = yMapRef.current 
-        ? (yMapRef.current.get("language") as Language) || language 
+      const currentLanguage = yMapRef.current
+        ? (yMapRef.current.get("language") as Language) || language
         : language;
 
-      console.log("[Leave] Saving code:", currentCode.length, "chars, language:", currentLanguage);
+      console.log(
+        "[Leave] Saving code:",
+        currentCode.length,
+        "chars, language:",
+        currentLanguage
+      );
 
       socketRef.current?.emit("leave-session", {
         sessionId,
@@ -1084,7 +1146,9 @@ export default function CollaborationPage() {
     <div className="flex h-screen flex-col bg-gray-50 p-4 gap-4 dark:bg-zinc-950">
       {/* Header: title left, timer centered, theme+leave right */}
       <header className="grid grid-cols-3 items-center">
-        <h1 className="text-xl font-bold dark:text-zinc-100 justify-self-start">PeerPrep</h1>
+        <h1 className="text-xl font-bold dark:text-zinc-100 justify-self-start">
+          PeerPrep
+        </h1>
         <div className="justify-self-center">
           <SessionTimer startedAt={startedAt} />
         </div>
@@ -1111,7 +1175,9 @@ export default function CollaborationPage() {
           <div className="flex gap-2 mb-2">
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "editor" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "editor"
+                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
+                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("editor")}
             >
@@ -1119,7 +1185,9 @@ export default function CollaborationPage() {
             </button>
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "chat" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "chat"
+                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
+                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("chat")}
             >
@@ -1127,7 +1195,9 @@ export default function CollaborationPage() {
             </button>
             <button
               className={`px-3 py-1 border rounded ${
-                activeTab === "call" ? "bg-white dark:bg-zinc-900 dark:text-zinc-100" : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
+                activeTab === "call"
+                  ? "bg-white dark:bg-zinc-900 dark:text-zinc-100"
+                  : "bg-gray-200 dark:bg-zinc-800 dark:text-zinc-100"
               }`}
               onClick={() => setActiveTab("call")}
             >
@@ -1141,7 +1211,9 @@ export default function CollaborationPage() {
                 language={language}
                 setLanguage={setLanguage}
                 testCases={question.testCases}
-                paramNames={question.signature?.params?.map((p: any) => p.name) || []}
+                paramNames={
+                  question.signature?.params?.map((p: any) => p.name) || []
+                }
                 socketRef={socketRef}
                 sessionId={sessionId}
                 currentUsername={currentUsername}
@@ -1150,7 +1222,7 @@ export default function CollaborationPage() {
                 onErrorChange={setLatestError}
                 sethasSubmitted={sethasSubmitted}
                 yTextRef={yTextRef}
-                yMapRef={yMapRef} 
+                yMapRef={yMapRef}
               />
             )}
             {activeTab === "chat" && (
