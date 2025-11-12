@@ -1,4 +1,4 @@
-# services/user/Dockerfile
+# Dockerfile
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
@@ -9,9 +9,11 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# App uses port 3004 inside the container
-ENV PORT=3004
-EXPOSE 3004
-# Health check for /health
-HEALTHCHECK --interval=10s --timeout=3s --retries=3 CMD wget -qO- http://127.0.0.1:3004/health || exit 1
+
+ENV PORT=8080
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:8080/health || exit 1
+
 CMD ["npm", "start"]

@@ -3,11 +3,13 @@ export async function startMatchApi(body: {
   difficulty: string;
   topics: string[];
 }) {
+  console.log(body);
   const response = await fetch(`${import.meta.env.VITE_API_URL}/matching/`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  console.log(response);
   const data = await response.json();
   return { response: response, data: data };
 }
