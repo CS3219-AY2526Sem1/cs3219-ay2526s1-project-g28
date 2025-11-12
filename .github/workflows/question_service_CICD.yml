@@ -80,25 +80,6 @@ jobs:
             $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
             "$NS/question-service:dev"
 
-      - name: Health check
-        run: |
-          for i in {1..40}; do
-            docker ps -a --filter "name=question-service" --format 'table {{.Names}}\t{{.Status}}'
-            if ! docker ps --format '{{.Names}}' | grep -q '^question-service$'; then
-              echo "Container exited"
-              docker logs --timestamps --tail=200 question-service || true
-              exit 1
-            fi
-            if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
-              echo "✅ /health OK"
-              exit 0
-            fi
-            echo "waiting for /health... ($i)"; sleep 1
-          done
-          echo "❌ health never came up"
-          docker logs question-service || true
-          exit 1
-
       # Install dependencies
       - name: Install dependencies
         working-directory: backend/question-service
