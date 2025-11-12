@@ -2,6 +2,75 @@
   "AWSTemplateFormatVersion": "2010-09-09",
   "Description": "The AWS CloudFormation template for this Serverless application",
   "Resources": {
+    "ServerlessDeploymentBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ServerlessDeploymentBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "ServerlessDeploymentBucket"
+        },
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Action": "s3:*",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      },
+                      "/*"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:",
+                      {
+                        "Ref": "AWS::Partition"
+                      },
+                      ":s3:::",
+                      {
+                        "Ref": "ServerlessDeploymentBucket"
+                      }
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
     "QuesitonLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
@@ -90,8 +159,10 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": "serverless-framework-deployments-ap-southeast-1-3a8834ab-0f35",
-          "S3Key": "serverless/question-service/prod/1762924262548-2025-11-12T05:11:02.548Z/question-service.zip"
+          "S3Bucket": {
+            "Ref": "ServerlessDeploymentBucket"
+          },
+          "S3Key": "serverless/question-service/prod/1762975407374-2025-11-12T19:23:27.374Z/question-service.zip"
         },
         "Handler": "lambda.handler",
         "Runtime": "nodejs20.x",
@@ -110,7 +181,8 @@
             "KAFKA_PASSWORD": "cfltWeFQnAErGZaU5voScbhQLWN3MIxJ6Cx2e61nSSFm9ehBOEPtcsfTIXTDS5tQ",
             "CLOUDINARY_CLOUD_NAME": "dyizbfggo",
             "CLOUDINARY_API_KEY": "783516565847746",
-            "CLOUDINARY_API_SECRET": "OcUjRj5dZYs58DhdklQx_RpOw9g"
+            "CLOUDINARY_API_SECRET": "OcUjRj5dZYs58DhdklQx_RpOw9g",
+            "API_GATEWAY_URL": "OcUjRj5dZYs58DhdklQx_RpOw9g"
           }
         },
         "Role": {
@@ -124,14 +196,14 @@
         "QuesitonLogGroup"
       ]
     },
-    "QuesitonLambdaVersionOeCHRiaGb95QtetPBw4L8v35SlRi5LH0sOvsL7ksM": {
+    "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "QuesitonLambdaFunction"
         },
-        "CodeSha256": "BFRbweeENageHYYvdreZtn6bOzuwANMClPQlXcftiBM="
+        "CodeSha256": "kx3W9E966g2003S67Ni0nSDPR+P02LBXp0OIaWsoaCI="
       }
     },
     "HttpApi": {
@@ -232,7 +304,9 @@
   },
   "Outputs": {
     "ServerlessDeploymentBucketName": {
-      "Value": "serverless-framework-deployments-ap-southeast-1-3a8834ab-0f35",
+      "Value": {
+        "Ref": "ServerlessDeploymentBucket"
+      },
       "Export": {
         "Name": "sls-question-service-prod-ServerlessDeploymentBucketName"
       }
@@ -240,7 +314,7 @@
     "QuesitonLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "QuesitonLambdaVersionOeCHRiaGb95QtetPBw4L8v35SlRi5LH0sOvsL7ksM"
+        "Ref": "QuesitonLambdaVersionycRkd4TTj9mtU0lVDqykYptU2h4QNS5z2rvbjm94N4"
       },
       "Export": {
         "Name": "sls-question-service-prod-QuesitonLambdaFunctionQualifiedArn"
