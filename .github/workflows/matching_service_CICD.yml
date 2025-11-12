@@ -2,6 +2,8 @@ name: CI + CD (matching-service)
 
 on:
   push:
+    branches:
+      - master
   workflow_dispatch: {} # allow manual trigger too
 
 concurrency:
