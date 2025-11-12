@@ -95,7 +95,7 @@ jobs:
             echo "waiting for /health... ($i)"; sleep 1
           done
           echo "❌ health never came up"
-          docker logs user-service || true
+          docker logs ai-service || true
           exit 1
 
       - name: Install dependencies
