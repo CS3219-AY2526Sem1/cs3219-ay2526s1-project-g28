@@ -6,7 +6,6 @@ export type ApiOptions = {
 export async function api(path: string, opts: ApiOptions = {}) {
   const base = import.meta.env.VITE_API_URL;
   const token = localStorage.getItem("token");
-
   const res = await fetch(`${base}${path}`, {
     method: opts.method ?? "GET",
     headers: {

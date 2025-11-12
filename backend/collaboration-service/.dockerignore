@@ -9,3 +9,6 @@ coverage
 dist
 build
 .serverless
+.gitignore
+Dockerfile
+Dockerfile.dev

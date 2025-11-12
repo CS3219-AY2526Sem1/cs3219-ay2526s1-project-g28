@@ -38,7 +38,8 @@ interface HistoryDetailDto {
   hasSubmitted?: boolean;
 }
 
-const COLLAB_SERVICE_URL = "http://localhost:3004";
+const COLLAB_SERVICE_URL =
+  "https://qp8he0nic9.execute-api.ap-southeast-1.amazonaws.com";
 
 function StatusBadge({
   status,
@@ -172,9 +173,13 @@ export default function HistoryDetail() {
       setLoading(true);
       setError(null);
       try {
-        let res = await fetch(`${COLLAB_SERVICE_URL}/history/${id}`);
+        let res = await fetch(
+          `${COLLAB_SERVICE_URL}/collaboration/history/${id}`
+        );
         if (!res.ok) {
-          res = await fetch(`${COLLAB_SERVICE_URL}/collaboration/${id}`);
+          res = await fetch(
+            `${COLLAB_SERVICE_URL}/collaboration/collaboration/${id}`
+          );
         }
         if (!res.ok) throw new Error(`Failed to load session ${id}`);
         const raw = await res.json();
