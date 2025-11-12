@@ -1,0 +1,133 @@
+name: CI + CD (question-service)
+
+on:
+  push:
+    branches:
+      - "**" # run on all branches
+  workflow_dispatch: {} # allow manual trigger too
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  question-service:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout
+      - uses: actions/checkout@v4
+
+      # Build Docker image (for local health check)
+      - name: Build image
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker build -t "$NS/question-service:dev" \
+            -f backend/question-service/Dockerfile \
+            backend/question-service
+
+      # Authenticate to Google Cloud
+      - name: Auth to Google
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Fetch dotenv secret from Google Secret Manager
+      - id: sm
+        uses: google-github-actions/get-secretmanager-secrets@v2
+        with:
+          secrets: |
+            DOTENV:projects/${{ secrets.GCP_PROJECT_ID }}/secrets/question-service-env/versions/latest
+
+      # Export GSM secrets to environment
+      - name: Export GSM secrets
+        run: |
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' >> $GITHUB_ENV
+
+      # Dynamically confirm GSM environment variable lengths
+      - name: Confirm all GSM env string lengths
+        run: |
+          echo "🔍 Checking all environment variables loaded from GSM..."
+          # Extract key names from the GSM payload and test them dynamically
+          echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sort | while read -r key; do
+            value=$(printenv "$key" || true)
+            if [ -z "$value" ]; then
+              echo "$key: MISSING"
+            else
+              echo "$key len:${#value}"
+            fi
+          done
+
+      # Start Mongo if using local DB
+      - name: Start Mongo if needed
+        run: |
+          if echo "${DB_LOCAL_URI}" | grep -q "mongodb://host.docker.internal"; then
+            docker run -d --name mongo -p 27017:27017 mongo:7
+            for i in {1..40}; do
+              docker exec mongo mongosh --quiet --eval "db.adminCommand({ ping: 1 })" && break
+              echo "waiting for Mongo... ($i)"; sleep 1
+            done
+          else
+            echo "External DB configured; not starting local Mongo."
+          fi
+
+      # Run container for health check
+      - name: Run question-service container
+        run: |
+          NS="${{ secrets.DOCKER_HUB_USERNAME }}"
+          docker run -d --name question-service \
+            -p 3002:3002 \
+            $(echo "${{ steps.sm.outputs.DOTENV }}" | grep '=' | cut -d'=' -f1 | sed 's/^/-e /' | tr '\n' ' ') \
+            "$NS/question-service:dev"
+
+      - name: Health check
+        run: |
+          for i in {1..40}; do
+            docker ps -a --filter "name=question-service" --format 'table {{.Names}}\t{{.Status}}'
+            if ! docker ps --format '{{.Names}}' | grep -q '^question-service$'; then
+              echo "Container exited"
+              docker logs --timestamps --tail=200 question-service || true
+              exit 1
+            fi
+            if curl -fsS http://127.0.0.1:3002/health >/dev/null; then
+              echo "✅ /health OK"
+              exit 0
+            fi
+            echo "waiting for /health... ($i)"; sleep 1
+          done
+          echo "❌ health never came up"
+          docker logs question-service || true
+          exit 1
+
+      - name: Install dependencies
+        working-directory: backend/question-service
+        run: npm ci --omit=dev
+
+      # Deploy to AWS Lambda with Serverless
+      - name: Deploy to AWS Lambda
+        working-directory: backend/question-service
+        run: |
+          npm install -g serverless@3
+          npx serverless deploy --stage prod --region ap-southeast-1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID_XZ }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY_XZ }}
+
+      # Logs (always show)
+      - name: Logs (always)
+        if: always()
+        run: |
+          echo "----- question-service logs -----"
+          docker logs --timestamps --tail=150 question-service || true
+          echo "----- mongo logs -----"
+          docker logs --timestamps --tail=80 mongo || true
+
+      # Cleanup
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f question-service || true
+          docker rm -f mongo || true
