@@ -10,7 +10,7 @@ interface PContentProps {
 
 const ALL_TOPICS = [
   "Strings",
-  "Linked Lists",
+  "Linked List",
   "Dynamic Programming",
   "Heaps",
   "Hashmap",
