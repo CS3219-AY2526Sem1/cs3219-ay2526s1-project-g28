@@ -16,7 +16,7 @@ const HomePage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = !!user?.isAdmin;
-
+  const GATEWAY_URL = import.meta.env.VITE_API_URL;
   const {
     pendingMatch,
     countdown,
@@ -44,11 +44,12 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const checkActiveSession = async () => {
       const sessionId = localStorage.getItem("activeSessionId");
+      console.log(sessionId)
       if (!sessionId || !user?.username) return;
 
       try {
         const res = await fetch(
-          `http://localhost:3004/collaboration/${sessionId}`
+          `${GATEWAY_URL}/collaboration/collaboration/${sessionId}`
         );
         if (!res.ok) {
           console.warn("Session fetch failed:", res.status);
