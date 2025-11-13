@@ -1,3 +1,3 @@
 export const NOTIFICATION_SERVICE_URL =
-  "http://notification-prod.eba-pidmimwp.ap-southeast-1.elasticbeanstalk.com/";
+  "https://d3lspwis800qk7.cloudfront.net/";
 export const DEFAULT_COUNTDOWN = 10;

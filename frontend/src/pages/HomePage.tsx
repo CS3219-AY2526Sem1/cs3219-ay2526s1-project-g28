@@ -7,6 +7,7 @@ import PContent from "../components/matching/PContent";
 import { cancelMatchApi } from "../lib/services/matchingService";
 import { useNavigate } from "react-router-dom";
 import { theme } from "../theme";
+import { api } from "@/lib/api";
 
 const HomePage: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -157,9 +158,7 @@ const HomePage: React.FC = () => {
             }}
           >
             <div className="flex items-start justify-between">
-              <h2 className="text-xl font-semibold m-0">
-                Match Found!
-              </h2>
+              <h2 className="text-xl font-semibold m-0">Match Found!</h2>
               <span
                 className="inline-flex items-center justify-center min-w-[3rem] px-2 py-1 rounded-lg text-sm font-semibold"
                 style={{
@@ -172,7 +171,10 @@ const HomePage: React.FC = () => {
               </span>
             </div>
 
-            <p className="mt-4 min-h-[24px]" style={{ color: theme.textSecondary }}>
+            <p
+              className="mt-4 min-h-[24px]"
+              style={{ color: theme.textSecondary }}
+            >
               {modalMessage}
             </p>
 
@@ -186,7 +188,7 @@ const HomePage: React.FC = () => {
                     color: theme.textPrimary,
                     border: `1px solid ${theme.border}`,
                   }}
-                  >
+                >
                   Decline
                 </button>
                 <button
