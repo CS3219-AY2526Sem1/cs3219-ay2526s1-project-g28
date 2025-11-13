@@ -34,6 +34,40 @@ function baseUsername(displayName, email, fallback = "user") {
     .slice(0, 20);
   return raw || "user";
 }
+async function fetchGithubEmailWithToken(accessToken) {
+  if (!accessToken) return null;
+
+  try {
+    const response = await fetch("https://api.github.com/user/emails", {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${accessToken}`,
+        "User-Agent": "peerprep-user-service",
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(
+        `GitHub email lookup failed with status ${response.status}`
+      );
+      return null;
+    }
+
+    const emails = await response.json();
+    if (!Array.isArray(emails)) return null;
+
+    const pick =
+      emails.find((e) => e.primary && e.verified) ||
+      emails.find((e) => e.primary) ||
+      emails.find((e) => e.verified) ||
+      emails[0];
+
+    return pick?.email || null;
+  } catch (err) {
+    console.error("Failed to fetch GitHub emails", err);
+    return null;
+  }
+}
 
 /* ========== Local email/password login (unchanged) ========== */
 export async function handleLogin(req, res) {
@@ -306,8 +340,12 @@ export const githubCallback = async (req, res) => {
   // Choose a verified (or first) email if available
   const emails = req.user.emails || [];
   const verified = emails.find((e) => e.verified) || emails[0];
-  const email = verified?.value || null;
 
+  let email = verified?.value || null;
+
+  if (!email) {
+    email = await fetchGithubEmailWithToken(req.user?._accessToken);
+  }
   try {
     let user = await findUserByProviderId(provider, providerId);
 
