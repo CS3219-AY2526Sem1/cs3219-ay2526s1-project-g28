@@ -45,11 +45,13 @@ const HomePage: React.FC = () => {
   useEffect(() => {
     const checkActiveSession = async () => {
       const sessionId = localStorage.getItem("activeSessionId");
+      console.log(sessionId)
       if (!sessionId || !user?.username) return;
 
       try {
-        const res = await api(`/collaboration/collaboration/${sessionId}`);
-        console.log(res);
+        const res = await fetch(
+          `${GATEWAY_URL}/collaboration/collaboration/${sessionId}`
+        );
         if (!res.ok) {
           console.warn("Session fetch failed:", res.status);
           return;
