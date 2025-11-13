@@ -48,14 +48,8 @@ const HomePage: React.FC = () => {
       if (!sessionId || !user?.username) return;
 
       try {
-<<<<<<< Updated upstream
         const res = await api(`/collaboration/collaboration/${sessionId}`);
         console.log(res);
-=======
-        const res = await fetch(
-          `${GATEWAY_URL}/collaboration/collaboration/${sessionId}`
-        );
->>>>>>> Stashed changes
         if (!res.ok) {
           console.warn("Session fetch failed:", res.status);
           return;
