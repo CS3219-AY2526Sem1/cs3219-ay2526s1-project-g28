@@ -17,7 +17,7 @@ const HomePage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const isAdmin = !!user?.isAdmin;
-
+  const GATEWAY_URL = import.meta.env.VITE_API_URL;
   const {
     pendingMatch,
     countdown,
@@ -48,8 +48,14 @@ const HomePage: React.FC = () => {
       if (!sessionId || !user?.username) return;
 
       try {
+<<<<<<< Updated upstream
         const res = await api(`/collaboration/collaboration/${sessionId}`);
         console.log(res);
+=======
+        const res = await fetch(
+          `${GATEWAY_URL}/collaboration/collaboration/${sessionId}`
+        );
+>>>>>>> Stashed changes
         if (!res.ok) {
           console.warn("Session fetch failed:", res.status);
           return;
