@@ -4,7 +4,7 @@ type Props = {
   labelPrefix?: string; // e.g. "Sign up" vs "Continue"
 };
 
-const API_BASE = import.meta.env.VITE_API_ORIGIN || "http://localhost:3001";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export default function OAuthButtons({ className = "", labelPrefix = "Continue" }: Props) {
   const go = (path: string) => {
