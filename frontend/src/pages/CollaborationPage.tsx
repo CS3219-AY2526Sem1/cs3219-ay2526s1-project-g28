@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
 const YJS_WEBSOCKET_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL;
+const NOTIFICATION_URL = import.meta.env.VITE_NOTI_WEBSOCKET_URL;
 
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
@@ -1043,7 +1044,7 @@ export default function CollaborationPage() {
   useEffect(() => {
     if (!sessionId || socketRef.current || !currentUsername) return;
 
-    const socket = io(GATEWAY_URL, {
+    const socket = io(NOTIFICATION_URL, {
       path: "/socket.io",
       transports: ["polling", "websocket"],
       reconnection: true,
