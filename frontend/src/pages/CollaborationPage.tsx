@@ -12,10 +12,11 @@ import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { api } from "../lib/api";
 import toast from "react-hot-toast";
+import { NOTIFICATION_SERVICE_URL } from "@/hooks/useSocket/constants";
 
 const GATEWAY_URL = import.meta.env.VITE_API_URL;
 const YJS_WEBSOCKET_URL = import.meta.env.VITE_YJS_WEBSOCKET_URL;
-
+const COLLAB_WEBSOCKET_URL = import.meta.env.VITE_COLLAB_WEBSOCKET_URL;
 type Difficulty = "Easy" | "Medium" | "Hard";
 type TabKey = "editor" | "chat" | "call";
 type Language = "python" | "javascript" | "java";
@@ -1043,7 +1044,7 @@ export default function CollaborationPage() {
   useEffect(() => {
     if (!sessionId || socketRef.current || !currentUsername) return;
 
-    const socket = io(GATEWAY_URL, {
+    const socket = io(COLLAB_WEBSOCKET_URL, {
       path: "/socket.io",
       transports: ["polling", "websocket"],
       reconnection: true,
